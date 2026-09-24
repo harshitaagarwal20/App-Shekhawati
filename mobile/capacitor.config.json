@@ -1,0 +1,12 @@
+{
+  "appId": "com.shekhawatiimpex.erp",
+  "appName": "Shekhawati ERP",
+  "webDir": "www",
+  "server": {
+    "url": "https://yellow-river-02ae19400.4.azurestaticapps.net",
+    "cleartext": false
+  },
+  "android": {
+    "allowMixedContent": false
+  }
+}

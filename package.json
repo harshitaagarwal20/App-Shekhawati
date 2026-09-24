@@ -1,0 +1,38 @@
+{
+  "name": "shekhawati-impex-erp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shekhawati Impex ERP - Jaipur bag/tote export manufacturing. Masters -> Buyer Order -> ... -> Cutting Issue.",
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "db:generate": "npm --workspace server run db:generate",
+    "db:migrate": "npm --workspace server run db:migrate",
+    "db:reset": "npm --workspace server run db:reset",
+    "db:seed": "npm --workspace server run db:seed",
+    "db:studio": "npm --workspace server run db:studio",
+    "db:setup": "npm --workspace server run db:setup",
+    "verify": "npm --workspace server run verify",
+    "dev": "concurrently -n server,client -c blue,green -k --handle-input npm:dev:server npm:dev:client",
+    "dev:server": "npm run dev --workspace server",
+    "dev:client": "npm run dev --workspace client",
+    "build": "npm run build --workspace client",
+    "lint": "eslint server/src server/prisma server/test client/src",
+    "test": "npm --workspace server run test",
+    "test:rules": "npm --workspace server run test:rules"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.18.0",
+    "concurrently": "^10.0.5",
+    "eslint": "^9.18.0",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "playwright": "^1.63.0"
+  },
+  "type": "module"
+}

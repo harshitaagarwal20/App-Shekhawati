@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-ChildItem -Path \".\" -Directory | Where-Object { $_.Name -ne \"node_modules\" } | Select-Object Name; Write-Output \"--- ROOT FILES ---\"; Get-ChildItem -Path \".\" -File | Select-Object Name)"
+    ]
+  }
+}

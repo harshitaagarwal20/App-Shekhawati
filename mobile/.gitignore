@@ -1,0 +1,4 @@
+node_modules/
+# Signing secrets - back these up somewhere safe, never share publicly
+keystore.properties
+*.jks

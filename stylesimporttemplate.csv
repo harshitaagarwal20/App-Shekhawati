@@ -1,0 +1,471 @@
+﻿Style No,Style Description,Buyer Code,Category,Fabric Content,Color,Avg Fabric Utilization / Pc,Utilization UOM,Size Group,Qty per Ctn,Remarks,Status
+TP-0007-008,CANVAS L-SHAPED ZIPPER FLAT POUCH(S) - Natural,TWA#,Pouch,100% Cotton,Natural,0.0525,Mtrs,Small,200,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TP-0007-009,CANVAS L-SHAPED ZIPPER FLAT POUCH(S) - Black,TWA#,Pouch,100% Cotton,Black,0.0575,Mtrs,Small,200,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TP-0007-010,CANVAS L-SHAPED ZIPPER FLAT POUCH(S) - Mustard,TWA#,Pouch,100% Cotton,Mustard,0.0575,Mtrs,Small,200,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TP-0007-013,CANVAS L-SHAPED ZIPPER FLAT POUCH(S) - Purple,TWA#,Pouch,100% Cotton,Purple,0.0575,Mtrs,Small,200,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TP-0007-038,CANVAS L-SHAPED ZIPPER FLAT POUCH(S) - Smoke Blue,TWA#,Pouch,100% Cotton,Smoke Blue,0.0575,Mtrs,Small,200,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TP-0007-040,CANVAS L-SHAPED ZIPPER FLAT POUCH(S) - Smoke Pink,TWA#,Pouch,100% Cotton,Smoke Pink,0.0575,Mtrs,Small,200,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TP-0007-045,CANVAS L-SHAPED ZIPPER FLAT POUCH(S) - Olive,TWA#,Pouch,100% Cotton,Olive,0.0575,Mtrs,Small,200,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TP-0008-008,CANVAS L-SHAPED ZIPPER FLAT POUCH(M) - Natural,TWA#,Pouch,100% Cotton,Natural,0.0825,Mtrs,Medium,120,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TP-0008-009,CANVAS L-SHAPED ZIPPER FLAT POUCH(M) - Black,TWA#,Pouch,100% Cotton,Black,0.0875,Mtrs,Medium,120,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TP-0008-010,CANVAS L-SHAPED ZIPPER FLAT POUCH(M) - Mustard,TWA#,Pouch,100% Cotton,Mustard,0.0875,Mtrs,Medium,120,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TP-0008-013,CANVAS L-SHAPED ZIPPER FLAT POUCH(M) - Purple,TWA#,Pouch,100% Cotton,Purple,0.0875,Mtrs,Medium,120,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TP-0008-038,CANVAS L-SHAPED ZIPPER FLAT POUCH(M) - Smoke Blue,TWA#,Pouch,100% Cotton,Smoke Blue,0.0875,Mtrs,Medium,120,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TP-0008-040,CANVAS L-SHAPED ZIPPER FLAT POUCH(M) - Smoke Pink,TWA#,Pouch,100% Cotton,Smoke Pink,0.0875,Mtrs,Medium,120,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TP-0008-045,CANVAS L-SHAPED ZIPPER FLAT POUCH(M) - Olive,TWA#,Pouch,100% Cotton,Olive,0.0875,Mtrs,Medium,120,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TP-0009-008,CANVAS SQUARE FASTENER POUCH(S) - Natural,TWA#,Pouch,100% Cotton,Natural,0.09,Mtrs,Small,200,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TP-0009-009,CANVAS SQUARE FASTENER POUCH(S) - Black,TWA#,Pouch,100% Cotton,Black,0.1,Mtrs,Small,200,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TP-0009-010,CANVAS SQUARE FASTENER POUCH(S) - Mustard,TWA#,Pouch,100% Cotton,Mustard,0.1,Mtrs,Small,200,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TP-0009-013,CANVAS SQUARE FASTENER POUCH(S) - Purple,TWA#,Pouch,100% Cotton,Purple,0.1,Mtrs,Small,200,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TP-0009-038,CANVAS SQUARE FASTENER POUCH(S) - Smoke Blue,TWA#,Pouch,100% Cotton,Smoke Blue,0.1,Mtrs,Small,200,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TP-0009-040,CANVAS SQUARE FASTENER POUCH(S) - Smoke Pink,TWA#,Pouch,100% Cotton,Smoke Pink,0.1,Mtrs,Small,200,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TP-0009-045,CANVAS SQUARE FASTENER POUCH(S) - Olive,TWA#,Pouch,100% Cotton,Olive,0.1,Mtrs,Small,200,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TP-0010-008,CANVAS SQUARE FASTENER POUCH(M) - Natural,TWA#,Pouch,100% Cotton,Natural,0.125,Mtrs,Medium,160,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TP-0010-009,CANVAS SQUARE FASTENER POUCH(M) - Black,TWA#,Pouch,100% Cotton,Black,0.135,Mtrs,Medium,160,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TP-0010-010,CANVAS SQUARE FASTENER POUCH(M) - Mustard,TWA#,Pouch,100% Cotton,Mustard,0.135,Mtrs,Medium,160,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TP-0010-013,CANVAS SQUARE FASTENER POUCH(M) - Purple,TWA#,Pouch,100% Cotton,Purple,0.135,Mtrs,Medium,160,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TP-0010-038,CANVAS SQUARE FASTENER POUCH(M) - Smoke Blue,TWA#,Pouch,100% Cotton,Smoke Blue,0.135,Mtrs,Medium,160,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TP-0010-040,CANVAS SQUARE FASTENER POUCH(M) - Smoke Pink,TWA#,Pouch,100% Cotton,Smoke Pink,0.135,Mtrs,Medium,160,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TP-0010-045,CANVAS SQUARE FASTENER POUCH(M) - Olive,TWA#,Pouch,100% Cotton,Olive,0.135,Mtrs,Medium,160,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TP-0011-008,CANVAS ROUND TISSUE POUCH - Natural,TWA#,Pouch,100% Cotton,Natural,0.0675,Mtrs,Free Size,300,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TP-0011-009,CANVAS ROUND TISSUE POUCH - Black,TWA#,Pouch,100% Cotton,Black,0.0675,Mtrs,Free Size,300,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TP-0011-010,CANVAS ROUND TISSUE POUCH - Mustard,TWA#,Pouch,100% Cotton,Mustard,0.0675,Mtrs,Free Size,300,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TP-0011-013,CANVAS ROUND TISSUE POUCH - Purple,TWA#,Pouch,100% Cotton,Purple,0.0675,Mtrs,Free Size,300,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TP-0011-038,CANVAS ROUND TISSUE POUCH - Smoke Blue,TWA#,Pouch,100% Cotton,Smoke Blue,0.0675,Mtrs,Free Size,300,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TP-0011-040,CANVAS ROUND TISSUE POUCH - Smoke Pink,TWA#,Pouch,100% Cotton,Smoke Pink,0.0675,Mtrs,Free Size,300,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TP-0011-045,CANVAS ROUND TISSUE POUCH - Olive,TWA#,Pouch,100% Cotton,Olive,0.0675,Mtrs,Free Size,300,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0101-001,Canvas Tote(L) - ROYAL BLUE,TWA#,Tote Bag,100% Cotton,Royal Blue,0.44,Mtrs,Large,50,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0101-002,Canvas Tote(L) - RED,TWA#,Tote Bag,100% Cotton,Red,0.44,Mtrs,Large,50,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0101-006,Canvas Tote(L) - MID NIGHT BLUE,TWA#,Tote Bag,100% Cotton,Mid Night Blue,0.44,Mtrs,Large,50,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0101-008,Canvas Tote(L) - Natural,TWA#,Tote Bag,100% Cotton,Natural,0.435,Mtrs,Large,50,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0101-009,Canvas Tote(L) - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.44,Mtrs,Large,50,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0101-011,Canvas Tote(L) - SKY GRAY,TWA#,Tote Bag,100% Cotton,Sky Gray,0.44,Mtrs,Large,50,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0101-012,Canvas Tote(L) - DARK GREEN,TWA#,Tote Bag,100% Cotton,Dark Green,0.44,Mtrs,Large,50,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0101-025,Canvas Tote(L) - KHAKI,TWA#,Tote Bag,100% Cotton,Khaki,0.44,Mtrs,Large,50,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0101-028,Canvas Tote(L) - SAND GBEIGE,TWA#,Tote Bag,100% Cotton,Sand Gbeige,0.44,Mtrs,Large,50,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0101-044,Canvas Tote(L) - White,TWA#,Tote Bag,100% Cotton,White,0.44,Mtrs,Large,50,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0105-001,Canvas Tote(M) - ROYAL BLUE,TWA#,Tote Bag,100% Cotton,Royal Blue,0.325,Mtrs,Medium,100,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0105-002,Canvas Tote(M) - RED,TWA#,Tote Bag,100% Cotton,Red,0.325,Mtrs,Medium,100,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0105-006,Canvas Tote(M) - MID NIGHT BLUE,TWA#,Tote Bag,100% Cotton,Mid Night Blue,0.325,Mtrs,Medium,100,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0105-008,Canvas Tote(M) - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.305,Mtrs,Medium,100,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0105-009,Canvas Tote(M) - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.325,Mtrs,Medium,100,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0105-011,Canvas Tote(M) - Sky gray,TWA#,Tote Bag,100% Cotton,Sky Gray,0.325,Mtrs,Medium,100,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0105-012,Canvas Tote(M) - DARK GREEN,TWA#,Tote Bag,100% Cotton,Dark Green,0.325,Mtrs,Medium,100,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0105-014,Canvas Tote(M) - WINE RED,TWA#,Tote Bag,100% Cotton,Wine Red,0.325,Mtrs,Medium,100,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0105-025,Canvas Tote(M) - KHAKI,TWA#,Tote Bag,100% Cotton,Khaki,0.325,Mtrs,Medium,100,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0105-028,Canvas Tote(M) - SAND GBEIGE,TWA#,Tote Bag,100% Cotton,Sand Gbeige,0.325,Mtrs,Medium,100,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0105-030,Canvas Tote(M) - PINK,TWA#,Tote Bag,100% Cotton,Pink,0.325,Mtrs,Medium,100,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0105-034,Canvas Tote(M) - LIGHT BLUE,TWA#,Tote Bag,100% Cotton,Light Blue,0.325,Mtrs,Medium,100,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0105-044,Canvas Tote(M) - WHITE,TWA#,Tote Bag,100% Cotton,White,0.325,Mtrs,Medium,100,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0125-001,Canvas Tote(S) - ROYAL BLUE,TWA#,Tote Bag,100% Cotton,Royal Blue,0.1725,Mtrs,Small,200,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0125-002,Canvas Tote(S) - RED,TWA#,Tote Bag,100% Cotton,Red,0.1725,Mtrs,Small,200,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0125-006,Canvas Tote(S) - MID NIGHT BLUE,TWA#,Tote Bag,100% Cotton,Mid Night Blue,0.1725,Mtrs,Small,200,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0125-008,Canvas Tote(S) - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.17,Mtrs,Small,200,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0125-009,Canvas Tote(S) - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.1725,Mtrs,Small,200,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0125-011,Canvas Tote(S) - Sky gray,TWA#,Tote Bag,100% Cotton,Sky Gray,0.1725,Mtrs,Small,200,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0125-012,Canvas Tote(S) - DARK GREEN,TWA#,Tote Bag,100% Cotton,Dark Green,0.1725,Mtrs,Small,200,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0125-014,Canvas Tote(S) - WINE RED,TWA#,Tote Bag,100% Cotton,Wine Red,0.1725,Mtrs,Small,200,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0125-025,Canvas Tote(S) - KHAKI,TWA#,Tote Bag,100% Cotton,Khaki,0.1725,Mtrs,Small,200,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0125-028,Canvas Tote(S) - SAND GBEIGE,TWA#,Tote Bag,100% Cotton,Sand Gbeige,0.1725,Mtrs,Small,200,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0125-030,Canvas Tote(S) - PINK,TWA#,Tote Bag,100% Cotton,Pink,0.1725,Mtrs,Small,200,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0125-034,Canvas Tote(S) - LIGHT BLUE,TWA#,Tote Bag,100% Cotton,Light Blue,0.1725,Mtrs,Small,200,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0125-044,Canvas Tote(S) - White,TWA#,Tote Bag,100% Cotton,White,0.1725,Mtrs,Small,200,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0179-006,Canvas college tote M - MID NIGHT BLUE,TWA#,Tote Bag,100% Cotton,Mid Night Blue,0.29,Mtrs,Medium,100,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0179-009,Canvas college tote M - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.29,Mtrs,Medium,100,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0179-028,Canvas college tote M - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.275,Mtrs,Medium,100,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0180-006,Canvas college tote M wide - MID NIGHT BLUE,TWA#,Tote Bag,100% Cotton,Mid Night Blue,0.29,Mtrs,Medium,100,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0180-009,Canvas college tote M wide - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.29,Mtrs,Medium,100,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0180-028,Canvas college tote M wide - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.275,Mtrs,Medium,100,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0408-006,Canvas W style bag - MID NIGHT BLUE,TWA#,Basic Bag,100% Cotton,Mid Night Blue,0.39,Mtrs,Free Size,50,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0408-008,Canvas W style bag - NATURAL,TWA#,Basic Bag,100% Cotton,Natural,0.365,Mtrs,Free Size,50,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0408-009,Canvas W style bag - NIGHT BLACK,TWA#,Basic Bag,100% Cotton,Night Black,0.39,Mtrs,Free Size,50,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0409-008,Canvas fram tote - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.34,Mtrs,Free Size,100,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0412-008,Canvas College Tote(L) wide - Natural,TWA#,Tote Bag,100% Cotton,Natural,0.43,Mtrs,Large,50,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0516-006,Denim ToteM - INDIGO,TWA#,Tote Bag,100% Cotton,Indigo,0.29,Mtrs,Medium,50,Fabric: 13 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0516-034,Denim ToteM - WASH BLUE,TWA#,Tote Bag,100% Cotton,Wash Blue,0.29,Mtrs,Medium,50,Fabric: 13 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0516-041,Denim ToteM - VINTAGE BLUE,TWA#,Tote Bag,100% Cotton,Vintage Blue,0.29,Mtrs,Medium,50,Fabric: 13 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0577-006,Denim pipe handle tote S - WASH BLUE,TWA#,Tote Bag,100% Cotton,Wash Blue,0.1875,Mtrs,Small,100,Fabric: 13 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0577-036,Denim pipe handle tote S - INDIGO,TWA#,Tote Bag,100% Cotton,Indigo,0.1875,Mtrs,Small,100,Fabric: 13 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0577-041,Denim pipe handle tote S - VINTAGE BLUE,TWA#,Tote Bag,100% Cotton,Vintage Blue,0.1875,Mtrs,Small,100,Fabric: 13 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0578-006,Denim pipe handle tote M - WASH BLUE,TWA#,Tote Bag,100% Cotton,Wash Blue,0.32,Mtrs,Medium,50,Fabric: 13 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0578-036,Denim pipe handle tote M - INDIGO,TWA#,Tote Bag,100% Cotton,Indigo,0.32,Mtrs,Medium,50,Fabric: 13 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0578-041,Denim pipe handle tote M - VINTAGE BLUE,TWA#,Tote Bag,100% Cotton,Vintage Blue,0.32,Mtrs,Medium,50,Fabric: 13 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0640-006,Denim college tote M wide - INDIGO,TWA#,Tote Bag,100% Cotton,Indigo,0.2525,Mtrs,Medium,50,Fabric: 13 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0640-034,Denim college tote M wide - WASH BLUE,TWA#,Tote Bag,100% Cotton,Wash Blue,0.27,Mtrs,Medium,50,Fabric: 13 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0640-041,Denim college tote M wide - VINTAGE BLUE,TWA#,Tote Bag,100% Cotton,Vintage Blue,0.27,Mtrs,Medium,50,Fabric: 13 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0655-006,Denim sholder tote - INDIGO,TWA#,Tote Bag,100% Cotton,Indigo,0.355,Mtrs,Free Size,50,Fabric: 13 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0655-034,Denim sholder tote - WASH BLUE,TWA#,Tote Bag,100% Cotton,Wash Blue,0.355,Mtrs,Free Size,50,Fabric: 13 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0655-041,Denim sholder tote - VINTAGE BLUE,TWA#,Tote Bag,100% Cotton,Vintage Blue,0.355,Mtrs,Free Size,50,Fabric: 13 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0656-006,Denim daily tote - INDIGO,TWA#,Tote Bag,100% Cotton,Indigo,0.3725,Mtrs,Free Size,40,Fabric: 13 OZ Denim; Also uses 9 OZ Denim @ 0.045 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0656-034,Denim daily tote - WASH BLUE,TWA#,Tote Bag,100% Cotton,Wash Blue,0.3925,Mtrs,Free Size,40,Fabric: 13 OZ Denim; Also uses 9 OZ Denim @ 0.045 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0656-041,Denim daily tote - VINTAGE BLUE,TWA#,Tote Bag,100% Cotton,Vintage Blue,0.3925,Mtrs,Free Size,40,Fabric: 13 OZ Denim; Also uses 9 OZ Denim @ 0.045 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0675-008,Canvas outhandle tote L - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.325,Mtrs,Large,50,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0675-009,Canvas outhandle tote L - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.345,Mtrs,Large,50,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0698-002,Canvas Tote(SS) - RED,TWA#,Tote Bag,100% Cotton,Red,0.1525,Mtrs,Free Size,200,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0698-006,Canvas Tote(SS) - MID NIGHT BLUE,TWA#,Tote Bag,100% Cotton,Mid Night Blue,0.1525,Mtrs,Free Size,200,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0698-008,Canvas Tote(SS) - Natural,TWA#,Tote Bag,100% Cotton,Natural,0.1325,Mtrs,Free Size,200,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0698-009,Canvas Tote(SS) - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.1525,Mtrs,Free Size,200,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0698-025,Canvas Tote(SS) - KHAKI,TWA#,Tote Bag,100% Cotton,Khaki,0.1525,Mtrs,Free Size,200,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0698-028,Canvas Tote(SS) - SAND GBEIGE,TWA#,Tote Bag,100% Cotton,Sand Gbeige,0.1525,Mtrs,Free Size,200,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0698-044,Canvas Tote(SS) - WHITE,TWA#,Tote Bag,100% Cotton,White,0.1525,Mtrs,Free Size,200,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0699-001,Canvcas tote (M) - ROYAL BLUE,TWA#,Tote Bag,100% Cotton,Royal Blue,0.245,Mtrs,Medium,100,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0699-002,Canvcas tote (M) - RED,TWA#,Tote Bag,100% Cotton,Red,0.245,Mtrs,Medium,100,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0699-006,Canvcas tote (M) - MID NIGHT BLUE,TWA#,Tote Bag,100% Cotton,Mid Night Blue,0.245,Mtrs,Medium,100,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0699-008,Canvcas tote (M) - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.2325,Mtrs,Medium,100,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0699-009,Canvcas tote (M) - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.2325,Mtrs,Medium,100,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0699-011,Canvcas tote (M) - SKY GRAY,TWA#,Tote Bag,100% Cotton,Sky Gray,0.245,Mtrs,Medium,100,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0699-014,Canvcas tote (M) - WINE RED,TWA#,Tote Bag,100% Cotton,Wine Red,0.245,Mtrs,Medium,100,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0699-025,Canvcas tote (M) - KHAKI,TWA#,Tote Bag,100% Cotton,Khaki,0.245,Mtrs,Medium,100,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0699-028,Canvcas tote (M) - SAND GBEIGE,TWA#,Tote Bag,100% Cotton,Sand Gbeige,0.245,Mtrs,Medium,100,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0699-030,Canvcas tote (M) - PINK,TWA#,Tote Bag,100% Cotton,Pink,0.245,Mtrs,Medium,100,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0699-034,Canvcas tote (M) - LIGHT BLUE,TWA#,Tote Bag,100% Cotton,Light Blue,0.245,Mtrs,Medium,100,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0699-044,Canvcas tote (M) - WHITE,TWA#,Tote Bag,100% Cotton,White,0.245,Mtrs,Medium,100,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0700-001,Canvas Tote(ML) - ROYAL BLUE,TWA#,Tote Bag,100% Cotton,Royal Blue,0.38,Mtrs,Medium,50,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0700-002,Canvas Tote(ML) - RED,TWA#,Tote Bag,100% Cotton,Red,0.38,Mtrs,Medium,50,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0700-006,Canvas Tote(ML) - MID NIGHT BLUE,TWA#,Tote Bag,100% Cotton,Mid Night Blue,0.38,Mtrs,Medium,50,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0700-008,Canvas Tote(ML) - Natural,TWA#,Tote Bag,100% Cotton,Natural,0.35,Mtrs,Medium,50,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0700-009,Canvas Tote(ML) - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.38,Mtrs,Medium,50,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0700-011,Canvas Tote(ML) - SKY GRAY,TWA#,Tote Bag,100% Cotton,Sky Gray,0.38,Mtrs,Medium,50,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0700-012,Canvas Tote(ML) - DARK GREEN,TWA#,Tote Bag,100% Cotton,Dark Green,0.38,Mtrs,Medium,50,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0700-025,Canvas Tote(ML) - KHAKI,TWA#,Tote Bag,100% Cotton,Khaki,0.38,Mtrs,Medium,50,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0700-028,Canvas Tote(ML) - SAND GBEIGE,TWA#,Tote Bag,100% Cotton,Sand Gbeige,0.38,Mtrs,Medium,50,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0700-030,Canvas Tote(ML) - PINK,TWA#,Tote Bag,100% Cotton,Pink,0.38,Mtrs,Medium,50,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0700-034,Canvas Tote(ML) - LIGHT BLUE,TWA#,Tote Bag,100% Cotton,Light Blue,0.38,Mtrs,Medium,50,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0700-044,Canvas Tote(ML) - WHITE,TWA#,Tote Bag,100% Cotton,White,0.38,Mtrs,Medium,50,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0704-006,Denim flat poach S - INDIGO,TWA#,Pouch,100% Cotton,Indigo,0.035,Mtrs,Free Size,300,Fabric: 13 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0704-041,Denim flat poach S - VINTAGE BLUE,TWA#,Pouch,100% Cotton,Vintage Blue,0.035,Mtrs,Free Size,300,Fabric: 13 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0705-006,Denim flat poach M - INDIGO,TWA#,Pouch,100% Cotton,Indigo,0.06,Mtrs,Free Size,200,Fabric: 13 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0705-041,Denim flat poach M - VINTAGE BLUE,TWA#,Pouch,100% Cotton,Vintage Blue,0.06,Mtrs,Free Size,200,Fabric: 13 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0706-006,Denim fastener poach S - INDIGO,TWA#,Pouch,100% Cotton,Indigo,0.041,Mtrs,Free Size,240,Fabric: 13 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0706-041,Denim fastener poach S - VINTAGE BLUE,TWA#,Pouch,100% Cotton,Vintage Blue,0.041,Mtrs,Free Size,240,Fabric: 13 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0707-006,Denim fastener poach M - INDIGO,TWA#,Pouch,100% Cotton,Indigo,0.095,Mtrs,Free Size,150,Fabric: 13 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0707-041,Denim fastener poach M - VINTAGE BLUE,TWA#,Pouch,100% Cotton,Vintage Blue,0.095,Mtrs,Free Size,150,Fabric: 13 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0708-006,Denim basic poach - INDIGO,TWA#,Pouch,100% Cotton,Indigo,0.06,Mtrs,Free Size,240,Fabric: 13 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0708-041,Denim basic poach - VINTAGE BLUE,TWA#,Pouch,100% Cotton,Vintage Blue,0.06,Mtrs,Free Size,240,Fabric: 13 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0748-002,Canvas daily tote(SS) - RED,TWA#,Tote Bag,100% Cotton,Red,0.135,Mtrs,Free Size,200,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0748-003,Canvas daily tote(SS) - ORANGE,TWA#,Tote Bag,100% Cotton,Orange,0.135,Mtrs,Free Size,200,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0748-006,Canvas daily tote(SS) - MID NIGHT BLUE,TWA#,Tote Bag,100% Cotton,Mid Night Blue,0.135,Mtrs,Free Size,200,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0748-009,Canvas daily tote(SS) - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.135,Mtrs,Free Size,200,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0748-011,Canvas daily tote(SS) - SKY GRAY,TWA#,Tote Bag,100% Cotton,Sky Gray,0.135,Mtrs,Free Size,200,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0748-030,Canvas daily tote(SS) - PINK,TWA#,Tote Bag,100% Cotton,Pink,0.135,Mtrs,Free Size,200,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0748-034,Canvas daily tote(SS) - LIGHT BLUE,TWA#,Tote Bag,100% Cotton,Light Blue,0.135,Mtrs,Free Size,200,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0748-041,Canvas daily tote(SS) - TURQUOISE BLUE,TWA#,Tote Bag,100% Cotton,Turquoise Blue,0.135,Mtrs,Free Size,200,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0748-043,Canvas daily tote(SS) - VIVID PINK,TWA#,Tote Bag,100% Cotton,Vivid Pink,0.135,Mtrs,Free Size,200,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0749-002,Canvas daily tote(S) - RED,TWA#,Tote Bag,100% Cotton,Red,0.155,Mtrs,Small,200,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0749-003,Canvas daily tote(S) - ORANGE,TWA#,Tote Bag,100% Cotton,Orange,0.155,Mtrs,Small,200,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0749-006,Canvas daily tote(S) - MID NIGHT BLUE,TWA#,Tote Bag,100% Cotton,Mid Night Blue,0.155,Mtrs,Small,200,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0749-008,Canvas daily tote(S) - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.1375,Mtrs,Small,200,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0749-009,Canvas daily tote(S) - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.155,Mtrs,Small,200,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0749-011,Canvas daily tote(S) - SKY GRAY,TWA#,Tote Bag,100% Cotton,Sky Gray,0.155,Mtrs,Small,200,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0749-030,Canvas daily tote(S) - PINK,TWA#,Tote Bag,100% Cotton,Pink,0.155,Mtrs,Small,200,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0749-034,Canvas daily tote(S) - LIGHT BLUE,TWA#,Tote Bag,100% Cotton,Light Blue,0.155,Mtrs,Small,200,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0749-041,Canvas daily tote(S) - TURQUOISE BLUE,TWA#,Tote Bag,100% Cotton,Turquoise Blue,0.155,Mtrs,Small,200,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0749-043,Canvas daily tote(S) - VIVID PINK,TWA#,Tote Bag,100% Cotton,Vivid Pink,0.155,Mtrs,Small,200,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0750-002,Canvas daily tote(SM) - RED,TWA#,Tote Bag,100% Cotton,Red,0.2025,Mtrs,Free Size,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0750-003,Canvas daily tote(SM) - ORANGE,TWA#,Tote Bag,100% Cotton,Orange,0.2025,Mtrs,Free Size,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0750-006,Canvas daily tote(SM) - MID NIGHT BLUE,TWA#,Tote Bag,100% Cotton,Mid Night Blue,0.2025,Mtrs,Free Size,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0750-009,Canvas daily tote(SM) - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.2025,Mtrs,Free Size,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0750-011,Canvas daily tote(SM) - SKY GRAY,TWA#,Tote Bag,100% Cotton,Sky Gray,0.2025,Mtrs,Free Size,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0750-030,Canvas daily tote(SM) - PINK,TWA#,Tote Bag,100% Cotton,Pink,0.2025,Mtrs,Free Size,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0750-034,Canvas daily tote(SM) - LIGHT BLUE,TWA#,Tote Bag,100% Cotton,Light Blue,0.2025,Mtrs,Free Size,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0750-041,Canvas daily tote(SM) - TURQUOISE BLUE,TWA#,Tote Bag,100% Cotton,Turquoise Blue,0.2025,Mtrs,Free Size,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0750-043,Canvas daily tote(SM) - VIVID PINK,TWA#,Tote Bag,100% Cotton,Vivid Pink,0.2025,Mtrs,Free Size,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0751-002,Canvas daily tote(M) - RED,TWA#,Tote Bag,100% Cotton,Red,0.3125,Mtrs,Medium,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0751-003,Canvas daily tote(M) - ORANGE,TWA#,Tote Bag,100% Cotton,Orange,0.3125,Mtrs,Medium,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0751-006,Canvas daily tote(M) - MID NIGHT BLUE,TWA#,Tote Bag,100% Cotton,Mid Night Blue,0.3125,Mtrs,Medium,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0751-008,Canvas daily tote(M) - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.285,Mtrs,Medium,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0751-009,Canvas daily tote(M) - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.3125,Mtrs,Medium,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0751-011,Canvas daily tote(M) - SKY GRAY,TWA#,Tote Bag,100% Cotton,Sky Gray,0.3125,Mtrs,Medium,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0751-030,Canvas daily tote(M) - PINK,TWA#,Tote Bag,100% Cotton,Pink,0.3125,Mtrs,Medium,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0751-034,Canvas daily tote(M) - LIGHT BLUE,TWA#,Tote Bag,100% Cotton,Light Blue,0.3125,Mtrs,Medium,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0751-041,Canvas daily tote(M) - TURQUOISE BLUE,TWA#,Tote Bag,100% Cotton,Turquoise Blue,0.3125,Mtrs,Medium,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0751-043,Canvas daily tote(M) - VIVID PINK,TWA#,Tote Bag,100% Cotton,Vivid Pink,0.3125,Mtrs,Medium,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0752-002,Canvas daily tote(ML) - RED,TWA#,Tote Bag,100% Cotton,Red,0.36,Mtrs,Medium,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0752-003,Canvas daily tote(ML) - ORANGE,TWA#,Tote Bag,100% Cotton,Orange,0.36,Mtrs,Medium,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0752-006,Canvas daily tote(ML) - MID NIGHT BLUE,TWA#,Tote Bag,100% Cotton,Mid Night Blue,0.36,Mtrs,Medium,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0752-008,Canvas daily tote(ML) - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.3425,Mtrs,Medium,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0752-009,Canvas daily tote(ML) - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.36,Mtrs,Medium,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0752-011,Canvas daily tote(ML) - SKY GRAY,TWA#,Tote Bag,100% Cotton,Sky Gray,0.36,Mtrs,Medium,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0752-030,Canvas daily tote(ML) - PINK,TWA#,Tote Bag,100% Cotton,Pink,0.36,Mtrs,Medium,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0752-034,Canvas daily tote(ML) - LIGHT BLUE,TWA#,Tote Bag,100% Cotton,Light Blue,0.36,Mtrs,Medium,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0752-041,Canvas daily tote(ML) - TURQUOISE BLUE,TWA#,Tote Bag,100% Cotton,Turquoise Blue,0.36,Mtrs,Medium,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0752-043,Canvas daily tote(ML) - VIVID PINK,TWA#,Tote Bag,100% Cotton,Vivid Pink,0.36,Mtrs,Medium,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0753-002,Canvas daily tote(L) - RED,TWA#,Tote Bag,100% Cotton,Red,0.405,Mtrs,Large,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0753-003,Canvas daily tote(L) - ORANGE,TWA#,Tote Bag,100% Cotton,Orange,0.405,Mtrs,Large,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0753-006,Canvas daily tote(L) - MID NIGHT BLUE,TWA#,Tote Bag,100% Cotton,Mid Night Blue,0.405,Mtrs,Large,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0753-008,Canvas daily tote(L) - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.39,Mtrs,Large,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0753-009,Canvas daily tote(L) - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.405,Mtrs,Large,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0753-011,Canvas daily tote(L) - SKY GRAY,TWA#,Tote Bag,100% Cotton,Sky Gray,0.405,Mtrs,Large,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0753-030,Canvas daily tote(L) - PINK,TWA#,Tote Bag,100% Cotton,Pink,0.405,Mtrs,Large,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0753-034,Canvas daily tote(L) - LIGHT BLUE,TWA#,Tote Bag,100% Cotton,Light Blue,0.405,Mtrs,Large,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0753-041,Canvas daily tote(L) - TURQUOISE BLUE,TWA#,Tote Bag,100% Cotton,Turquoise Blue,0.405,Mtrs,Large,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0753-043,Canvas daily tote(L) - VIVID PINK,TWA#,Tote Bag,100% Cotton,Vivid Pink,0.405,Mtrs,Large,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0756-006,Light denim bag(L) - INDIGO,TWA#,Basic Bag,100% Cotton,Indigo,0.26,Mtrs,Large,100,Fabric: 9 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0756-034,Light denim bag(L) - WASH BLUE,TWA#,Basic Bag,100% Cotton,Wash Blue,0.29,Mtrs,Large,100,Fabric: 9 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0756-041,LIGHT DENIM BAG(L) - VINTAGE BLUE,TWA#,Basic Bag,100% Cotton,Vintage Blue,0.29,Mtrs,Large,100,Fabric: 9 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0769-009,CANVAS COOLER TOTE(S) - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.195,Mtrs,Small,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0770-009,CANVAS COOLER TOTE(M) - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.325,Mtrs,Medium,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0789-002,CANVAS BELT LINE TOTE - RED,TWA#,Tote Bag,100% Cotton,Red,0.385,Mtrs,Free Size,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0789-003,CANVAS BELT LINE TOTE - ORANGE,TWA#,Tote Bag,100% Cotton,Orange,0.385,Mtrs,Free Size,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0789-006,CANVAS BELT LINE TOTE - MID NIGHT BLUE,TWA#,Tote Bag,100% Cotton,Mid Night Blue,0.385,Mtrs,Free Size,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0789-008,CANVAS BELT LINE TOTE - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.365,Mtrs,Free Size,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0789-009,CANVAS BELT LINE TOTE - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.385,Mtrs,Free Size,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0789-011,CANVAS BELT LINE TOTE - SKY GRAY,TWA#,Tote Bag,100% Cotton,Sky Gray,0.385,Mtrs,Free Size,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0789-030,CANVAS BELT LINE TOTE - PINK,TWA#,Tote Bag,100% Cotton,Pink,0.385,Mtrs,Free Size,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0789-034,CANVAS BELT LINE TOTE - LIGHT BLUE,TWA#,Tote Bag,100% Cotton,Light Blue,0.385,Mtrs,Free Size,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0789-041,CANVAS BELT LINE TOTE - TURQUOISE BLUE,TWA#,Tote Bag,100% Cotton,Turquoise Blue,0.385,Mtrs,Free Size,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0789-043,CANVAS BELT LINE TOTE - VIVID PINK,TWA#,Tote Bag,100% Cotton,Vivid Pink,0.385,Mtrs,Free Size,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0822-006,CANVAS FLAT POUCH(S) - MID NIGHT BLUE,TWA#,Pouch,100% Cotton,Mid Night Blue,0.045,Mtrs,Small,300,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0822-008,CANVAS FLAT POUCH(S) - NATURAL,TWA#,Pouch,100% Cotton,Natural,0.045,Mtrs,Small,300,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0822-009,CANVAS FLAT POUCH(S) - NIGHT BLACK,TWA#,Pouch,100% Cotton,Night Black,0.045,Mtrs,Small,300,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0823-006,CANVAS FLAT POUCH(M) - MID NIGHT BLUE,TWA#,Pouch,100% Cotton,Mid Night Blue,0.0675,Mtrs,Medium,200,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0823-009,CANVAS FLAT POUCH(M) - NIGHT BLACK,TWA#,Pouch,100% Cotton,Night Black,0.0675,Mtrs,Medium,200,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0824-006,CANVAS FASTNER POUCH(S) - MID NIGHT BLUE,TWA#,Pouch,100% Cotton,Mid Night Blue,0.065,Mtrs,Small,240,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0824-009,CANVAS FASTNER POUCH(S) - NIGHT BLACK,TWA#,Pouch,100% Cotton,Night Black,0.065,Mtrs,Small,240,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0825-006,CANVAS FASTNER POUCH(M) - MID NIGHT BLUE,TWA#,Pouch,100% Cotton,Mid Night Blue,0.09,Mtrs,Medium,200,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0825-008,CANVAS FASTNER POUCH(M) - NATURAL,TWA#,Pouch,100% Cotton,Natural,0.09,Mtrs,Medium,200,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0825-009,CANVAS FASTNER POUCH(M) - NIGHT BLACK,TWA#,Pouch,100% Cotton,Night Black,0.09,Mtrs,Medium,200,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0826-006,CANVAS BASIC POUCH - MID NIGHT BLUE,TWA#,Pouch,100% Cotton,Mid Night Blue,0.055,Mtrs,Free Size,200,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0826-009,CANVAS BASIC POUCH - NIGHT BLACK,TWA#,Pouch,100% Cotton,Night Black,0.055,Mtrs,Free Size,200,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0827-006,CANVAS DAILY POUCH(S) - MID NIGHT BLUE,TWA#,Pouch,100% Cotton,Mid Night Blue,0.055,Mtrs,Small,300,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0827-008,CANVAS DAILY POUCH(S) - NATURAL,TWA#,Pouch,100% Cotton,Natural,0.055,Mtrs,Small,200,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0827-009,CANVAS DAILY POUCH(S) - NIGHT BLACK,TWA#,Pouch,100% Cotton,Night Black,0.055,Mtrs,Small,300,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0828-006,CANVAS DAILY POUCH(M) - MID NIGHT BLUE,TWA#,Pouch,100% Cotton,Mid Night Blue,0.095,Mtrs,Medium,200,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0828-009,CANVAS DAILY POUCH(M) - NIGHT BLACK,TWA#,Pouch,100% Cotton,Night Black,0.095,Mtrs,Medium,200,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0829-006,CANVAS WIRE POUCH(S) - MID NIGHT BLUE,TWA#,Pouch,100% Cotton,Mid Night Blue,0.075,Mtrs,Small,120,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0829-009,CANVAS WIRE POUCH(S) - NIGHT BLACK,TWA#,Pouch,100% Cotton,Night Black,0.075,Mtrs,Small,120,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0830-006,CANVAS WIRE POUCH(M) - MID NIGHT BLUE,TWA#,Pouch,100% Cotton,Mid Night Blue,0.095,Mtrs,Medium,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0830-009,CANVAS WIRE POUCH(M) - NIGHT BLACK,TWA#,Pouch,100% Cotton,Night Black,0.095,Mtrs,Medium,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0858-006,Denim line tote (L) - Indigo,TWA#,Tote Bag,100% Cotton,Indigo,0.49,Mtrs,Large,30,Fabric: 13 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0858-034,Denim line tote (L) - Wash blue,TWA#,Tote Bag,100% Cotton,Wash Blue,0.49,Mtrs,Large,30,Fabric: 13 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0858-041,Denim line tote (L) - Vintage blue,TWA#,Tote Bag,100% Cotton,Vintage Blue,0.2175,Mtrs,Large,30,Fabric: 13 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0860-006,Denim Multi Tote(S) - Indigo,TWA#,Tote Bag,100% Cotton,Indigo,0.2175,Mtrs,Small,50,Fabric: 13 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0860-034,Denim Multi Tote(S) - Wash blue,TWA#,Tote Bag,100% Cotton,Wash Blue,0.2175,Mtrs,Small,50,Fabric: 13 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0860-041,Denim Multi Tote(S) - Vintage blue,TWA#,Tote Bag,100% Cotton,Vintage Blue,0.2175,Mtrs,Small,50,Fabric: 13 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0861-006,Denim Multi Tote(M) - Indigo,TWA#,Tote Bag,100% Cotton,Indigo,0.405,Mtrs,Medium,50,Fabric: 13 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0861-034,Denim Multi Tote(M) - Wash blue,TWA#,Tote Bag,100% Cotton,Wash Blue,0.405,Mtrs,Medium,50,Fabric: 13 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0861-041,Denim Multi Tote(M) - Vintage blue,TWA#,Tote Bag,100% Cotton,Vintage Blue,0.405,Mtrs,Medium,50,Fabric: 13 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0868-009,CANVAS SQUARE COOLER TOTE(S) - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.2375,Mtrs,Small,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0869-009,CANVAS SQUARE COOLER TOTE(M) - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.455,Mtrs,Medium,20,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0890-002,CANVAS BELT LINE TOTE (S) - RED,TWA#,Tote Bag,100% Cotton,Red,0.245,Mtrs,Small,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0890-003,CANVAS BELT LINE TOTE (S) - ORANGE,TWA#,Tote Bag,100% Cotton,Orange,0.245,Mtrs,Small,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0890-006,CANVAS BELT LINE TOTE (S) - MID NIGHT BLUE,TWA#,Tote Bag,100% Cotton,Mid Night Blue,0.245,Mtrs,Small,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0890-008,CANVAS BELT LINE TOTE (S) - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.225,Mtrs,Small,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0890-009,CANVAS BELT LINE TOTE (S) - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.245,Mtrs,Small,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0890-011,CANVAS BELT LINE TOTE (S) - SKY GRAY,TWA#,Tote Bag,100% Cotton,Sky Gray,0.245,Mtrs,Small,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0890-030,CANVAS BELT LINE TOTE (S) - PINK,TWA#,Tote Bag,100% Cotton,Pink,0.245,Mtrs,Small,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0890-034,CANVAS BELT LINE TOTE (S) - LIGHT BLUE,TWA#,Tote Bag,100% Cotton,Light Blue,0.245,Mtrs,Small,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0890-041,CANVAS BELT LINE TOTE (S) - TURQUOISE BLUE,TWA#,Tote Bag,100% Cotton,Turquoise Blue,0.245,Mtrs,Small,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0890-043,CANVAS BELT LINE TOTE (S) - VIVID PINK,TWA#,Tote Bag,100% Cotton,Vivid Pink,0.245,Mtrs,Small,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0893-006,CANVAS BELT STRAP POUCH(S) - MID NIGHT BLUE,TWA#,Pouch,100% Cotton,Mid Night Blue,0.06,Mtrs,Small,200,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0893-009,CANVAS BELT STRAP POUCH(S) - NIGHT BLACK,TWA#,Pouch,100% Cotton,Night Black,0.06,Mtrs,Small,200,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0894-006,CANVAS BELT STRAP POUCH(M) - MID NIGHT BLUE,TWA#,Pouch,100% Cotton,Mid Night Blue,0.105,Mtrs,Medium,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0894-009,CANVAS BELT STRAP POUCH(M) - NIGHT BLACK,TWA#,Pouch,100% Cotton,Night Black,0.105,Mtrs,Medium,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0895-006,CANVAS FLAT POUCH(L) - MID NIGHT BLUE,TWA#,Pouch,100% Cotton,Mid Night Blue,0.0925,Mtrs,Large,200,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0895-009,CANVAS FLAT POUCH(L) - NIGHT BLACK,TWA#,Pouch,100% Cotton,Night Black,0.0925,Mtrs,Large,200,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0896-006,CANVAS SHELL POUCH - MID NIGHT BLUE,TWA#,Pouch,100% Cotton,Mid Night Blue,0.075,Mtrs,Free Size,200,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0896-009,CANVAS SHELL POUCH - NIGHT BLACK,TWA#,Pouch,100% Cotton,Night Black,0.075,Mtrs,Free Size,200,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0904-002,CANVAS BOXLUNCH TOTE - RED,TWA#,Tote Bag,100% Cotton,Red,0.2075,Mtrs,Free Size,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0904-006,CANVAS BOXLUNCH TOTE - MID NIGHT BLUE,TWA#,Tote Bag,100% Cotton,Mid Night Blue,0.2075,Mtrs,Free Size,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0904-008,CANVAS BOXLUNCH TOTE - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.195,Mtrs,Free Size,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0904-009,CANVAS BOXLUNCH TOTE - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.2075,Mtrs,Free Size,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0904-011,CANVAS BOXLUNCH TOTE - SKY GRAY,TWA#,Tote Bag,100% Cotton,Sky Gray,0.2075,Mtrs,Free Size,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0905-002,CANVAS URBAN TOTE - RED,TWA#,Tote Bag,100% Cotton,Red,0.295,Mtrs,Free Size,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0905-006,CANVAS URBAN TOTE - MID NIGHT BLUE,TWA#,Tote Bag,100% Cotton,Mid Night Blue,0.295,Mtrs,Free Size,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0905-008,CANVAS URBAN TOTE - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.295,Mtrs,Free Size,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0905-009,CANVAS URBAN TOTE - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.295,Mtrs,Free Size,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0905-011,CANVAS URBAN TOTE - SKY GRAY,TWA#,Tote Bag,100% Cotton,Sky Gray,0.295,Mtrs,Free Size,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0915-006,DENIM DAILY POUCH(S) - INDIGO,TWA#,Pouch,100% Cotton,Indigo,0.0475,Mtrs,Small,300,Fabric: 13 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0915-041,DENIM DAILY POUCH(S) - VINTAGE BLUE,TWA#,Pouch,100% Cotton,Vintage Blue,0.0525,Mtrs,Small,300,Fabric: 13 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0916-006,DENIM DAILY POUCH(M) - INDIGO,TWA#,Pouch,100% Cotton,Indigo,0.085,Mtrs,Medium,200,Fabric: 13 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0916-041,DENIM DAILY POUCH(M) - VINTAGE BLUE,TWA#,Pouch,100% Cotton,Vintage Blue,0.0975,Mtrs,Medium,200,Fabric: 13 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0917-006,DENIM FLAT POUCH(L) - INDIGO,TWA#,Pouch,100% Cotton,Indigo,0.0725,Mtrs,Large,200,Fabric: 13 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0917-041,DENIM FLAT POUCH(L) - VINTAGE BLUE,TWA#,Pouch,100% Cotton,Vintage Blue,0.0725,Mtrs,Large,200,Fabric: 13 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0918-006,DENIM DRAWSTRING BAG(S) - INDIGO,TWA#,Basic Bag,100% Cotton,Indigo,0.055,Mtrs,Small,300,Fabric: 6 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0918-041,DENIM DRAWSTRING BAG(S) - VINTAGE BLUE,TWA#,Basic Bag,100% Cotton,Vintage Blue,0.07,Mtrs,Small,300,Fabric: 6 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0919-006,DENIM DRAWSTRING BAG(M) - INDIGO,TWA#,Basic Bag,100% Cotton,Indigo,0.1075,Mtrs,Medium,200,Fabric: 6 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0919-041,DENIM DRAWSTRING BAG(M) - VINTAGE BLUE,TWA#,Basic Bag,100% Cotton,Vintage Blue,0.1075,Mtrs,Medium,200,Fabric: 6 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0929-009,CANVAS PICNIC COOLER TOTE - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.465,Mtrs,Free Size,30,Fabric: 10 OZ Duck; Also uses TAFETA @ 0.245 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0932-006,DENIM COOLER TOTE(S) - INDIGO,TWA#,Tote Bag,100% Cotton,Indigo,0.1675,Mtrs,Small,100,Fabric: 9 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0932-041,DENIM COOLER TOTE(S) - VINTAGE BLUE,TWA#,Tote Bag,100% Cotton,Vintage Blue,0.17,Mtrs,Small,100,Fabric: 9 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0933-006,DENIM COOLER TOTE(M) - INDIGO,TWA#,Tote Bag,100% Cotton,Indigo,0.2975,Mtrs,Medium,50,Fabric: 9 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0933-041,DENIM COOLER TOTE(M) - VINTAGE BLUE,TWA#,Tote Bag,100% Cotton,Vintage Blue,0.2975,Mtrs,Medium,50,Fabric: 9 OZ Denim; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0948-008,Canvas Marine Tote(M) - Natural,TWA#,Tote Bag,100% Cotton,Natural,0.305,Mtrs,Medium,50,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0950-011,Canvas Garden Tote(M) - SKY GRAY,TWA#,Tote Bag,100% Cotton,Sky Gray,0.345,Mtrs,Medium,50,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0951-006,CANVAS SACOCHE - MID NIGHT BLUE,TWA#,Basic Bag,100% Cotton,Mid Night Blue,0.215,Mtrs,Free Size,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0951-008,CANVAS SACOCHE - NATURAL,TWA#,Basic Bag,100% Cotton,Natural,0.205,Mtrs,Free Size,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0951-009,CANVAS SACOCHE - NIGHT BLACK,TWA#,Basic Bag,100% Cotton,Night Black,0.215,Mtrs,Free Size,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0952-006,CANVAS 2 STYLE SHOULDER TOTE - MID NIGHT BLUE,TWA#,Tote Bag,100% Cotton,Mid Night Blue,0.345,Mtrs,Free Size,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0952-008,CANVAS 2 STYLE SHOULDER TOTE - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.3275,Mtrs,Free Size,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0952-009,CANVAS 2 STYLE SHOULDER TOTE - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.345,Mtrs,Free Size,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0953-006,CANVAS OUT HANDLE FLAT TOTE - MID NIGHT BLUE,TWA#,Tote Bag,100% Cotton,Mid Night Blue,0.37,Mtrs,Free Size,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0953-008,CANVAS OUT HANDLE FLAT TOTE - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.34,Mtrs,Free Size,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0953-009,CANVAS OUT HANDLE FLAT TOTE - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.37,Mtrs,Free Size,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0954-006,CANVAS FRONT FOLDING SHOULDER TOTE - MID NIGHT BLUE,TWA#,Tote Bag,100% Cotton,Mid Night Blue,0.43,Mtrs,Free Size,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0954-008,CANVAS FRONT FOLDING SHOULDER TOTE - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.3775,Mtrs,Free Size,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0954-009,CANVAS FRONT FOLDING SHOULDER TOTE - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.43,Mtrs,Free Size,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0955-002,CANVAS COLOR BOTTOM TOTE(S) - RED,TWA#,Tote Bag,100% Cotton,Red,0.0625,Mtrs,Small,200,Fabric: 10 OZ Duck; Also uses 10 OZ Duck @ 0.1225 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0955-006,CANVAS COLOR BOTTOM TOTE(S) - MID NIGHT BLUE,TWA#,Tote Bag,100% Cotton,Mid Night Blue,0.0625,Mtrs,Small,200,Fabric: 10 OZ Duck; Also uses 10 OZ Duck @ 0.1225 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0955-009,CANVAS COLOR BOTTOM TOTE(S) - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.0625,Mtrs,Small,200,Fabric: 10 OZ Duck; Also uses 10 OZ Duck @ 0.1225 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0955-011,CANVAS COLOR BOTTOM TOTE(S) - SKY GRAY,TWA#,Tote Bag,100% Cotton,Sky Gray,0.0625,Mtrs,Small,200,Fabric: 10 OZ Duck; Also uses 10 OZ Duck @ 0.1225 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0956-002,CANVAS COLOR BOTTOM TOTE(M) - RED,TWA#,Tote Bag,100% Cotton,Red,0.0875,Mtrs,Medium,100,Fabric: 10 OZ Duck; Also uses 10 OZ Duck @ 0.245 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0956-006,CANVAS COLOR BOTTOM TOTE(M) - MID NIGHT BLUE,TWA#,Tote Bag,100% Cotton,Mid Night Blue,0.0875,Mtrs,Medium,100,Fabric: 10 OZ Duck; Also uses 10 OZ Duck @ 0.245 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0956-009,CANVAS COLOR BOTTOM TOTE(M) - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.0875,Mtrs,Medium,100,Fabric: 10 OZ Duck; Also uses 10 OZ Duck @ 0.245 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0956-011,CANVAS COLOR BOTTOM TOTE(M) - SKY GRAY,TWA#,Tote Bag,100% Cotton,Sky Gray,0.0875,Mtrs,Medium,100,Fabric: 10 OZ Duck; Also uses 10 OZ Duck @ 0.245 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0957-002,CANVAS COLOR BOTTOM TOTE(L) - RED,TWA#,Tote Bag,100% Cotton,Red,0.13,Mtrs,Large,50,Fabric: 10 OZ Duck; Also uses 10 OZ Duck @ 0.335 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0957-006,CANVAS COLOR BOTTOM TOTE(L) - MID NIGHT BLUE,TWA#,Tote Bag,100% Cotton,Mid Night Blue,0.13,Mtrs,Large,50,Fabric: 10 OZ Duck; Also uses 10 OZ Duck @ 0.335 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0957-009,CANVAS COLOR BOTTOM TOTE(L) - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.13,Mtrs,Large,50,Fabric: 10 OZ Duck; Also uses 10 OZ Duck @ 0.335 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0957-011,CANVAS COLOR BOTTOM TOTE(L) - SKY GRAY,TWA#,Tote Bag,100% Cotton,Sky Gray,0.13,Mtrs,Large,50,Fabric: 10 OZ Duck; Also uses 10 OZ Duck @ 0.335 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0958-002,CANVAS COLOR BOTTOM SHOULDER TOTE - RED,TWA#,Tote Bag,100% Cotton,Red,0.1175,Mtrs,Free Size,50,Fabric: 10 OZ Duck; Also uses 10 OZ Duck @ 0.345 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0958-006,CANVAS COLOR BOTTOM SHOULDER TOTE - MID NIGHT BLUE,TWA#,Tote Bag,100% Cotton,Mid Night Blue,0.1175,Mtrs,Free Size,50,Fabric: 10 OZ Duck; Also uses 10 OZ Duck @ 0.345 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0958-009,CANVAS COLOR BOTTOM SHOULDER TOTE - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.1175,Mtrs,Free Size,50,Fabric: 10 OZ Duck; Also uses 10 OZ Duck @ 0.345 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0958-011,CANVAS COLOR BOTTOM SHOULDER TOTE - SKY GRAY,TWA#,Tote Bag,100% Cotton,Sky Gray,0.1175,Mtrs,Free Size,50,Fabric: 10 OZ Duck; Also uses 10 OZ Duck @ 0.345 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0974-008,CANVAS FASTNER POCKET TOTE - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.39,Mtrs,Free Size,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0974-009,CANVAS FASTNER POCKET TOTE - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.41,Mtrs,Free Size,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0974-044,CANVAS FASTNER POCKET TOTE - WHITE,TWA#,Tote Bag,100% Cotton,White,0.41,Mtrs,Free Size,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0981-006,Canvas Tote(M) with inner pocket - MID NIGHT BLUE,TWA#,Tote Bag,100% Cotton,Mid Night Blue,0.355,Mtrs,Medium,100,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0981-009,Canvas Tote(M) with inner pocket - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.355,Mtrs,Medium,100,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0982-008,Canvas Tote(L) with inner pocket - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.51,Mtrs,Large,50,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0982-009,Canvas Tote(L) with inner pocket - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.52,Mtrs,Large,50,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0984-006,canvas w style bag with inner pocket - NIGHT BLACK,TWA#,Basic Bag,100% Cotton,Night Black,0.42,Mtrs,Free Size,50,Fabric: 12OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0984-008,canvas w style bag with inner pocket - NATURAL,TWA#,Basic Bag,100% Cotton,Natural,0.4,Mtrs,Free Size,50,Fabric: 12OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0984-009,canvas w style bag with inner pocket - mid night blue,TWA#,Basic Bag,100% Cotton,Mid Night Blue,0.42,Mtrs,Free Size,50,Fabric: 12OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0999-008,Cavas Holiday tote(S) - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.235,Mtrs,Small,100,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-0999-009,Cavas Holiday tote(S) - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.2525,Mtrs,Small,100,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1000-008,TR-1000-008 - NATURAL,TWA#,Basic Bag,100% Cotton,Natural,0.4,Mtrs,Free Size,,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1000-009,TR-1000-009 - NIGHT BLACK,TWA#,Basic Bag,100% Cotton,Night Black,0.42,Mtrs,Free Size,,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1014-002,CANVAS COLOR BOTTOM OUT HANDLE TOTE M - RED,TWA#,Tote Bag,100% Cotton,Red,0.085,Mtrs,Medium,50,Fabric: 10 OZ Duck; Also uses 10 OZ Duck @ 0.255 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1014-006,CANVAS COLOR BOTTOM OUT HANDLE TOTE M - MID NIGHT BLUE,TWA#,Tote Bag,100% Cotton,Mid Night Blue,0.085,Mtrs,Medium,50,Fabric: 10 OZ Duck; Also uses 10 OZ Duck @ 0.255 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1014-009,CANVAS COLOR BOTTOM OUT HANDLE TOTE M - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.085,Mtrs,Medium,50,Fabric: 10 OZ Duck; Also uses 10 OZ Duck @ 0.255 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1014-011,CANVAS COLOR BOTTOM OUT HANDLE TOTE M - SKY GRAY,TWA#,Tote Bag,100% Cotton,Sky Gray,0.085,Mtrs,Medium,50,Fabric: 10 OZ Duck; Also uses 10 OZ Duck @ 0.255 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1015-002,CANVAS COLOR BOTTOM OUT HANDLE TOTE L - RED,TWA#,Tote Bag,100% Cotton,Red,0.13,Mtrs,Large,50,Fabric: 10 OZ Duck; Also uses 10 OZ Duck @ 0.33 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1015-006,CANVAS COLOR BOTTOM OUT HANDLE TOTE L - MID NIGHT BLUE,TWA#,Tote Bag,100% Cotton,Mid Night Blue,0.13,Mtrs,Large,50,Fabric: 10 OZ Duck; Also uses 10 OZ Duck @ 0.33 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1015-009,CANVAS COLOR BOTTOM OUT HANDLE TOTE L - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.13,Mtrs,Large,50,Fabric: 10 OZ Duck; Also uses 10 OZ Duck @ 0.33 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1015-011,CANVAS COLOR BOTTOM OUT HANDLE TOTE L - SKY GRAY,TWA#,Tote Bag,100% Cotton,Sky Gray,0.13,Mtrs,Large,50,Fabric: 10 OZ Duck; Also uses 10 OZ Duck @ 0.33 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1016-002,CANVAS COLOR BOTTOM FLAT TOTE - RED,TWA#,Tote Bag,100% Cotton,Red,0.05,Mtrs,Free Size,50,Fabric: 10 OZ Duck; Also uses 10 OZ Duck @ 0.29 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1016-006,CANVAS COLOR BOTTOM FLAT TOTE - MID NIGHT BLUE,TWA#,Tote Bag,100% Cotton,Mid Night Blue,0.05,Mtrs,Free Size,50,Fabric: 10 OZ Duck; Also uses 10 OZ Duck @ 0.29 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1016-009,CANVAS COLOR BOTTOM FLAT TOTE - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.05,Mtrs,Free Size,50,Fabric: 10 OZ Duck; Also uses 10 OZ Duck @ 0.29 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1016-011,CANVAS COLOR BOTTOM FLAT TOTE - SKY GRAY,TWA#,Tote Bag,100% Cotton,Sky Gray,0.05,Mtrs,Free Size,50,Fabric: 10 OZ Duck; Also uses 10 OZ Duck @ 0.29 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1017-002,CANVAS TOP COLOR GUSSET TOTE - RED,TWA#,Tote Bag,100% Cotton,Red,0.105,Mtrs,Free Size,50,Fabric: 10 OZ Duck; Also uses 10 OZ Duck @ 0.31 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1017-006,CANVAS TOP COLOR GUSSET TOTE - MID NIGHT BLUE,TWA#,Tote Bag,100% Cotton,Mid Night Blue,0.105,Mtrs,Free Size,50,Fabric: 10 OZ Duck; Also uses 10 OZ Duck @ 0.31 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1017-009,CANVAS TOP COLOR GUSSET TOTE - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.105,Mtrs,Free Size,50,Fabric: 10 OZ Duck; Also uses 10 OZ Duck @ 0.31 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1017-011,CANVAS TOP COLOR GUSSET TOTE - SKY GRAY,TWA#,Tote Bag,100% Cotton,Sky Gray,0.105,Mtrs,Free Size,50,Fabric: 10 OZ Duck; Also uses 10 OZ Duck @ 0.31 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1018-002,CANVAS TOP COLOR BELTLINE TOTE - RED,TWA#,Tote Bag,100% Cotton,Red,0.1,Mtrs,Free Size,50,Fabric: 10 OZ Duck; Also uses 10 OZ Duck @ 0.3 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1018-006,CANVAS TOP COLOR BELTLINE TOTE - MID NIGHT BLUE,TWA#,Tote Bag,100% Cotton,Mid Night Blue,0.1,Mtrs,Free Size,50,Fabric: 10 OZ Duck; Also uses 10 OZ Duck @ 0.3 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1018-009,CANVAS TOP COLOR BELTLINE TOTE - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.1,Mtrs,Free Size,50,Fabric: 10 OZ Duck; Also uses 10 OZ Duck @ 0.3 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1018-011,CANVAS TOP COLOR BELTLINE TOTE - SKY GRAY,TWA#,Tote Bag,100% Cotton,Sky Gray,0.1,Mtrs,Free Size,50,Fabric: 10 OZ Duck; Also uses 10 OZ Duck @ 0.3 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1046-008,Organic cotton canvas tote (S) - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.165,Mtrs,Small,100,Fabric: 10 OZ ORGANIC; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1046-009,Organic cotton canvas tote (S) - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.185,Mtrs,Small,100,Fabric: 10 OZ ORGANIC; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1047-006,ORGANIC COTTON CANVAS TOTE(M) - Midnight Blue,TWA#,Tote Bag,100% Cotton,Mid Night Blue,0.335,Mtrs,Medium,50,Fabric: 10 OZ ORGANIC; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1047-008,Organic cotton canvas tote (M) - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.305,Mtrs,Medium,50,Fabric: 10 OZ ORGANIC; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1047-009,Organic cotton canvas tote (M) - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.335,Mtrs,Medium,50,Fabric: 10 OZ ORGANIC; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1048-008,Organic cotton canvas tote (L) - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.3775,Mtrs,Large,50,Fabric: 10 OZ ORGANIC; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1048-009,Organic cotton canvas tote (L) - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.4025,Mtrs,Large,50,Fabric: 10 OZ ORGANIC; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1049-008,Organic cotton canvas tote (S) with inner pocket - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.205,Mtrs,Small,100,Fabric: 10 OZ ORGANIC; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1049-009,Organic cotton canvas tote (S) with inner pocket - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.23,Mtrs,Small,100,Fabric: 10 OZ ORGANIC; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1050-008,Organic cotton canvas tote (M) with inner pocket - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.36,Mtrs,Medium,50,Fabric: 10 OZ ORGANIC; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1050-009,Organic cotton canvas tote (M) with inner pocket - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.385,Mtrs,Medium,50,Fabric: 10 OZ ORGANIC; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1051-008,Organic cotton canvas tote (L) with inner pocket - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.43,Mtrs,Large,50,Fabric: 10 OZ ORGANIC; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1051-009,Organic cotton canvas tote (L) with inner pocket - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.45,Mtrs,Large,50,Fabric: 10 OZ ORGANIC; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1057-006,CANVAS DENIM BOTTOM FLAT POUCH(S) - NATURAL,TWA#,Pouch,100% Cotton,Natural,0.05,Mtrs,Small,200,Fabric: 10 OZ Duck; Also uses 9 OZ Denim @ 0.015 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1057-041,CANVAS DENIM BOTTOM FLAT POUCH(S) - NATURAL,TWA#,Pouch,100% Cotton,Natural,0.05,Mtrs,Small,200,Fabric: 10 OZ Duck; Also uses 9 OZ Denim @ 0.015 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1058-006,CANVAS DENIM BOTTOM FLAT POUCH(M) - NATURAL,TWA#,Pouch,100% Cotton,Natural,0.08,Mtrs,Medium,200,Fabric: 10 OZ Duck; Also uses 9 OZ Denim @ 0.018 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1058-041,CANVAS DENIM BOTTOM FLAT POUCH(M) - NATURAL,TWA#,Pouch,100% Cotton,Natural,0.08,Mtrs,Medium,200,Fabric: 10 OZ Duck; Also uses 9 OZ Denim @ 0.018 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1059-006,CANVAS DENIM BOTTOM DAILY POUCH(S) - NATURAL,TWA#,Pouch,100% Cotton,Natural,0.058,Mtrs,Small,200,Fabric: 10 OZ Duck; Also uses 9 OZ Denim @ 0.0225 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1059-041,CANVAS DENIM BOTTOM DAILY POUCH(S) - NATURAL,TWA#,Pouch,100% Cotton,Natural,0.058,Mtrs,Small,200,Fabric: 10 OZ Duck; Also uses 9 OZ Denim @ 0.0225 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1060-006,CANVAS DENIM BOTTOM DAILY POUCH(M) - NATURAL,TWA#,Pouch,100% Cotton,Natural,0.085,Mtrs,Medium,200,Fabric: 10 OZ Duck; Also uses 9 OZ Denim @ 0.0315 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1060-041,CANVAS DENIM BOTTOM DAILY POUCH(M) - NATURAL,TWA#,Pouch,100% Cotton,Natural,0.085,Mtrs,Medium,200,Fabric: 10 OZ Duck; Also uses 9 OZ Denim @ 0.0315 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1066-006,CANVAS REVERSIBLE POUCH - MID NIGHT BLUE,TWA#,Pouch,100% Cotton,Mid Night Blue,0.0625,Mtrs,Free Size,200,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1066-008,CANVAS REVERSIBLE POUCH - NATURAL,TWA#,Pouch,100% Cotton,Natural,0.0575,Mtrs,Free Size,200,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1066-009,CANVAS REVERSIBLE POUCH - NIGHT BLACK,TWA#,Pouch,100% Cotton,Night Black,0.0625,Mtrs,Free Size,200,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1075-006,CANVAS SACOCHE WITH INNER POCKET - MID NIGHT BLUE,TWA#,Basic Bag,100% Cotton,Mid Night Blue,0.2675,Mtrs,Free Size,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1075-008,CANVAS SACOCHE WITH INNER POCKET - NATURAL,TWA#,Basic Bag,100% Cotton,Natural,0.25,Mtrs,Free Size,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1075-009,CANVAS SACOCHE WITH INNER POCKET - NIGHT BLACK,TWA#,Basic Bag,100% Cotton,Night Black,0.2675,Mtrs,Free Size,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1080-006,CANVAS ADJUSTABLE SHOULDER SACOCHE - MID NIGHT BLUE,TWA#,Basic Bag,100% Cotton,Mid Night Blue,0.2475,Mtrs,Free Size,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1080-008,CANVAS ADJUSTABLE SHOULDER SACOCHE - NATURAL,TWA#,Basic Bag,100% Cotton,Natural,0.23,Mtrs,Free Size,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1080-009,CANVAS ADJUSTABLE SHOULDER SACOCHE - NIGHT BLACK,TWA#,Basic Bag,100% Cotton,Night Black,0.2475,Mtrs,Free Size,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1081-006,CANVAS SQUARE SACOCHE - MID NIGHT BLUE,TWA#,Basic Bag,100% Cotton,Mid Night Blue,0.1625,Mtrs,Free Size,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1081-008,CANVAS SQUARE SACOCHE - NATURAL,TWA#,Basic Bag,100% Cotton,Natural,0.165,Mtrs,Free Size,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1081-009,CANVAS SQUARE SACOCHE - NIGHT BLACK,TWA#,Basic Bag,100% Cotton,Night Black,0.1625,Mtrs,Free Size,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1082-006,CANVAS FRONT POCKET SACOCHE - MID NIGHT BLUE,TWA#,Basic Bag,100% Cotton,Mid Night Blue,0.1575,Mtrs,Free Size,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1082-008,CANVAS FRONT POCKET SACOCHE - NATURAL,TWA#,Basic Bag,100% Cotton,Natural,0.145,Mtrs,Free Size,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1082-009,CANVAS FRONT POCKET SACOCHE - NIGHT BLACK,TWA#,Basic Bag,100% Cotton,Night Black,0.1575,Mtrs,Free Size,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1107-006,CANVAS SQUARE TOTE(XXS) - MID NIGHT BLUE,TWA#,Tote Bag,100% Cotton,Mid Night Blue,0.07,Mtrs,Small,400,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1107-008,CANVAS SQUARE TOTE(XXS) - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.065,Mtrs,Small,400,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1107-009,CANVAS SQUARE TOTE(XXS) - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.07,Mtrs,Small,400,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1108-002,CANVAS SQUARE TOTE COLOR BOTTOM (XXS) - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.05,Mtrs,Small,400,Fabric: 10 OZ Duck; Also uses 10 OZ Duck @ 0.023 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1108-006,CANVAS SQUARE TOTE COLOR BOTTOM (XXS) - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.05,Mtrs,Small,400,Fabric: 10 OZ Duck; Also uses 10 OZ Duck @ 0.023 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1108-009,CANVAS SQUARE TOTE COLOR BOTTOM (XXS) - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.05,Mtrs,Small,400,Fabric: 10 OZ Duck; Also uses 10 OZ Duck @ 0.023 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1108-011,CANVAS SQUARE TOTE COLOR BOTTOM (XXS) - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.05,Mtrs,Small,400,Fabric: 10 OZ Duck; Also uses 10 OZ Duck @ 0.023 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1109-006,CANVAS SQUARE TOTE(XS) - MID NIGHT BLUE,TWA#,Tote Bag,100% Cotton,Mid Night Blue,0.135,Mtrs,Small,200,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1109-008,CANVAS SQUARE TOTE(XS) - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.125,Mtrs,Small,200,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1109-009,CANVAS SQUARE TOTE(XS) - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.135,Mtrs,Small,200,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1110-002,CANVAS SQUARE TOTE COLOR BOTTOM (XS) - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.1,Mtrs,Small,200,Fabric: 10 OZ Duck; Also uses 10 OZ Duck @ 0.035 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1110-006,CANVAS SQUARE TOTE COLOR BOTTOM (XS) - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.1,Mtrs,Small,200,Fabric: 10 OZ Duck; Also uses 10 OZ Duck @ 0.035 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1110-009,CANVAS SQUARE TOTE COLOR BOTTOM (XS) - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.1,Mtrs,Small,200,Fabric: 10 OZ Duck; Also uses 10 OZ Duck @ 0.035 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1110-011,CANVAS SQUARE TOTE COLOR BOTTOM (XS) - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.1,Mtrs,Small,200,Fabric: 10 OZ Duck; Also uses 10 OZ Duck @ 0.035 Mtrs/pc; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1111-008,CANVAS TOOL TOTE - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.5575,Mtrs,Free Size,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1111-009,CANVAS TOOL TOTE - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.47,Mtrs,Free Size,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1112-008,CANVAS BIG TOTE WITH PARTITION POCKET - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.625,Mtrs,Free Size,30,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1112-009,CANVAS BIG TOTE WITH PARTITION POCKET - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.665,Mtrs,Free Size,30,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1113-008,CANVAS BOX SQUARE TOTE - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.42,Mtrs,Free Size,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1113-009,CANVAS BOX SQUARE TOTE - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.518,Mtrs,Free Size,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1114-008,CANVAS HOLIDAY SQUARE TOTE WITH PARTITION POCKET - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.7,Mtrs,Free Size,30,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1114-009,CANVAS HOLIDAY SQUARE TOTE WITH PARTITION POCKET - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.73,Mtrs,Free Size,30,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1115-008,CANVAS FRONT POCKET SHOULDER TOTE - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.43,Mtrs,Free Size,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1115-009,CANVAS FRONT POCKET SHOULDER TOTE - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.48,Mtrs,Free Size,50,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1116-008,CANVAS REVERSIBLE TOTE - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.46,Mtrs,Free Size,30,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1116-009,CANVAS REVERSIBLE TOTE - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.5,Mtrs,Free Size,30,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1174-008,ORGANIC COTTON CANVAS LINE TOTE - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.305,Mtrs,Free Size,50,Fabric: 10 OZ ORGANIC; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1174-009,ORGANIC COTTON CANVAS LINE TOTE - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.335,Mtrs,Free Size,50,Fabric: 10 OZ ORGANIC; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1175-008,ORGANIC COTTON CANVAS WSTYLE BAG - NATURAL,TWA#,Basic Bag,100% Cotton,Natural,0.3425,Mtrs,Free Size,50,Fabric: 10 OZ ORGANIC; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1175-009,ORGANIC COTTON CANVAS WSTYLE BAG - NIGHT BLACK,TWA#,Basic Bag,100% Cotton,Night Black,0.3575,Mtrs,Free Size,50,Fabric: 10 OZ ORGANIC; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1176-008,ORGANIC COTTON CANVAS BOX TOTE - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.335,Mtrs,Free Size,50,Fabric: 10 OZ ORGANIC; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1176-009,ORGANIC COTTON CANVAS BOX TOTE - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.38,Mtrs,Free Size,50,Fabric: 10 OZ ORGANIC; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1177-008,ORGANIC COTTON CANVAS SACOCHE - NATURAL,TWA#,Basic Bag,100% Cotton,Natural,0.085,Mtrs,Free Size,100,Fabric: 10 OZ ORGANIC; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1177-009,ORGANIC COTTON CANVAS SACOCHE - NIGHT BLACK,TWA#,Basic Bag,100% Cotton,Night Black,0.1,Mtrs,Free Size,100,Fabric: 10 OZ ORGANIC; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1212-008,ORGANIC COTTON BICOLOR COOLER TOTE(S) - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.125,Mtrs,Small,100,Fabric: 10 OZ ORGANIC; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1212-009,ORGANIC COTTON BICOLOR COOLER TOTE(S) - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.135,Mtrs,Small,100,Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1213-008,ORGANIC COTTON BICOLOR COOLER TOTE(M) - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.3175,Mtrs,Medium,30,Fabric: 10 OZ ORGANIC; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1213-009,ORGANIC COTTON BICOLOR COOLER TOTE(M) - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.3375,Mtrs,Medium,30,Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1260-008,ORGANIC COTTON CANVAS TOTE(ML) - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.375,Mtrs,Medium,50,Fabric: 10 OZ ORGANIC; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1260-009,ORGANIC COTTON CANVAS TOTE(ML) - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.395,Mtrs,Medium,50,Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1303-008,ORGANIC COTTON CANVAS SQUARE LINE TOTE - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.265,Mtrs,Free Size,50,Fabric: 10 OZ ORGANIC; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1303-009,ORGANIC COTTON CANVAS SQUARE LINE TOTE - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.29,Mtrs,Free Size,50,Fabric: 10 OZ ORGANIC; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1305-008,ORGANIC COTTON CANVAS TOTE(ML) WITH INNER POCKET - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.405,Mtrs,Medium,,Fabric: 10 OZ ORGANIC; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1305-009,ORGANIC COTTON CANVAS TOTE(ML) WITH INNER POCKET - NIGHT BLACK,TWA#,Tote Bag,100% Cotton,Night Black,0.44,Mtrs,Medium,,Fabric: 10 OZ ORGANIC; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1306-008,ORGANIC COTTON CANVAS TOTE(ML) WITH INNER POCKET - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.025,Mtrs,Medium,300,Fabric: 10 OZ ORGANIC; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1307-008,ORGANIC COTTON CANVAS TOTE(ML) WITH INNER POCKET - NATURAL,TWA#,Tote Bag,100% Cotton,Natural,0.04,Mtrs,Medium,300,Fabric: 10 OZ ORGANIC; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1308-008,ORGANIC COTTON CANVAS FLAT POUCH - NATURAL,TWA#,Pouch,100% Cotton,Natural,0.06,Mtrs,Free Size,200,Fabric: 10 OZ ORGANIC; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1309-008,ORGANIC COTTON CANVAS FASTENER POUCH - NATURAL,TWA#,Pouch,100% Cotton,Natural,0.0925,Mtrs,Free Size,100,Fabric: 10 OZ ORGANIC; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1311-008,ORGANIC,TWA#,Basic Bag,100% Cotton,,0.0975,Mtrs,Free Size,200,Fabric: 10 OZ ORGANIC; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1343-008,CANVAS HOLIDAY SQUARE TOTE WITH PARTITION POCKET Ver2 - Natural,TWA#,Tote Bag,100% Cotton,Natural,0.6025,Mtrs,Free Size,40,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1343-009,CANVAS HOLIDAY SQUARE TOTE WITH PARTITION POCKET Ver2 - Black,TWA#,Tote Bag,100% Cotton,Black,0.645,Mtrs,Free Size,40,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1343-010,CANVAS HOLIDAY SQUARE TOTE WITH PARTITION POCKET Ver2 - Mustard,TWA#,Tote Bag,100% Cotton,Mustard,0.645,Mtrs,Free Size,40,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1343-013,CANVAS HOLIDAY SQUARE TOTE WITH PARTITION POCKET Ver2 - Purple,TWA#,Tote Bag,100% Cotton,Purple,0.645,Mtrs,Free Size,40,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1343-038,CANVAS HOLIDAY SQUARE TOTE WITH PARTITION POCKET Ver2 - Smoke Blue,TWA#,Tote Bag,100% Cotton,Smoke Blue,0.645,Mtrs,Free Size,40,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1343-040,CANVAS HOLIDAY SQUARE TOTE WITH PARTITION POCKET Ver2 - Smoke Pink,TWA#,Tote Bag,100% Cotton,Smoke Pink,0.645,Mtrs,Free Size,40,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1343-045,CANVAS HOLIDAY SQUARE TOTE WITH PARTITION POCKET Ver2 - Olive,TWA#,Tote Bag,100% Cotton,Olive,0.645,Mtrs,Free Size,40,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1344-008,CANVAS SQUARE TOTE WITH OUTSIDE POCKET - Natural,TWA#,Tote Bag,100% Cotton,Natural,0.5625,Mtrs,Free Size,40,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1344-009,CANVAS SQUARE TOTE WITH OUTSIDE POCKET - Black,TWA#,Tote Bag,100% Cotton,Black,0.5825,Mtrs,Free Size,40,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1344-010,CANVAS SQUARE TOTE WITH OUTSIDE POCKET - Mustard,TWA#,Tote Bag,100% Cotton,Mustard,0.5825,Mtrs,Free Size,40,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1344-013,CANVAS SQUARE TOTE WITH OUTSIDE POCKET - Purple,TWA#,Tote Bag,100% Cotton,Purple,0.5825,Mtrs,Free Size,40,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1344-038,CANVAS SQUARE TOTE WITH OUTSIDE POCKET - Smoke Blue,TWA#,Tote Bag,100% Cotton,Smoke Blue,0.5825,Mtrs,Free Size,40,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1344-040,CANVAS SQUARE TOTE WITH OUTSIDE POCKET - Smoke Pink,TWA#,Tote Bag,100% Cotton,Smoke Pink,0.5825,Mtrs,Free Size,40,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1344-045,CANVAS SQUARE TOTE WITH OUTSIDE POCKET - Olive,TWA#,Tote Bag,100% Cotton,Olive,0.5825,Mtrs,Free Size,40,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1345-008,TUCK HANDLE CANVAS TOTE - Natural,TWA#,Tote Bag,100% Cotton,Natural,0.3,Mtrs,Free Size,50,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1345-009,TUCK HANDLE CANVAS TOTE - Black,TWA#,Tote Bag,100% Cotton,Black,0.325,Mtrs,Free Size,50,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1345-010,TUCK HANDLE CANVAS TOTE - Mustard,TWA#,Tote Bag,100% Cotton,Mustard,0.325,Mtrs,Free Size,50,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1345-013,TUCK HANDLE CANVAS TOTE - Purple,TWA#,Tote Bag,100% Cotton,Purple,0.325,Mtrs,Free Size,50,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1345-038,TUCK HANDLE CANVAS TOTE - Smoke Blue,TWA#,Tote Bag,100% Cotton,Smoke Blue,0.325,Mtrs,Free Size,50,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1345-040,TUCK HANDLE CANVAS TOTE - Smoke Pink,TWA#,Tote Bag,100% Cotton,Smoke Pink,0.325,Mtrs,Free Size,50,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1345-045,TUCK HANDLE CANVAS TOTE - Olive,TWA#,Tote Bag,100% Cotton,Olive,0.325,Mtrs,Free Size,50,Fabric: 10 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1381-006,Canvas daily tote(M)Wide - Midnight Blue,TWA#,Tote Bag,100% Cotton,Mid Night Blue,0.325,Mtrs,Medium,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1381-008,Canvas daily tote(M)Wide - Natural,TWA#,Tote Bag,100% Cotton,Natural,0.305,Mtrs,Medium,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1381-009,Canvas daily tote(M)Wide - Night Black,TWA#,Tote Bag,100% Cotton,Night Black,0.325,Mtrs,Medium,100,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1382-006,Canvas Tote(M)Wide - Midnight Blue,TWA#,Tote Bag,100% Cotton,Mid Night Blue,0.34,Mtrs,Medium,100,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1382-008,Canvas Tote(M)Wide - Natural,TWA#,Tote Bag,100% Cotton,Natural,0.3175,Mtrs,Medium,50,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TR-1382-009,Canvas Tote(M)Wide - Night Black,TWA#,Tote Bag,100% Cotton,Night Black,0.34,Mtrs,Medium,50,Fabric: 12 oz Fabric; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TS-1310-006,FASTENER PENCIL CASE - NAVY,TWA#,Basic Bag,100% Cotton,Navy,0.067,Mtrs,Free Size,400,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TS-1310-008,FASTENER PENCIL CASE - natural,TWA#,Basic Bag,100% Cotton,Natural,0.065,Mtrs,Free Size,400,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
+TS-1310-009,FASTENER PENCIL CASE - BLACK,TWA#,Basic Bag,100% Cotton,Black,0.067,Mtrs,Free Size,400,Fabric: 10 OZ Duck; Source: TWA03 Requirement Sheet 14.07.2022,ACTIVE
