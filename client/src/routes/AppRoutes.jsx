@@ -30,6 +30,14 @@ const QuotationDetail = lazy(() => import('../pages/quotations/QuotationDetail.j
 
 const PurchaseOrderList = lazy(() => import('../pages/procurement/PurchaseOrderList.jsx'));
 const PurchaseOrderDetail = lazy(() => import('../pages/procurement/PurchaseOrderDetail.jsx'));
+const docPage = (name) => lazy(() => import('../pages/procurement/DocumentPages.jsx').then((m) => ({ default: m[name] })));
+const PoDocumentForm = docPage('PoDocumentForm');
+const PoDocumentDetail = docPage('PoDocumentDetail');
+const PoDocumentPrint = docPage('PoDocumentPrint');
+const QuotationDocumentForm = docPage('QuotationDocumentForm');
+const QuotationDocumentDetail = docPage('QuotationDocumentDetail');
+const GrnDocumentForm = docPage('GrnDocumentForm');
+const GrnDocumentDetail = docPage('GrnDocumentDetail');
 const GatePassList = lazy(() => import('../pages/procurement/GatePassList.jsx'));
 const GatePassDetail = lazy(() => import('../pages/procurement/GatePassDetail.jsx'));
 const GrnList = lazy(() => import('../pages/procurement/GrnList.jsx'));
@@ -204,6 +212,10 @@ export default function AppRoutes() {
 
           {/* --- Procurement ----------------------------------------------- */}
           <Route path="/quotations" element={guarded('VENDOR_QUOTATION.VIEW', <QuotationList />)} />
+          <Route path="/quotations/new-document" element={guarded('VENDOR_QUOTATION.CREATE', <QuotationDocumentForm />)} />
+          <Route path="/quotations/documents/:id" element={guarded('VENDOR_QUOTATION.VIEW', <QuotationDocumentDetail />)} />
+          <Route path="/purchase-orders/new-document" element={guarded('PURCHASE_ORDER.CREATE', <PoDocumentForm />)} />
+          <Route path="/purchase-orders/documents/:id" element={guarded('PURCHASE_ORDER.VIEW', <PoDocumentDetail />)} />
           <Route
             path="/quotations/:id"
             element={guarded('VENDOR_QUOTATION.VIEW', <QuotationDetail />)}
@@ -219,6 +231,8 @@ export default function AppRoutes() {
           <Route path="/gate-passes" element={guarded('GATE_PASS.VIEW', <GatePassList />)} />
           <Route path="/gate-passes/:id" element={guarded('GATE_PASS.VIEW', <GatePassDetail />)} />
           <Route path="/grns" element={guarded('GRN.VIEW', <GrnList />)} />
+          <Route path="/grns/new-document" element={guarded('GRN.CREATE', <GrnDocumentForm />)} />
+          <Route path="/grns/documents/:id" element={guarded('GRN.VIEW', <GrnDocumentDetail />)} />
           <Route path="/grns/:id" element={guarded('GRN.VIEW', <GrnDetail />)} />
           <Route
             path="/grn-reversals/:id"
@@ -311,6 +325,7 @@ export default function AppRoutes() {
           {/* --- Printing ----------------------------------------------------
               One route for all five printable documents. The payload is
               assembled on the server; this renders it. */}
+          <Route path="/print/po-document/:id" element={guarded('PURCHASE_ORDER.EXPORT', <PoDocumentPrint />)} />
           <Route path="/print/:kind/:id" element={<DocumentPrint />} />
 
           {/* --- Masters ------------------------------------------------------ */}

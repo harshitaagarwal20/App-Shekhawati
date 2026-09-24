@@ -33,6 +33,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { grns as grnApi, grnReversals as revApi } from '../../services/erp.js';
 import { Alert, PageHeader, Spinner, StatusBadge } from '../../components/ui.jsx';
+import TableWrap from '../../components/TableWrap.jsx';
+import { PartOfDocument } from './DocumentPages.jsx';
 import { Detail, DetailGrid, TraceChain } from '../shared/Detail.jsx';
 import { fmtDate, fmtDateTime, fmtEnum, fmtMoney, fmtNum } from '../../utils/format.js';
 
@@ -186,6 +188,8 @@ export default function GrnDetail() {
         }
       />
 
+      <PartOfDocument header={grn.header} to={`/grns/documents/${grn.header?.id}`} label="receipt" />
+
       {banner && (
         <Alert kind={banner.kind} onDismiss={() => setBanner(null)}>
           {banner.text}
@@ -283,7 +287,6 @@ export default function GrnDetail() {
                     `, writing off ${eligibility.wouldReverse.rollCount} roll(s) (${eligibility.wouldReverse.rollNos.join(', ')})`}
                   {eligibility.wouldReverse.purchaseOrder &&
                     `, and take ${eligibility.wouldReverse.purchaseOrder.poId} from ${eligibility.wouldReverse.purchaseOrder.receivedQty} received to ${eligibility.wouldReverse.purchaseOrder.receivedQtyAfter}`}
-import TableWrap from '../../components/TableWrap.jsx';
                   . Nothing moves until somebody else approves it.
                 </p>
 

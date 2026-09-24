@@ -249,3 +249,37 @@ describe('FOB costing', () => {
     assert.equal(marginAtPrice({ unitPrice: null, exchangeRate: '83', totalCost: '1', commissionPct: '0' }), null);
   });
 });
+
+// ---------------------------------------------------------------------------
+//  Multi-line documents
+// ---------------------------------------------------------------------------
+
+import { documentStatus, duplicateMaterial, lineNumber } from '../src/domain/documentLines.js';
+
+describe('Multi-line documents', () => {
+  test('line 1 keeps the document number; later lines are suffixed', () => {
+    assert.equal(lineNumber('RF-012', 1), 'RF-012');
+    assert.equal(lineNumber('RF-012', 2), 'RF-012/2');
+    assert.equal(lineNumber('GRN-0100', 12), 'GRN-0100/12');
+  });
+
+  test('a line number must be a positive whole number', () => {
+    assert.throws(() => lineNumber('RF-012', 0));
+    assert.throws(() => lineNumber('RF-012', 1.5));
+    assert.throws(() => lineNumber('', 1));
+  });
+
+  test('the same material twice on one document is caught', () => {
+    const lines = [{ item: 'Fabric', sub: '10 oz' }, { item: 'Zipper' }, { item: 'Fabric', sub: '10 oz' }];
+    assert.deepEqual(duplicateMaterial(lines, (l) => `${l.item}|${l.sub ?? ''}`), { first: 0, second: 2, key: 'Fabric|10 oz' });
+    assert.equal(duplicateMaterial(lines.slice(0, 2), (l) => l.item), null);
+  });
+
+  test('a document is as far along as its least-advanced live line', () => {
+    assert.equal(documentStatus([{ status: 'PENDING' }, { status: 'PENDING' }]), 'PENDING');
+    assert.equal(documentStatus([{ status: 'APPROVED' }, { status: 'PENDING' }]), 'PARTLY_APPROVED');
+    assert.equal(documentStatus([{ status: 'APPROVED' }, { status: 'REJECTED' }]), 'APPROVED');
+    assert.equal(documentStatus([{ status: 'REJECTED' }, { status: 'REJECTED' }]), 'REJECTED');
+    assert.equal(documentStatus([]), 'EMPTY');
+  });
+});

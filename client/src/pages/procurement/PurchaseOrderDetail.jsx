@@ -30,6 +30,7 @@ import { Detail, DetailGrid, TraceChain } from '../shared/Detail.jsx';
 import { fmtDate, fmtMoney, fmtNum } from '../../utils/format.js';
 import PurchaseOrderForm from './PurchaseOrderForm.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
+import { PartOfDocument } from './DocumentPages.jsx';
 
 export default function PurchaseOrderDetail() {
   const { id } = useParams();
@@ -130,6 +131,8 @@ export default function PurchaseOrderDetail() {
           </>
         }
       />
+
+      <PartOfDocument header={po.header} to={`/purchase-orders/documents/${po.header?.id}`} label="purchase order" />
 
       {banner && (
         <Alert kind={banner.kind} onDismiss={() => setBanner(null)}>

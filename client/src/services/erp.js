@@ -203,6 +203,11 @@ export const quotations = {
   get: (id) => request({ method: 'GET', url: `/quotations/${id}` }),
   options: (params) => request({ method: 'GET', url: '/quotations/options', params }),
   create: (body) => request({ method: 'POST', url: '/quotations', data: body }),
+  /** Multi-line: one vendor quote, several items. */
+  createDocument: (body) => request({ method: 'POST', url: '/quotations/documents', data: body }),
+  getDocument: (id) => request({ method: 'GET', url: `/quotations/documents/${id}` }),
+  approveDocument: (id, body) => request({ method: 'POST', url: `/quotations/documents/${id}/approve`, data: body ?? {} }),
+  rejectDocument: (id, reason) => request({ method: 'POST', url: `/quotations/documents/${id}/reject`, data: { reason } }),
   update: (id, body) => request({ method: 'PATCH', url: `/quotations/${id}`, data: body }),
   remove: (id) => request({ method: 'DELETE', url: `/quotations/${id}` }),
 
@@ -254,6 +259,12 @@ export const purchaseOrders = {
   get: (id) => request({ method: 'GET', url: `/purchase-orders/${id}` }),
   options: (params) => request({ method: 'GET', url: '/purchase-orders/options', params }),
   create: (body) => request({ method: 'POST', url: '/purchase-orders', data: body }),
+  /** Multi-line: one PO, many items. */
+  createDocument: (body) => request({ method: 'POST', url: '/purchase-orders/documents', data: body }),
+  getDocument: (id) => request({ method: 'GET', url: `/purchase-orders/documents/${id}` }),
+  printDocument: (id) => request({ method: 'GET', url: `/purchase-orders/documents/${id}/print` }),
+  approveDocument: (id, body) => request({ method: 'POST', url: `/purchase-orders/documents/${id}/approve`, data: body ?? {} }),
+  rejectDocument: (id, reason) => request({ method: 'POST', url: `/purchase-orders/documents/${id}/reject`, data: { reason } }),
   update: (id, body) => request({ method: 'PATCH', url: `/purchase-orders/${id}`, data: body }),
   remove: (id) => request({ method: 'DELETE', url: `/purchase-orders/${id}` }),
   setStatus: (id, status) =>
@@ -316,6 +327,9 @@ export const grns = {
    * ledger is not a state this system holds.
    */
   create: (body) => request({ method: 'POST', url: '/grns', data: body }),
+  /** Multi-line: one delivery, one bill, several PO lines. */
+  createDocument: (body) => request({ method: 'POST', url: '/grns/documents', data: body }),
+  getDocument: (id) => request({ method: 'GET', url: `/grns/documents/${id}` }),
   update: (id, body) => request({ method: 'PATCH', url: `/grns/${id}`, data: body }),
   remove: (id) => request({ method: 'DELETE', url: `/grns/${id}` }),
 

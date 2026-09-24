@@ -242,9 +242,46 @@ async function permissionExists(code) {
   return Boolean(await prisma.permission.findUnique({ where: { code }, select: { id: true } }));
 }
 
+/**
+ * MULTI-LINE DOCUMENTS SPEAK ONCE.
+ *
+ * Raising or approving a ten-line PO writes ten trail entries, one per line,
+ * and would tell the Director ten times. A line is a "follower" when another
+ * line of the same document had the same thing happen in the last two
+ * minutes; only the first speaks, and its link opens the line - from which
+ * the whole document is one click.
+ */
+const LINE_MODELS = { PURCHASE_ORDER: 'purchaseOrder', VENDOR_QUOTATION: 'vendorQuotation', GRN: 'grn' };
+
+async function isFollowerLine(row) {
+  const model = LINE_MODELS[row.documentType];
+  if (!model) return false;
+  const line = await prisma[model]
+    .findUnique({ where: { id: row.documentId }, select: { headerId: true } })
+    .catch(() => null);
+  if (!line?.headerId) return false;
+  const siblings = await prisma[model].findMany({
+    where: { headerId: line.headerId, id: { not: row.documentId } },
+    select: { id: true },
+  });
+  if (!siblings.length) return false;
+  const earlier = await prisma.approvalHistory.findFirst({
+    where: {
+      documentType: row.documentType,
+      documentId: { in: siblings.map((s) => s.id) },
+      action: row.action,
+      actedAt: { gte: new Date(Date.now() - 120_000), lte: row.actedAt ?? new Date() },
+      id: { not: row.id },
+    },
+    select: { id: true },
+  });
+  return Boolean(earlier);
+}
+
 export async function handleApprovalEvent(row) {
   const rule = recipientsForApprovalEvent(row);
   if (!rule) return { created: 0, recipients: 0 };
+  if (await isFollowerLine(row)) return { created: 0, recipients: 0 };
 
   const { title, body } = describeApprovalEvent(row, rule.kind);
   const base = {

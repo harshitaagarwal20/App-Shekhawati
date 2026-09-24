@@ -100,6 +100,7 @@ after(async () => {
   if (createdPoIds.length) {
     await prisma.approvalHistory.deleteMany({ where: { documentId: { in: createdPoIds } } });
     await prisma.purchaseOrder.deleteMany({ where: { id: { in: createdPoIds } } });
+    await prisma.purchaseOrderHeader.deleteMany({ where: { id: { in: createdHeaderIds } } });
   }
   if (order) await prisma.buyerOrder.delete({ where: { id: order.id } });
   await prisma.$disconnect();
@@ -113,6 +114,8 @@ after(async () => {
  * the ceiling what it makes of it. Driving the API would mean satisfying
  * maker-checker to reach APPROVED, which is a different control's test.
  */
+const createdHeaderIds = [];
+
 async function givenPo({ orderQty, status, approvalStatus, workflowState }) {
   // The table's CHECK constraints insist a decided PO carries its decision:
   // a name and a decidedAt for anything past PENDING, an approvedAt for an
@@ -122,8 +125,17 @@ async function givenPo({ orderQty, status, approvalStatus, workflowState }) {
   const decided = approvalStatus !== 'PENDING';
   const decidedAt = decided ? new Date() : null;
 
+  // Multi-line: every PO line belongs to a PO document.
+  const poNo = `C1-CX-${stamp}-${createdPoIds.length + 1}`;
+  const header = await prisma.purchaseOrderHeader.create({
+    data: { poNo, poDate: new Date(), vendorId: vendor.id },
+  });
+  createdHeaderIds.push(header.id);
+
   const row = await prisma.purchaseOrder.create({
     data: {
+      headerId: header.id,
+      lineNo: 1,
       approvedByName: decided ? 'C1 ceiling test' : null,
       decidedAt,
       approvedAt: approvalStatus === 'APPROVED' ? decidedAt : null,

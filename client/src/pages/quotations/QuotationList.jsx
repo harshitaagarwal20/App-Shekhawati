@@ -82,9 +82,14 @@ export default function QuotationList() {
               rowCount={list.meta.total}
             />
             {canCreate && (
+              <>
+              <button type="button" className="btn" onClick={() => navigate('/quotations/new-document')}>
+                New multi-item quote
+              </button>
               <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
                 New quotation
               </button>
+              </>
             )}
           </>
         }

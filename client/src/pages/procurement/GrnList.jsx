@@ -106,9 +106,14 @@ export default function GrnList() {
               rowCount={list.meta.total}
             />
             {canCreate && (
+              <>
+              <button type="button" className="btn" onClick={() => navigate('/grns/new-document')}>
+                Receive several PO lines
+              </button>
               <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
                 Post a receipt
               </button>
+              </>
             )}
           </>
         }

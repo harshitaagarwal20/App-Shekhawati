@@ -70,7 +70,7 @@ if (live) {
 }
 
 const TAG = `APPRV-${Date.now()}`;
-const made = { quotations: [] };
+const made = { quotations: [], headers: [] };
 let vendorId = null;
 
 if (live) {
@@ -84,6 +84,7 @@ after(async () => {
       where: { documentType: 'VENDOR_QUOTATION', documentId: { in: made.quotations } },
     });
     await prisma.vendorQuotation.deleteMany({ where: { id: { in: made.quotations } } });
+    await prisma.vendorQuotationHeader.deleteMany({ where: { id: { in: made.headers } } });
   }
   await prisma.$disconnect();
 });
@@ -92,9 +93,19 @@ after(async () => {
  * A quotation sitting at PENDING_APPROVAL, raised by nobody in particular so
  * that maker-checker does not refuse the approval before the race is reached.
  */
+/** Multi-line: every quotation line belongs to a quote document. */
+async function quoteHeader(quotationNo) {
+  const h = await prisma.vendorQuotationHeader.create({
+    data: { quotationNo, quotationDate: new Date(), vendorId },
+  });
+  made.headers.push(h.id);
+  return h.id;
+}
+
 async function pendingQuotation(suffix) {
   const q = await prisma.vendorQuotation.create({
     data: {
+      headerId: await quoteHeader(`${TAG}-${suffix}`),
       quotationNo: `${TAG}-${suffix}`,
       quotationDate: new Date(),
       item: 'Fabric',
@@ -335,6 +346,7 @@ describe('F-02 - a quotation decision moves the workflow state too', () => {
     const user = await prisma.user.findFirst({ where: { username: 'admin' }, select: { id: true, fullName: true } });
     const q = await prisma.vendorQuotation.create({
       data: {
+        headerId: await quoteHeader(`${TAG}-SELF`),
         quotationNo: `${TAG}-SELF`,
         quotationDate: new Date(),
         item: 'Fabric',

@@ -3301,3 +3301,30 @@ table.data.dash-mini tr:first-child td { border-top: none; }
 .cost-tile-label { font-size: 11.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
 .cost-tile-value { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .cost-tile-sub { font-size: 11.5px; color: var(--text-muted); }
+
+/* --- Multi-line PO print ---------------------------------------------------- */
+
+.doc-sheet {
+  background: #fff;
+  color: #111;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  max-width: 900px;
+}
+.doc-head, .doc-parties {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.doc-parties { padding: 12px 0; border-top: 1px solid #ddd; border-bottom: 1px solid #ddd; }
+.doc-lines { width: 100%; margin: 12px 0; }
+.doc-sign { display: flex; justify-content: space-between; margin-top: 56px; }
+.doc-sign > div { border-top: 1px solid #999; padding-top: 4px; min-width: 180px; text-align: center; }
+.card-bad { border-color: var(--danger); }
+@media print {
+  .no-print { display: none !important; }
+  .doc-sheet { border: 0; padding: 0; max-width: none; }
+}

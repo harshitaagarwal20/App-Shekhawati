@@ -119,9 +119,14 @@ export default function PurchaseOrderList() {
               rowCount={list.meta.total}
             />
             {canCreate && (
+              <>
+              <button type="button" className="btn" onClick={() => navigate('/purchase-orders/new-document')}>
+                New multi-item PO
+              </button>
               <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
                 New purchase order
               </button>
+              </>
             )}
           </>
         }

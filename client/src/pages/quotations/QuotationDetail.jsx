@@ -23,6 +23,7 @@ import {
 import QuotationForm from './QuotationForm.jsx';
 import { fmtDate, fmtDateTime } from '../../utils/format.js';
 import TableWrap from '../../components/TableWrap.jsx';
+import { PartOfDocument } from '../procurement/DocumentPages.jsx';
 
 
 const fmtNum = (v) =>
@@ -118,6 +119,8 @@ export default function QuotationDetail() {
           </>
         }
       />
+
+      <PartOfDocument header={quotation.header} to={`/quotations/documents/${quotation.header?.id}`} label="quotation" />
 
       {banner && (
         <Alert kind={banner.kind} onDismiss={() => setBanner(null)}>
