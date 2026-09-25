@@ -45,7 +45,7 @@ const schema = z.object({
   //
   //  The state code is the first two digits of the company's own GSTIN.
   COMPANY_NAME: z.string().default('Sekawati Impex'),
-  COMPANY_ADDRESS: z.string().default('Jaipur, Rajasthan, India'),
+  COMPANY_ADDRESS: z.string().default('G-90, Garment Zone, Sitapura Industrial Area, Jaipur - 302022'),
   COMPANY_GSTIN: z.string().default(''),
   COMPANY_STATE_CODE: z
     .string()

@@ -225,7 +225,7 @@ export const EXTRA_REPORTS = {
     permission: 'CUTTING_ISSUE.VIEW',
     excelRef: '— derived from posted Cutting Issues',
     category: 'STAFF_EFFICIENCY',
-    filters: ['orderId', 'firmName', 'dateFrom', 'dateTo'],
+    filters: ['orderId', 'dateFrom', 'dateTo'],
     columns: [
       col('styleNo', 'Style'),
       col('styleDescription', 'Description'),

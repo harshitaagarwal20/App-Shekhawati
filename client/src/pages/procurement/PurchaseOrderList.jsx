@@ -260,7 +260,7 @@ export default function PurchaseOrderList() {
                     <td>
                       {po.item}
                       {(po.subCategory || po.accessoriesItem) && (
-                        <div className="faint">{po.subCategory ?? po.accessoriesItem}</div>
+                        <div className="faint">{po.subCategory ?? [po.accessoriesItem, po.accessoryType].filter(Boolean).join(' · ')}</div>
                       )}
                     </td>
                     <td>{po.vendor?.vendorName ?? '-'}</td>

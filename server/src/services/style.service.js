@@ -13,7 +13,7 @@
 import prisma from '../config/prisma.js';
 import { ApiError } from '../utils/ApiError.js';
 import { blockIfReferenced, makeCrud } from './crud.js';
-import { assertValueInList } from './masterList.service.js';
+import { assertAccessoryVariety, assertValueInList } from './masterList.service.js';
 import { OPTIONS_LIMIT } from '../utils/http.js';
 import { requirementFor as resolveRequirement } from '../domain/requirement.js';
 import { computeRequirement } from '../domain/requirement.js';
@@ -95,7 +95,7 @@ async function validateHeader(data) {
  *   it; it cannot be chosen for a new one. Null on create - a new style uses
  *   the list as it stands today.
  */
-async function validateBomLine(line, index, keepCategories = null) {
+async function validateBomLine(line, index, keepCategories = null, keepVarieties = null) {
   const at = `bom[${index}]`;
   await assertValueInList('ItemCategory', line.itemCategory, {
     field: `${at}.itemCategory`,
@@ -105,6 +105,10 @@ async function validateBomLine(line, index, keepCategories = null) {
   await assertValueInList('UOM', line.uom, { field: `${at}.uom`, required: true });
   if (line.subCategory) await assertValueInList('FabricSubCat', line.subCategory, { field: `${at}.subCategory` });
   if (line.accessoriesItem) await assertValueInList('AccessoriesItem', line.accessoriesItem, { field: `${at}.accessoriesItem` });
+  await assertAccessoryVariety(line.accessoriesItem, line.accessoryType, {
+    field: `${at}.accessoryType`,
+    allow: keepVarieties,
+  });
   if (line.colorCode) await assertValueInList('ColorCode', line.colorCode, { field: `${at}.colorCode` });
   if (line.content) await assertValueInList('FabricContent', line.content, { field: `${at}.content` });
   if (line.gsm) await assertValueInList('GSM', line.gsm, { field: `${at}.gsm` });
@@ -247,11 +251,14 @@ export async function update(id, input, actorId) {
      */
     const existing = await prisma.styleBomLine.findMany({
       where: { styleId: id, deletedAt: null },
-      select: { itemCategory: true },
+      select: { itemCategory: true, accessoryType: true },
     });
     const keepCategories = new Set(existing.map((l) => l.itemCategory).filter(Boolean));
+    const keepVarieties = new Set(existing.map((l) => l.accessoryType).filter(Boolean));
 
-    for (const [i, line] of synced.entries()) await validateBomLine(line, i, keepCategories);
+    for (const [i, line] of synced.entries()) {
+      await validateBomLine(line, i, keepCategories, keepVarieties);
+    }
 
     await prisma.$transaction([
       // Replace the BOM wholesale: hard-delete lines rather than soft-delete,
@@ -452,6 +459,7 @@ export async function requirementFor(styleId, qty) {
         itemCategory: line.itemCategory,
         subCategory: line.subCategory,
         accessoriesItem: line.accessoriesItem,
+        accessoryType: line.accessoryType,
         description: line.description,
         /* The BOM line's own colour, so a document built from this explosion
            does not have to be told again what the style already says. */

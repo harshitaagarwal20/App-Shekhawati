@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
-import { gatePasses as gpApi } from '../../services/erp.js';
+import { gatePasses as gpApi, purchaseOrders as poApi } from '../../services/erp.js';
 import {
   Alert,
   ConfirmDialog,
@@ -18,10 +18,10 @@ import {
   Field,
   Modal,
   PageHeader,
+  RecordSelect,
   Spinner,
   StatusBadge,
   TextArea,
-  TextInput,
 } from '../../components/ui.jsx';
 
 import { Detail, DetailGrid, TraceChain } from '../shared/Detail.jsx';
@@ -41,6 +41,8 @@ export default function GatePassDetail() {
   const [clearing, setClearing] = useState(false);
   const [allocating, setAllocating] = useState(false);
   const [allocDoc, setAllocDoc] = useState('');
+  const [allocPos, setAllocPos] = useState(null);
+  const [allocAllVendors, setAllocAllVendors] = useState(false);
   const [allocPurpose, setAllocPurpose] = useState('');
   const [allocBusy, setAllocBusy] = useState(false);
   const [allocError, setAllocError] = useState('');
@@ -67,6 +69,33 @@ export default function GatePassDetail() {
   useEffect(() => {
     load();
   }, [load]);
+
+  /*
+   * ALLOCATION IS BY PURCHASE ORDER, PICKED FROM A LIST.
+   *
+   * It was a typed document number that could be a PO, a job work or a
+   * cutting challan. A typed number is a typo waiting to happen at a busy gate,
+   * and the business allocates inward loads to POs. So the choice is the
+   * approved POs that are still expecting goods - from this pass's vendor
+   * first, since that is who drove in.
+   */
+  const vendorId = gp?.vendorId ?? null;
+  useEffect(() => {
+    if (!allocating) return;
+    let live = true;
+    setAllocPos(null);
+    poApi
+      .options({
+        approvedOnly: 'true',
+        openOnly: 'true',
+        ...(vendorId && !allocAllVendors ? { vendorId } : {}),
+      })
+      .then((rows) => live && setAllocPos(rows.filter((po) => Number(po.pendingQty) > 0)))
+      .catch(() => live && setAllocPos([]));
+    return () => {
+      live = false;
+    };
+  }, [allocating, allocAllVendors, vendorId]);
 
   async function doDelete() {
     setBusy(true);
@@ -138,11 +167,11 @@ export default function GatePassDetail() {
           <strong>Not allocated.</strong> This delivery was recorded at the gate from{' '}
           {gp.partyName}
           {gp.movementTime && ` at ${fmtDateTime(gp.movementTime)}`}, but has not been matched to a
-          purchase order, job work or cutting challan yet. It cannot be cleared until it is.
+          purchase order yet. It cannot be cleared until it is.
           {canAllocate && (
             <span className="row" style={{ marginTop: 8 }}>
               <button type="button" className="btn btn-sm btn-primary" onClick={() => setAllocating(true)}>
-                Allocate to a document
+                Allocate to a PO
               </button>
             </span>
           )}
@@ -284,23 +313,57 @@ export default function GatePassDetail() {
             {allocError && <Alert kind="error">{allocError}</Alert>}
             <p className="muted" style={{ marginTop: 0 }}>
               {gp.partyName} delivered
-              {gp.movementTime && ` at ${fmtDateTime(gp.movementTime)}`}. Name the document this
-              load answers - the item, quantity and UOM are taken from it.
+              {gp.movementTime && ` at ${fmtDateTime(gp.movementTime)}`}. Choose the purchase
+              order this load is for - the item, quantity and UOM are taken from it.
             </p>
             <Field
-              label="Document"
+              label="Purchase Order"
               required
-              hint="The purchase order, job work or cutting challan number."
+              hint="Approved POs still waiting for goods. Each shows what is pending."
               htmlFor="alloc-doc"
             >
-              <TextInput
+              <RecordSelect
                 id="alloc-doc"
+                options={allocPos ?? []}
+                loading={allocPos === null}
+                getValue={(po) => po.poId}
+                getLabel={(po) =>
+                  [
+                    po.header?.poNo && po.header.poNo !== po.poId ? `${po.header.poNo} / ${po.poId}` : po.poId,
+                    [po.accessoriesItem ?? po.subCategory ?? po.item, po.accessoryType, po.colorCode]
+                      .filter(Boolean)
+                      .join(' '),
+                    `${fmtNum(po.pendingQty)} ${po.uom} pending`,
+                    po.vendor?.vendorName,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')
+                }
+                placeholder="Select the PO..."
                 value={allocDoc}
                 onChange={(e) => setAllocDoc(e.target.value)}
-                placeholder="RF-001, DY-001, CH-001..."
-                autoFocus
               />
             </Field>
+            {vendorId && (
+              <label className="row" style={{ gap: 6, fontSize: 12.5, marginTop: -6, marginBottom: 10 }}>
+                <input
+                  type="checkbox"
+                  checked={allocAllVendors}
+                  onChange={(e) => {
+                    setAllocAllVendors(e.target.checked);
+                    setAllocDoc('');
+                  }}
+                />
+                Show POs of all vendors
+              </label>
+            )}
+            {allocPos && allocPos.length === 0 && (
+              <Alert kind="warning">
+                No approved PO is waiting for goods
+                {vendorId && !allocAllVendors ? ' from this vendor' : ''}. The PO must be approved
+                before goods can be allocated to it.
+              </Alert>
+            )}
             <Field label="Purpose" required htmlFor="alloc-purpose">
               {/* An enum, not a Master List. This asked for a list called
                   "Purpose", which is not one of the twenty-five that exist, so
@@ -314,8 +377,8 @@ export default function GatePassDetail() {
               />
             </Field>
             <p className="faint" style={{ fontSize: 11.5, marginBottom: 0 }}>
-              A pass is allocated once. If it goes to the wrong document, cancel it and raise the
-              right one - that leaves both facts on the record.
+              A pass is allocated once. If it goes to the wrong PO, cancel it and raise the right
+              one - that leaves both facts on the record.
             </p>
           </div>
           <div className="modal-footer">
@@ -333,7 +396,7 @@ export default function GatePassDetail() {
                     purpose: allocPurpose || undefined,
                   });
                   setAllocating(false);
-                  setBanner({ kind: 'success', text: `${gp.gatePassNo} allocated to ${allocDoc.trim()}.` });
+                  setBanner({ kind: 'success', text: `${gp.gatePassNo} allocated to PO ${allocDoc.trim()}.` });
                   await load();
                 } catch (e) {
                   setAllocError(e.message);

@@ -1085,7 +1085,9 @@ export async function getById(id) {
 // Container No is typed at Planning and inherited here. See planning.service.js.
 async function validateDropdowns(data) {
   if (data.firmName !== undefined) {
-    await assertValueInList('StitchingUnit', data.firmName, { field: 'firmName', required: true });
+    // Optional: cutting is not tracked by unit. A unit that IS named must
+    // still be a real one.
+    await assertValueInList('StitchingUnit', data.firmName, { field: 'firmName' });
   }
 }
 
@@ -1129,7 +1131,7 @@ export async function create(input, actorId) {
         // Same reason as the ceiling above: a cutting plan's pieces live in
         // plannedQty now, and plannedCuttingPcs is zero on one.
         plannedCutting: D(input.plannedCutting ?? planning?.plannedQty ?? 0),
-        firmName: input.firmName,
+        firmName: input.firmName ?? '',
         unitWiseCuttingPcsToBeIssued: D(input.unitWiseCuttingPcsToBeIssued ?? 0),
         cuttingPcsIssued: D(input.cuttingPcsIssued ?? 0),
         cuttingPcsDamaged: D(input.cuttingPcsDamaged ?? 0),
@@ -1165,7 +1167,7 @@ export async function create(input, actorId) {
     action: 'SUBMITTED',
     toStatus: 'DRAFT',
     actor: { userId: actorId },
-    remarks: `Drafted for ${order.orderNo}, ${input.firmName}`,
+    remarks: `Drafted for ${order.orderNo}${input.firmName ? `, ${input.firmName}` : ''}`,
   });
 
   return { ...project(ci), verification };
@@ -1200,7 +1202,7 @@ export async function update(id, input, actorId) {
       ...(input.plannedCutting !== undefined
         ? { plannedCutting: D(input.plannedCutting) }
         : {}),
-      ...(input.firmName !== undefined ? { firmName: input.firmName } : {}),
+      ...(input.firmName !== undefined ? { firmName: input.firmName ?? '' } : {}),
       ...(input.unitWiseCuttingPcsToBeIssued !== undefined
         ? { unitWiseCuttingPcsToBeIssued: D(input.unitWiseCuttingPcsToBeIssued) }
         : {}),
@@ -1433,7 +1435,7 @@ export async function post(id, input, actor) {
       documentId: id,
       submittedTo: actor.fullName,
       actor,
-      remarks: `Posted: ${D(existing.cuttingPcsIssued).toFixed(0)} pcs to ${existing.firmName}`,
+      remarks: `Posted: ${D(existing.cuttingPcsIssued).toFixed(0)} pcs to ${existing.firmName || 'stitching'}`,
     });
 
     await engine.approve(tx, {
@@ -1441,7 +1443,7 @@ export async function post(id, input, actor) {
       documentId: id,
       actor,
       remarks:
-        `Cut and issued to ${existing.firmName}` +
+        `Cut and issued to ${existing.firmName || 'stitching'}` +
         (assessment && !assessment.within
           ? ` - ${assessment.overLimitQty} pcs over the permitted quantity, authorised.`
           : '.'),

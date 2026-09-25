@@ -193,6 +193,8 @@ const bomLineSchema = z
     itemCategory: requiredDropdown(60, 'Item category'),
     subCategory: dropdown(60),
     accessoriesItem: dropdown(80),
+    /** L_AccessoryVariety - which button, which zipper. */
+    accessoryType: dropdown(120),
     description: optionalText(200),
     colorCode: dropdown(60),
     content: dropdown(80),

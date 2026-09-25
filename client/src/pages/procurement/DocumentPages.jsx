@@ -40,6 +40,7 @@ import {
   StatusBadge,
   TextArea,
   TextInput,
+  VarietySelect,
 } from '../../components/ui.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
 import { fmtDate, fmtDateTime } from '../../utils/format.js';
@@ -98,10 +99,15 @@ function MaterialCells({ line, set }) {
       <td style={{ minWidth: 160 }}>
         {acc ? (
           <>
+            {/* Changing the item clears the variety: a button variety means
+                nothing on a zipper. */}
             <MasterSelect listCode="AccessoriesItem" value={line.accessoriesItem} currentValue={line.accessoriesItem}
-              aria-label="Accessories item" onChange={(e) => set({ accessoriesItem: e.target.value })} />
-            <TextInput placeholder="type, e.g. #5 nylon" value={line.accessoryType} maxLength={120}
-              style={{ marginTop: 4 }} onChange={(e) => set({ accessoryType: e.target.value })} />
+              aria-label="Accessories item" onChange={(e) => set({ accessoriesItem: e.target.value, accessoryType: '' })} />
+            <div style={{ marginTop: 4 }}>
+              <VarietySelect accessoriesItem={line.accessoriesItem} value={line.accessoryType}
+                currentValue={line.accessoryType} aria-label="Variety"
+                onChange={(e) => set({ accessoryType: e.target.value })} />
+            </div>
           </>
         ) : (
           <MasterSelect listCode="FabricSubCat" value={line.subCategory} currentValue={line.subCategory}
@@ -495,7 +501,8 @@ export function PoDocumentPrint() {
             {p.vendor?.gstNo && <div className="muted">GSTIN {p.vendor.gstNo}</div>}
           </div>
           <div>
-            {p.header.orderNo && <div>Buyer order: <span className="code">{p.header.orderNo}</span></div>}
+            {/* No buyer order: the vendor's copy does not say whose order the
+                goods are for. See PurchaseOrderBody in DocumentPrint. */}
             {p.header.paymentTerms && <div>Payment: {p.header.paymentTerms}</div>}
           </div>
         </div>
@@ -507,7 +514,7 @@ export function PoDocumentPrint() {
             {p.lines.map((l) => (
               <tr key={l.poId}>
                 <td>{l.lineNo}</td>
-                <td>{describe(l)}{l.gsm ? ` · ${l.gsm}` : ''}{l.orderNo ? <div className="faint">for {l.orderNo}</div> : null}</td>
+                <td>{describe(l)}{l.gsm ? ` · ${l.gsm}` : ''}</td>
                 <td>{l.hsnCode ?? ''}</td>
                 <td className="num">{qty(l.orderQty)}</td>
                 <td>{l.uom}</td>
@@ -986,7 +993,7 @@ export function GrnDocumentDetail() {
                   <td className="code">
                     <Link to={`/purchase-orders/${l.purchaseOrder?.id}`} onClick={(e) => e.stopPropagation()}>{l.purchaseOrder?.poId}</Link>
                   </td>
-                  <td>{[l.item, l.purchaseOrder?.subCategory, l.purchaseOrder?.accessoriesItem, l.purchaseOrder?.colorCode].filter(Boolean).join(' · ')}</td>
+                  <td>{[l.item, l.purchaseOrder?.subCategory, l.purchaseOrder?.accessoriesItem, l.purchaseOrder?.accessoryType, l.purchaseOrder?.colorCode].filter(Boolean).join(' · ')}</td>
                   <td className="num">{qty(l.receivingQty)} {l.uom}</td>
                   <td className="num">{money(l.inventoryRate)}</td>
                   <td className="num">{money(l.amount)}</td>

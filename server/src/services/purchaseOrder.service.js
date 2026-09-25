@@ -63,7 +63,7 @@ import { Prisma } from '@prisma/client';
 import prisma from '../config/prisma.js';
 import { ApiError } from '../utils/ApiError.js';
 import { OPTIONS_LIMIT, searchFilter } from '../utils/http.js';
-import { assertValueInList } from './masterList.service.js';
+import { assertAccessoryVariety, assertValueInList } from './masterList.service.js';
 import { nextNumber, peekNumber } from './documentNumber.service.js';
 import * as engine from './approvalEngine.js';
 import { env } from '../config/env.js';
@@ -423,10 +423,23 @@ const LIST_FIELDS = [
   ['count', 'Count'],
 ];
 
-async function validateDropdowns(data) {
+async function validateDropdowns(data, existing = null) {
   for (const [field, listCode] of LIST_FIELDS) {
     if (data[field] === undefined) continue;
     await assertValueInList(listCode, data[field], { field });
+  }
+
+  /*
+   * The variety must be a listed one that belongs to the item. On an edit the
+   * value the row already holds is kept even if it is not in the list - the
+   * free text typed before varieties were a dropdown.
+   */
+  if (data.accessoryType !== undefined) {
+    await assertAccessoryVariety(
+      data.accessoriesItem !== undefined ? data.accessoriesItem : existing?.accessoriesItem,
+      data.accessoryType,
+      { allow: existing?.accessoryType ? [existing.accessoryType] : null },
+    );
   }
 }
 
@@ -1484,7 +1497,7 @@ export async function update(id, input, actorId) {
     );
   }
 
-  await validateDropdowns(input);
+  await validateDropdowns(input, existing);
 
   const vendorId = input.vendorId ?? existing.vendorId;
   const vendor = await resolveVendor(vendorId);
@@ -2222,6 +2235,8 @@ export async function options({ vendorId, orderId, approvedOnly, openOnly } = {}
       address: true,
       vendor: { select: { id: true, vendorName: true, vendorCode: true, address: true } },
       order: { select: { id: true, orderNo: true } },
+      // The multi-line PO the line belongs to, so a dropdown can say "PO-003".
+      header: { select: { poNo: true } },
     },
   });
 

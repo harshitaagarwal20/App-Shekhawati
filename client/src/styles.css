@@ -320,6 +320,23 @@ a { color: var(--primary); }
   text-overflow: ellipsis;
   transition: background var(--t-fast), color var(--t-fast);
 }
+/* Label and plain-words hint on two lines. Each clips on its own, so a long
+   hint cannot push the label out of view. */
+.nav-link-label,
+.nav-link-hint {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nav-link-label { font-size: 13.5px; }
+.nav-link-hint {
+  margin-top: 1px;
+  font-size: 11.5px;
+  font-weight: 400;
+  color: #7f97ab;
+}
+.nav-link:hover .nav-link-hint,
+.nav-link.active .nav-link-hint { color: #b9cad8; }
 .nav-link:hover { background: rgba(255, 255, 255, 0.07); color: #fff; }
 .nav-link.active {
   background: rgba(109, 191, 143, 0.16);

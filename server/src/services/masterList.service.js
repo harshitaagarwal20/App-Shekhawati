@@ -432,3 +432,43 @@ export async function assertValueInList(
     { field, list: listCode, listName, validValues: shown },
   );
 }
+
+/**
+ * An accessory variety must be in the AccessoryVariety list AND belong to the
+ * accessories item it is recorded against.
+ *
+ * Each variety carries its item in `attributes.item` ("4-hole horn 18L" is a
+ * Button variety). Checking the list alone would let a zipper be recorded as
+ * a button variety, which is two stock items for nobody's benefit. A value
+ * with no item tagged - one imported from a file, say - fits any item.
+ *
+ * `allow` grandfathers what the row already holds, exactly as in
+ * assertValueInList: the free text typed before varieties were a list, or a
+ * variety since withdrawn, can be KEPT on an edit but never newly chosen.
+ */
+export async function assertAccessoryVariety(
+  accessoriesItem,
+  accessoryType,
+  { field = 'accessoryType', allow = null } = {},
+) {
+  if (!accessoryType) return;
+  if (allow && (allow instanceof Set ? allow.has(accessoryType) : allow.includes(accessoryType))) return;
+
+  if (!accessoriesItem) {
+    throw ApiError.badRequest('Choose the accessories item before its variety.', { field });
+  }
+
+  await assertValueInList('AccessoryVariety', accessoryType, { field });
+
+  const hit = await prisma.masterListValue.findFirst({
+    where: { value: accessoryType, deletedAt: null, list: { code: 'AccessoryVariety', deletedAt: null } },
+    select: { attributes: true },
+  });
+  const owner = hit?.attributes?.item;
+  if (owner && owner !== accessoriesItem) {
+    throw ApiError.badRequest(
+      `"${accessoryType}" is a ${owner} variety, not a ${accessoriesItem} one.`,
+      { field },
+    );
+  }
+}

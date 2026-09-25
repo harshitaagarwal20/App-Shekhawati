@@ -495,7 +495,7 @@ function MaterialSpec({ po }) {
     ['Item', po.item],
     ['Sub Category', po.subCategory],
     ['Accessories Item', po.accessoriesItem],
-    ['Accessory Type', po.accessoryType],
+    ['Variety', po.accessoryType],
     ['Colour', po.colorCode],
     ['Content', po.content],
     ['GSM', po.gsm],

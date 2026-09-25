@@ -30,7 +30,7 @@ import { Prisma } from '@prisma/client';
 import prisma from '../config/prisma.js';
 import { ApiError } from '../utils/ApiError.js';
 import { OPTIONS_LIMIT, searchFilter } from '../utils/http.js';
-import { assertValueInList } from './masterList.service.js';
+import { assertAccessoryVariety, assertValueInList } from './masterList.service.js';
 import { nextNumber } from './documentNumber.service.js';
 import * as engine from './approvalEngine.js';
 import { documentStatus, duplicateMaterial, lineNumber } from '../domain/documentLines.js';
@@ -121,7 +121,7 @@ const LIST_FIELDS = [
   ['authorisedBy', 'AuthorisedBy'],
 ];
 
-async function validateDropdowns(data) {
+async function validateDropdowns(data, existing = null) {
   for (const [field, listCode] of LIST_FIELDS) {
     if (data[field] === undefined) continue;
     await assertValueInList(listCode, data[field], { field });
@@ -132,6 +132,19 @@ async function validateDropdowns(data) {
   }
   if (data.accessoriesItem !== undefined) {
     await assertValueInList('AccessoriesItem', data.accessoriesItem, { field: 'accessoriesItem' });
+  }
+
+  /*
+   * The variety must be a listed one that belongs to the item. On an edit the
+   * value the row already holds is kept even if it is not in the list - the
+   * free text typed before varieties were a dropdown.
+   */
+  if (data.accessoryType !== undefined) {
+    await assertAccessoryVariety(
+      data.accessoriesItem !== undefined ? data.accessoriesItem : existing?.accessoriesItem,
+      data.accessoryType,
+      { allow: existing?.accessoryType ? [existing.accessoryType] : null },
+    );
   }
 }
 
@@ -520,7 +533,7 @@ export async function update(id, input, actorId) {
     );
   }
 
-  await validateDropdowns(input);
+  await validateDropdowns(input, existing);
   if (input.vendorId !== undefined) await resolveVendor(input.vendorId);
   if (input.orderId !== undefined) await resolveOrder(input.orderId);
 

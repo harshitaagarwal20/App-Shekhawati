@@ -83,7 +83,7 @@ const BACK_TO = {
  */
 const COMPANY = {
   name: 'Sekawati Impex',
-  line: 'G-82, Garment Zone, Sitapura Industrial Area, Tonk Road, Jaipur - 302022, Rajasthan, India',
+  line: 'G-90, Garment Zone, Sitapura Industrial Area, Jaipur - 302022, Rajasthan, India',
   gstin: '08ADSPG8203G1ZG',
   phone: '+91 80438 26505',
 };
@@ -312,7 +312,7 @@ function PoMeta({ label, value }) {
  * because that is what the format is and what a second line would need.
  */
 function PurchaseOrderBody({ doc }) {
-  const { line, totals, references, approval } = doc;
+  const { line, totals, approval } = doc;
   const company = companyOf(doc);
   const excess = Number(line.excessAllowedPct) > 0 ? line.excessAllowedPct : null;
 
@@ -348,9 +348,10 @@ function PurchaseOrderBody({ doc }) {
         <PoMeta label="PO No" value={doc.poId} />
         <PoMeta label="PO Date" value={fmtDate(doc.poDate)} />
         <PoMeta label="Order mode" value={fmtEnum(doc.orderMode)} />
-        <PoMeta label="Buyer order" value={references.orderNo} />
-        <PoMeta label="Buyer" value={references.buyerName} />
-        <PoMeta label="Style" value={references.styleNo} />
+        {/* No buyer order, buyer or style. This copy goes to the VENDOR, who
+            needs none of them - and a supplier who learns whose order the
+            cloth is for can go round us to the buyer. The link to the buyer
+            order stays on the PO screen, where the ceiling is checked. */}
       </div>
 
       <table className="print-table po-items">

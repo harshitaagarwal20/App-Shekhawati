@@ -18,6 +18,7 @@ import {
   ConfirmDialog,
   EmptyState,
   Field,
+  MasterSelect,
   Modal,
   RowActions,
   PageHeader,
@@ -27,6 +28,16 @@ import {
   TextInput,
 } from '../../components/ui.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
+
+/**
+ * Lists whose values each belong to a value of ANOTHER list. The dropdown that
+ * reads them shows only the values of the parent chosen beside it - picking
+ * Button offers button varieties and nothing else. The parent is stored on the
+ * value as `attributes.item`.
+ */
+const PARENT_LIST = {
+  AccessoryVariety: { listCode: 'AccessoriesItem', label: 'For item' },
+};
 
 export default function ListMaster() {
   const { can } = useAuth();
@@ -41,6 +52,7 @@ export default function ListMaster() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [banner, setBanner] = useState(null);
   const [newValue, setNewValue] = useState('');
+  const [newParent, setNewParent] = useState('');
   const [busy, setBusy] = useState(false);
   const [creatingList, setCreatingList] = useState(false);
   const [newList, setNewList] = useState({ code: '', name: '', description: '' });
@@ -69,13 +81,18 @@ export default function ListMaster() {
     lists.reload();
   }
 
+  const parent = detail ? PARENT_LIST[detail.code] : null;
+
   async function addValue(e) {
     e.preventDefault();
     const value = newValue.trim();
-    if (!value) return;
+    if (!value || (parent && !newParent)) return;
     setBusy(true);
     try {
-      await masterLists.addValue(selected.id, { value });
+      await masterLists.addValue(selected.id, {
+        value,
+        ...(parent ? { attributes: { item: newParent } } : {}),
+      });
       setNewValue('');
       setBanner({ kind: 'success', text: `"${value}" added to ${detail.code}.` });
       afterValueChange(detail.code);
@@ -249,6 +266,18 @@ export default function ListMaster() {
 
                 {canEdit && (
                   <form className="row" onSubmit={addValue} style={{ marginBottom: 14 }}>
+                    {parent && (
+                      <div style={{ minWidth: 170 }}>
+                        <MasterSelect
+                          listCode={parent.listCode}
+                          value={newParent}
+                          onChange={(e) => setNewParent(e.target.value)}
+                          placeholder={`${parent.label}...`}
+                          aria-label={parent.label}
+                          disabled={busy}
+                        />
+                      </div>
+                    )}
                     <div style={{ flex: 1, minWidth: 200 }}>
                       <TextInput
                         placeholder="New value, exactly as it should read in dropdowns"
@@ -257,7 +286,11 @@ export default function ListMaster() {
                         disabled={busy}
                       />
                     </div>
-                    <button type="submit" className="btn btn-primary" disabled={busy || !newValue.trim()}>
+                    <button
+                      type="submit"
+                      className="btn btn-primary"
+                      disabled={busy || !newValue.trim() || (parent && !newParent)}
+                    >
                       Add
                     </button>
                   </form>
@@ -268,6 +301,7 @@ export default function ListMaster() {
                     <thead>
                       <tr>
                         <th style={{ width: 50 }}>Order</th>
+                        {parent && <th>{parent.label}</th>}
                         <th>Value</th>
                         <th style={{ width: 90 }}>Status</th>
                         {canEdit && <th style={{ textAlign: 'right' }}>Actions</th>}
@@ -276,7 +310,7 @@ export default function ListMaster() {
                     <tbody>
                       {(detail.values ?? []).length === 0 && (
                         <tr>
-                          <td colSpan={4}>
+                          <td colSpan={5}>
                             <EmptyState title="This list has no values yet" />
                           </td>
                         </tr>
@@ -284,6 +318,7 @@ export default function ListMaster() {
                       {(detail.values ?? []).map((v) => (
                         <tr key={v.id} className={v.isActive ? '' : 'inactive'}>
                           <td className="faint">{v.sortOrder}</td>
+                          {parent && <td>{v.attributes?.item ?? <span className="faint">Any</span>}</td>}
                           <td>{v.value}</td>
                           <td>
                             <span className={`badge ${v.isActive ? 'badge-active' : 'badge-inactive'}`}>

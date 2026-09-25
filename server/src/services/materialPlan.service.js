@@ -112,6 +112,7 @@ function projectLine(line) {
     category: line.category,
     subCategory: line.subCategory,
     accessoriesItem: line.accessoriesItem,
+    accessoryType: line.accessoryType,
     colorCode: line.colorCode,
     content: line.content,
     gsm: line.gsm,
@@ -294,6 +295,7 @@ function explode(style, orderLine) {
       skipped.push({
         itemCategory: line.itemCategory,
         accessoriesItem: line.accessoriesItem ?? null,
+        accessoryType: line.accessoryType ?? null,
         reason:
           `BOM line ${line.lineNo} carries no usable quantity per piece, so nothing can be ` +
           'required of it. Set the utilisation on the Style Master.',
@@ -306,6 +308,7 @@ function explode(style, orderLine) {
       category: categoryOfLine(line, { field: 'itemCategory' }),
       subCategory: line.subCategory ?? null,
       accessoriesItem: line.accessoriesItem ?? null,
+      accessoryType: line.accessoryType ?? null,
       colorCode: line.colorCode ?? null,
       content: line.content ?? null,
       gsm: line.gsm ?? null,
@@ -486,7 +489,9 @@ export async function drift(id) {
   const orderLine = resolveOrderLine(order, plan.orderLineId ?? undefined);
   const { usable } = explode(orderLine.style ?? order.style, orderLine);
 
-  const keyOf = (l) => `${l.itemCategory}|${l.accessoriesItem ?? ''}|${l.subCategory ?? ''}`;
+  // The variety is part of the key: an 18L and a 24L button are two lines.
+  const keyOf = (l) =>
+    `${l.itemCategory}|${l.accessoriesItem ?? ''}|${l.accessoryType ?? ''}|${l.subCategory ?? ''}`;
   const now = new Map(usable.map((l) => [keyOf(l), l]));
 
   const changes = [];

@@ -44,6 +44,7 @@ const lineSchema = z.object({
   itemCategory: optionalText(60),
   subCategory: optionalText(60),
   accessoriesItem: optionalText(80),
+  accessoryType: optionalText(120),
   description: optionalText(200),
   uom: optionalText(20),
   consumption: decimal('Consumption', { min: 0 }).optional(),

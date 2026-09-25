@@ -55,14 +55,17 @@ const fmt = (d) => (d ? new Date(d).toISOString().slice(0, 10).split('-').revers
  *
  * An approved PO first - that is a rate somebody paid - and an approved
  * quotation after it. Matched on category, sub-category and accessory, which
- * is what identifies a material on every document in this system. Returns
- * null rather than guessing: an unpriced line is visible, a wrong one is not.
+ * is what identifies a material on every document in this system - and on the
+ * variety when the line names one, since an 18L horn button is not priced like
+ * a 24L plastic one. Returns null rather than guessing: an unpriced line is
+ * visible, a wrong one is not.
  */
 export async function suggestRate(line) {
   const match = {
     item: line.itemCategory,
     subCategory: line.subCategory ?? null,
     accessoriesItem: line.accessoriesItem ?? null,
+    ...(line.accessoryType ? { accessoryType: line.accessoryType } : {}),
     deletedAt: null,
   };
   const po = await prisma.purchaseOrder.findFirst({
@@ -299,6 +302,7 @@ export async function create(input, actor) {
       itemCategory: b.itemCategory,
       subCategory: b.subCategory,
       accessoriesItem: b.accessoriesItem,
+      accessoryType: b.accessoryType,
       colorCode: b.colorCode,
       description: b.description,
       uom: b.uom,
@@ -365,6 +369,7 @@ export async function update(id, input, actor) {
         ...(l.itemCategory !== undefined ? { itemCategory: l.itemCategory } : {}),
         ...(l.subCategory !== undefined ? { subCategory: l.subCategory || null } : {}),
         ...(l.accessoriesItem !== undefined ? { accessoriesItem: l.accessoriesItem || null } : {}),
+        ...(l.accessoryType !== undefined ? { accessoryType: l.accessoryType || null } : {}),
         ...(l.description !== undefined ? { description: l.description || null } : {}),
         ...(l.uom !== undefined ? { uom: l.uom } : {}),
         ...(l.consumption !== undefined ? { consumption: D(l.consumption) } : {}),
@@ -489,6 +494,7 @@ export async function revise(id, actor) {
             itemCategory: l.itemCategory,
             subCategory: l.subCategory,
             accessoriesItem: l.accessoriesItem,
+            accessoryType: l.accessoryType,
             colorCode: l.colorCode,
             description: l.description,
             uom: l.uom,

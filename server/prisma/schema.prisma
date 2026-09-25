@@ -1293,6 +1293,10 @@ model StyleBomLine {
   subCategory     String? @map("sub_category") @db.VarChar(60)
   /// L_AccessoriesItem when itemCategory = Accessories ("Cotton Handle")
   accessoriesItem String? @map("accessories_item") @db.VarChar(80)
+  /// L_AccessoryVariety, only when accessoriesItem is set: WHICH button or
+  /// zipper. Carried to the material plan, and from the quotation to the PO,
+  /// the GRN and the stock item, so the variety is chosen, never retyped.
+  accessoryType   String? @map("accessory_type") @db.VarChar(120)
   /// Free description as it should print on the PO
   description     String? @db.VarChar(200)
   /// L_ColorCode
@@ -1433,10 +1437,10 @@ model StyleComponent {
   bomLineNo Int?    @map("bom_line_no")
   remarks   String? @db.Text
 
-  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
-  createdById String?   @map("created_by_id") @db.Uuid
-  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
-  updatedById String?   @map("updated_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdById String?  @map("created_by_id") @db.Uuid
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  updatedById String?  @map("updated_by_id") @db.Uuid
 
   @@unique([styleId, lineNo])
   @@index([styleId])
@@ -2586,7 +2590,6 @@ model Grn {
 
   @@unique([headerId, lineNo])
   @@index([headerId])
-
   /// F-04 - ONE BILL PER PO, AMONG THE RECEIPTS THAT STILL STAND.
   ///
   /// This was a plain `@@unique([purchaseOrderId, billNo])`, which is the
@@ -2857,10 +2860,10 @@ model FabricRoll {
   //  guessing a shade is how two batches end up in one bundle.
 
   /// The shade band the roll was graded into - "A", "B", "S1". Uppercased.
-  shade        String?   @db.VarChar(20)
+  shade             String?   @db.VarChar(20)
   /// The dye house's batch / lot number, from the mill's packing list at GRN
   /// or the job worker's challan when the roll comes back from dyeing.
-  dyeLot       String?   @map("dye_lot") @db.VarChar(40)
+  dyeLot            String?   @map("dye_lot") @db.VarChar(40)
   /// Who last graded it, and when - a shade is a judgement somebody made.
   shadeMarkedAt     DateTime? @map("shade_marked_at") @db.Timestamptz(3)
   shadeMarkedByName String?   @map("shade_marked_by_name") @db.VarChar(120)
@@ -2961,6 +2964,11 @@ model InventoryItem {
   subCategory     String  @default("") @map("sub_category") @db.VarChar(60)
   /// L_AccessoriesItem
   accessoriesItem String  @default("") @map("accessories_item") @db.VarChar(80)
+  /// L_AccessoryVariety. Part of the identity: 18L horn buttons and 24L
+  /// metal buttons in the same colour are two stock items with two balances,
+  /// not one "Button" balance nobody can issue from correctly. Empty for
+  /// fabric and for accessories received before varieties existed.
+  accessoryType   String  @default("") @map("accessory_type") @db.VarChar(120)
   /// L_ColorCode
   colorCode       String  @default("") @map("color_code") @db.VarChar(60)
   /// L_FabricContent
@@ -3000,7 +3008,7 @@ model InventoryItem {
   deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
   deletedById String?   @map("deleted_by_id") @db.Uuid
 
-  @@unique([itemCategory, subCategory, accessoriesItem, colorCode, gsm, count, uom], name: "inventory_item_identity")
+  @@unique([itemCategory, subCategory, accessoriesItem, accessoryType, colorCode, gsm, count, uom], name: "inventory_item_identity")
   @@index([itemCategory])
   @@index([category])
   @@index([isActive])
@@ -3217,14 +3225,14 @@ model FabricIssue {
   /// The roll's shade and dye lot AS ISSUED - snapshotted, because the shade
   /// check on the next issue against the same challan line is judged against
   /// what was actually cut, not against a roll somebody re-graded afterwards.
-  shade  String? @db.VarChar(20)
-  dyeLot String? @map("dye_lot") @db.VarChar(40)
+  shade          String? @db.VarChar(20)
+  dyeLot         String? @map("dye_lot") @db.VarChar(40)
   /// Set only when this issue knowingly put a second shade or lot onto a
   /// cutting challan line. The reason is the override; without it the issue
   /// is refused. Null on every issue that matched.
   shadeMixReason String? @map("shade_mix_reason") @db.Text
 
-  dyeIssues     DyeIssue[] @relation("JobWorkFirstIssue")
+  dyeIssues     DyeIssue[]     @relation("JobWorkFirstIssue")
   cuttingIssues CuttingIssue[]
 
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
@@ -3330,7 +3338,7 @@ model DyeIssue {
   /// of its challans (fabric issues). A PO for 10,000 may go out as two
   /// challans of 5,000. Re-derived from the challans on every issue, never
   /// typed. `dye_issues_issued_within_ordered` keeps it within `qty`.
-  issuedQty Decimal @default(0) @map("issued_qty") @db.Decimal(18, 4)
+  issuedQty Decimal       @default(0) @map("issued_qty") @db.Decimal(18, 4)
   /// The challans that sent fabric out against this order.
   challans  FabricIssue[] @relation("JobWorkChallans")
 
@@ -4023,6 +4031,8 @@ model MaterialPlanLine {
   category        ItemCategory
   subCategory     String?      @map("sub_category") @db.VarChar(60)
   accessoriesItem String?      @map("accessories_item") @db.VarChar(80)
+  /// L_AccessoryVariety, copied from the BOM line with everything else.
+  accessoryType   String?      @map("accessory_type") @db.VarChar(120)
   colorCode       String?      @map("color_code") @db.VarChar(60)
   content         String?      @db.VarChar(80)
   gsm             String?      @db.VarChar(20)
@@ -4278,8 +4288,8 @@ model CutPiecesReceipt {
   /// panels per bag (every component) and handles per bag (HANDLE components).
   /// Frozen so a later correction to the style does not rewrite this receipt.
   /// Null on a style with no panel list, where the counts were typed.
-  panelsPerBag  Int?    @map("panels_per_bag")
-  handlesPerBag Int?    @map("handles_per_bag")
+  panelsPerBag   Int?     @map("panels_per_bag")
+  handlesPerBag  Int?     @map("handles_per_bag")
   /// pcsReceived x panelsPerBag - every cut panel handed over. Derived.
   panelsReceived Decimal? @map("panels_received") @db.Decimal(18, 4)
   /// The per-component breakdown behind panelsReceived, as it was multiplied:
@@ -4589,8 +4599,8 @@ model StyleCostSheet {
   status   String   @default("DRAFT") @db.VarChar(20)
 
   /// The currency the FOB is quoted in, and rupees per unit of it.
-  currency     String  @default("USD") @db.VarChar(10)
-  exchangeRate Decimal @default(1) @map("exchange_rate") @db.Decimal(18, 6)
+  currency     String   @default("USD") @db.VarChar(10)
+  exchangeRate Decimal  @default(1) @map("exchange_rate") @db.Decimal(18, 6)
   /// The buyer's target price, when they gave one - in `currency`.
   targetPrice  Decimal? @map("target_price") @db.Decimal(18, 4)
 
@@ -4659,22 +4669,24 @@ model StyleCostSheetLine {
   itemCategory    String  @map("item_category") @db.VarChar(60)
   subCategory     String? @map("sub_category") @db.VarChar(60)
   accessoriesItem String? @map("accessories_item") @db.VarChar(80)
+  /// L_AccessoryVariety - which kind of that accessory ("4-hole horn 18L").
+  accessoryType   String? @map("accessory_type") @db.VarChar(120)
   colorCode       String? @map("color_code") @db.VarChar(60)
   description     String? @db.VarChar(200)
   uom             String  @db.VarChar(20)
 
   /// Per piece, before wastage. Typed or copied from the BOM.
-  consumption Decimal @db.Decimal(12, 4)
-  wastagePct  Decimal @default(0) @map("wastage_pct") @db.Decimal(9, 6)
+  consumption      Decimal  @db.Decimal(12, 4)
+  wastagePct       Decimal  @default(0) @map("wastage_pct") @db.Decimal(9, 6)
   /// SERVER-CALCULATED. consumption x (1 + wastagePct).
-  grossConsumption Decimal @map("gross_consumption") @db.Decimal(14, 6)
+  grossConsumption Decimal  @map("gross_consumption") @db.Decimal(14, 6)
   /// Rupees per UOM. Null until somebody prices it.
-  rate       Decimal? @db.Decimal(18, 4)
+  rate             Decimal? @db.Decimal(18, 4)
   /// Where the suggested rate came from - "PO RF-012/1, 12-09-2026" - or
   /// "manual". A rate is only as good as its source.
-  rateSource String?  @map("rate_source") @db.VarChar(200)
+  rateSource       String?  @map("rate_source") @db.VarChar(200)
   /// SERVER-CALCULATED. grossConsumption x rate. Null while unpriced.
-  amount     Decimal? @db.Decimal(18, 4)
+  amount           Decimal? @db.Decimal(18, 4)
 
   @@unique([costSheetId, lineNo])
   @@index([costSheetId])
@@ -4776,20 +4788,20 @@ model StockLayerConsumption {
 
 /// The purchase order a vendor receives. Lines: PurchaseOrder.
 model PurchaseOrderHeader {
-  id      String   @id @default(uuid()) @db.Uuid
+  id           String    @id @default(uuid()) @db.Uuid
   /// Vendor initials + running number - RF-012. Line 1 carries it bare.
-  poNo    String   @unique @map("po_no") @db.VarChar(40)
-  poDate  DateTime @map("po_date") @db.Date
-  vendorId String  @map("vendor_id") @db.Uuid
-  vendor   Vendor  @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  poNo         String    @unique @map("po_no") @db.VarChar(40)
+  poDate       DateTime  @map("po_date") @db.Date
+  vendorId     String    @map("vendor_id") @db.Uuid
+  vendor       Vendor    @relation(fields: [vendorId], references: [id], onDelete: Restrict)
   /// Snapshotted from the Vendor Master at creation, as on the lines.
-  address String?  @db.Text
+  address      String?   @db.Text
   /// The buyer order the document is mostly for; each line keeps its own.
-  orderId String?  @map("order_id") @db.Uuid
+  orderId      String?   @map("order_id") @db.Uuid
   /// When the vendor is asked to deliver, and on what terms.
   deliveryDate DateTime? @map("delivery_date") @db.Date
   paymentTerms String?   @map("payment_terms") @db.VarChar(150)
-  remarks String?  @db.Text
+  remarks      String?   @db.Text
 
   lines PurchaseOrder[]
 
@@ -4809,12 +4821,12 @@ model PurchaseOrderHeader {
 
 /// One vendor's quote, covering one or more items. Lines: VendorQuotation.
 model VendorQuotationHeader {
-  id            String   @id @default(uuid()) @db.Uuid
-  quotationNo   String   @unique @map("quotation_no") @db.VarChar(40)
-  quotationDate DateTime @map("quotation_date") @db.Date
-  vendorId      String   @map("vendor_id") @db.Uuid
-  vendor        Vendor   @relation(fields: [vendorId], references: [id], onDelete: Restrict)
-  orderId       String?  @map("order_id") @db.Uuid
+  id            String    @id @default(uuid()) @db.Uuid
+  quotationNo   String    @unique @map("quotation_no") @db.VarChar(40)
+  quotationDate DateTime  @map("quotation_date") @db.Date
+  vendorId      String    @map("vendor_id") @db.Uuid
+  vendor        Vendor    @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  orderId       String?   @map("order_id") @db.Uuid
   /// The vendor's own reference on their quote.
   vendorRefNo   String?   @map("vendor_ref_no") @db.VarChar(60)
   /// Prices are held until this date.
@@ -4839,16 +4851,16 @@ model VendorQuotationHeader {
 
 /// One delivery against one vendor bill. Lines: Grn, one per PO line received.
 model GrnHeader {
-  id       String   @id @default(uuid()) @db.Uuid
-  grnNo    String   @unique @map("grn_no") @db.VarChar(40)
-  grnDate  DateTime @map("grn_date") @db.Date
-  vendorId String   @map("vendor_id") @db.Uuid
-  vendor   Vendor   @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  id       String    @id @default(uuid()) @db.Uuid
+  grnNo    String    @unique @map("grn_no") @db.VarChar(40)
+  grnDate  DateTime  @map("grn_date") @db.Date
+  vendorId String    @map("vendor_id") @db.Uuid
+  vendor   Vendor    @relation(fields: [vendorId], references: [id], onDelete: Restrict)
   /// The vendor's invoice / delivery challan number, as on every line.
-  billNo   String   @map("bill_no") @db.VarChar(60)
+  billNo   String    @map("bill_no") @db.VarChar(60)
   billDate DateTime? @map("bill_date") @db.Date
-  location String?  @db.VarChar(80)
-  remarks  String?  @db.Text
+  location String?   @db.VarChar(80)
+  remarks  String?   @db.Text
 
   lines Grn[]
 

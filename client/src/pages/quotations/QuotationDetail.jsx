@@ -179,7 +179,7 @@ export default function QuotationDetail() {
             <Detail label="Item" value={quotation.item} />
             <Detail label="Sub Category" value={quotation.subCategory} />
             <Detail label="Accessories Item" value={quotation.accessoriesItem} />
-            <Detail label="Accessory Type" value={quotation.accessoryType} />
+            <Detail label="Variety" value={quotation.accessoryType} />
             <Detail label="UOM" value={quotation.uom} />
             <Detail label="Order No" value={quotation.order?.orderNo} mono />
             <Detail label="Buyer" value={quotation.order?.buyer?.buyerName} />

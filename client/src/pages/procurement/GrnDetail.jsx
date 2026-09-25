@@ -394,7 +394,7 @@ export default function GrnDetail() {
             <Detail label="Vendor" value={`${grn.vendor?.vendorName} (${grn.vendor?.vendorCode})`} />
             <Detail label="Item" value={grn.item} />
             {/* Typed on the PO; shown here so the store checks the right button arrived. */}
-            <Detail label="Accessory Type" value={purchaseOrder?.accessoryType} />
+            <Detail label="Variety" value={purchaseOrder?.accessoryType} />
             <Detail
               label="Stock item"
               value={grn.inventoryItem?.itemCode}

@@ -213,7 +213,7 @@ export default function QuotationList() {
                     <td>
                       {q.item}
                       {(q.subCategory || q.accessoriesItem) && (
-                        <div className="faint">{q.subCategory ?? q.accessoriesItem}</div>
+                        <div className="faint">{q.subCategory ?? [q.accessoriesItem, q.accessoryType].filter(Boolean).join(' · ')}</div>
                       )}
                     </td>
                     <td>{q.vendor?.vendorName ?? '-'}</td>

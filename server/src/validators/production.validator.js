@@ -600,8 +600,10 @@ const cuttingIssueBody = z.object({
 
   /// Excel: "Planned Cutting" (Auto, from the approved plan).
   plannedCutting: decimal('Planned cutting', { min: 0 }).optional(),
-  /// Excel: "Firm Name" (-> L_StitchingUnit) - the receiving unit.
-  firmName: requiredText(120, 'Firm / unit'),
+  /// Excel: "Firm Name" (-> L_StitchingUnit) - the receiving unit. No longer
+  /// asked for: the business does not track cutting by unit. Stored as '' when
+  /// absent, since the column predates that and is NOT NULL.
+  firmName: optionalText(120),
   /// Excel: "Unit wise Cutting Pcs to be issued" (Auto, from the plan).
   unitWiseCuttingPcsToBeIssued: decimal('Unit-wise pieces', { min: 0 }).optional(),
   /// Excel: "Cutting Pcs Issued" (Manual).

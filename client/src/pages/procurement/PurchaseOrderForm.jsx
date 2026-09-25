@@ -17,7 +17,7 @@
  * ---------------------------------------------------------------------------
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { z } from 'zod';
 import {
   orders as ordersApi,
@@ -263,6 +263,18 @@ export default function PurchaseOrderForm({ purchaseOrder, onSaved, onCancel }) 
     }
   }, [item, form]);
 
+  /*
+   * A variety belongs to one accessories item: a button variety means nothing
+   * on a zipper. Cleared when the item CHANGES, not on the first render, so a
+   * PO opened for edit keeps what it was saved with.
+   */
+  const lastAccessory = useRef(accessoriesItem);
+  useEffect(() => {
+    if (lastAccessory.current === accessoriesItem) return;
+    lastAccessory.current = accessoriesItem;
+    if (form.getValues('accessoryType')) form.setValue('accessoryType', '', { shouldDirty: true });
+  }, [accessoriesItem, form]);
+
   return (
     <FormShell
       onSubmit={submit}
@@ -371,12 +383,15 @@ export default function PurchaseOrderForm({ purchaseOrder, onSaved, onCancel }) 
             />
           )}
           {isAccessory && (
-            <RHFInput
+            <RHFMasterSelect
               form={form}
               name="accessoryType"
-              label="Accessory Type"
-              maxLength={120}
-              hint="e.g. for a Button: 4-hole horn, 18L"
+              label="Variety"
+              listCode="AccessoryVariety"
+              filter={(v) => !v.attributes?.item || v.attributes.item === accessoriesItem}
+              disabled={!accessoriesItem}
+              placeholder={accessoriesItem ? 'Select variety...' : 'Choose the item first'}
+              hint="Which one - e.g. for a Button: 4-hole horn 18L. Add new ones in Dropdown Lists."
             />
           )}
           <RHFMasterSelect form={form} name="uom" label="UOM" listCode="UOM" required />

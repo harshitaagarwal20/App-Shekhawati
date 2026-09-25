@@ -520,21 +520,19 @@ export const REPORTS = {
   'cutting-issue-status': {
     title: 'Cutting issue status',
     description:
-      'Cutting challans by unit, against the plan that authorised them. The last report in ' +
+      'Cutting challans against the plan that authorised them. The last report in ' +
       'the pipeline.',
     permission: 'CUTTING_ISSUE.VIEW',
     excelRef: 'Cutting Issue',
     category: 'STAFF_EFFICIENCY',
-    filters: ['orderId', 'firmName', 'status', 'dateFrom', 'dateTo'],
+    filters: ['orderId', 'status', 'dateFrom', 'dateTo'],
     columns: [
       col('challanNo', 'Challan No'),
       col('issueDate', 'Date', 'date'),
       col('orderNo', 'Order No'),
       col('styleNo', 'Style'),
-      col('firmName', 'Unit'),
       col('containerNo', 'Container'),
       col('plannedCutting', 'Planned', 'qty'),
-      col('unitWisePcs', 'Unit allotment', 'qty'),
       col('cuttingPcsIssued', 'Issued', 'qty'),
       col('varianceQty', 'Variance', 'qty'),
       col('handleIssued', 'Handles', 'qty'),
@@ -1642,7 +1640,11 @@ async function cuttingIssueStatus(q) {
   });
 
   const rows = challans.map((c) => {
-    const allotted = D(c.unitWiseCuttingPcsToBeIssued);
+    // Cutting is not tracked by unit any more, so the variance is against the
+    // plan, falling back to a unit allotment only where an old challan has one.
+    const allotted = D(c.unitWiseCuttingPcsToBeIssued).greaterThan(0)
+      ? D(c.unitWiseCuttingPcsToBeIssued)
+      : D(c.plannedCutting);
     const issued = D(c.cuttingPcsIssued);
     return {
       id: c.id,

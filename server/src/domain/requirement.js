@@ -87,7 +87,7 @@ export function computeRequirement(avgUtilisationPerPiece, quantity, wastagePct 
  * applies", rather than two that can drift apart.
  *
  * @param {object} style   Style with `bomLines` loaded
- * @param {object} [line]  { item | itemCategory, subCategory?, accessoriesItem? }
+ * @param {object} [line]  { item | itemCategory, subCategory?, accessoriesItem?, accessoryType? }
  * @param {Date}   [at]    Resolve the line effective on this date
  */
 function resolveBomLine(style, line, at) {
@@ -106,8 +106,23 @@ function resolveBomLine(style, line, at) {
       (!at || !b.effectiveFrom || new Date(b.effectiveFrom) <= at),
   );
 
+  /*
+   * The VARIETY narrows, it never excludes. A style with an 18L and a 24L
+   * button line must bound an 18L PO by the 18L line. But a BOM that says only
+   * "Button" still bounds a PO naming a variety - the BOM was written before
+   * varieties were a list, or the style genuinely takes whichever the buyer
+   * supplies - and refusing it would stop procurement over a missing detail.
+   */
+  const variety = line?.accessoryType || null;
+  const exact = variety ? candidates.filter((b) => b.accessoryType === variety) : [];
+  const pool = exact.length
+    ? exact
+    : variety
+      ? candidates.filter((b) => !b.accessoryType)
+      : candidates;
+
   // The version in force on the date asked about: latest effectiveFrom wins.
-  return candidates.sort(
+  return pool.sort(
     (a, b) => new Date(b.effectiveFrom ?? 0) - new Date(a.effectiveFrom ?? 0),
   )[0];
 }

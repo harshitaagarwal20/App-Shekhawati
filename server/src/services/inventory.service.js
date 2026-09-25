@@ -192,7 +192,7 @@ export const ITEM_SORTABLE = ['itemCode', 'description', 'itemCategory', 'uom', 
 export const LEDGER_SORTABLE = ['entryDate', 'documentNo', 'qty', 'createdAt'];
 export const ROLL_SORTABLE = ['rollNo', 'receivedQty', 'balanceQty', 'stage', 'createdAt'];
 
-const ITEM_SEARCH = ['itemCode', 'description', 'itemCategory', 'subCategory', 'accessoriesItem', 'colorCode', 'hsnCode'];
+const ITEM_SEARCH = ['itemCode', 'description', 'itemCategory', 'subCategory', 'accessoriesItem', 'accessoryType', 'colorCode', 'hsnCode'];
 const ROLL_SEARCH = ['rollNo', 'fabricName', 'colorCode', 'content', 'count', 'gsm', 'location', 'shade', 'dyeLot'];
 
 // ===========================================================================
@@ -200,12 +200,13 @@ const ROLL_SEARCH = ['rollNo', 'fabricName', 'colorCode', 'content', 'count', 'g
 // ===========================================================================
 
 /**
- * The seven columns that make one stock-keeping item distinct from another.
+ * The eight columns that make one stock-keeping item distinct from another.
  *
  * This is the same tuple as the `inventory_item_identity` unique constraint on
  * the table, and deliberately so: two receipts of 320 GSM Natural 10x6 cotton
  * are the same item and must accumulate on one balance, while the same fabric
- * in Night Black is a different item and must not.
+ * in Night Black is a different item and must not - and neither is an 18L horn
+ * button the same item as a 24L metal one, which is what `accessoryType` says.
  *
  * Empty string rather than null throughout, because a UNIQUE index treats two
  * NULLs as distinct and would happily create the same item twice.
@@ -215,6 +216,7 @@ export function itemIdentity(source) {
     itemCategory: source.item ?? source.itemCategory ?? '',
     subCategory: source.subCategory ?? '',
     accessoriesItem: source.accessoriesItem ?? '',
+    accessoryType: source.accessoryType ?? '',
     colorCode: source.colorCode ?? '',
     gsm: source.gsm ?? '',
     count: source.count ?? '',
@@ -229,6 +231,7 @@ export function describeItem(source) {
       source.item ?? source.itemCategory,
       source.subCategory,
       source.accessoriesItem,
+      source.accessoryType,
       source.content,
       source.gsm,
       source.count,

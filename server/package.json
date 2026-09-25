@@ -16,7 +16,7 @@
     "db:format": "prisma format",
     "lint": "eslint src",
     "test": "node --test --test-concurrency=1 \"test/*.test.js\"",
-    "test:rules": "node --test test/rules.test.js test/phase6-18.rules.test.js test/reports.rules.test.js test/phase38-40.rules.test.js test/tax.rules.test.js test/rbac.rules.test.js test/dashboard.rules.test.js test/pagination.rules.test.js test/urlParams.rules.test.js test/c1.poMode.rules.test.js test/upload.rules.test.js test/improvements.rules.test.js test/costing-and-cutting.rules.test.js",
+    "test:rules": "node --test test/rules.test.js test/phase6-18.rules.test.js test/reports.rules.test.js test/phase38-40.rules.test.js test/tax.rules.test.js test/rbac.rules.test.js test/dashboard.rules.test.js test/pagination.rules.test.js test/urlParams.rules.test.js test/c1.poMode.rules.test.js test/upload.rules.test.js test/improvements.rules.test.js test/costing-and-cutting.rules.test.js test/accessoryVariety.rules.test.js",
     "db:setup": "prisma migrate deploy && node prisma/seed/index.js",
     "verify:seed": "node prisma/seed/verify.js",
     "verify:scope": "node prisma/verify-scope.js",

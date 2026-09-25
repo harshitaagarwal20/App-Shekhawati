@@ -75,18 +75,6 @@ const optCount = (label) =>
     .transform((v) => (v === null ? null : Number(v)));
 
 /**
- * A tech-pack measurement: blank, or greater than zero. Blank means "the tech
- * pack does not say", which is honest; zero is an empty cell that got coerced.
- */
-const optMeasure = (label) =>
-  z
-    .union([z.string(), z.number()])
-    .optional()
-    .transform((v) => (v === '' || v === undefined || v === null ? null : v))
-    .refine((v) => v === null || (Number.isFinite(Number(v)) && Number(v) > 0), `${label} must be greater than zero`)
-    .transform((v) => (v === null ? null : String(Number(v))));
-
-/**
  * Bill To and Ship To, as the Buyer Master shows them.
  *
  * Neither is a stored column. An order builds Bill To from the buyer's own name
@@ -430,49 +418,15 @@ export const styleMaster = {
           label: 'Avg Fabric Utilization / Pc',
           type: 'number',
           step: '0.0001',
-          hint: 'Drives the "Order as per Style" requirement. Kept in step with the Fabric BOM '
-            + 'line. Leave it 0 if sampling has not decided it yet.',
         },
         {
           name: 'qtyPerCarton',
           label: 'Qty / Ctn',
           type: 'number',
           step: '1',
-          hint: 'Finished pieces per export carton, as the requirement sheet states it. '
-            + 'Leave blank if the sheet does not say - this is the specification, not a packed quantity.',
         },
         { name: 'status', label: 'Status', type: 'status' },
         { name: 'remarks', label: 'Remarks', type: 'textarea', span: 2 },
-      ],
-    },
-    {
-      /*
-       * The tech pack. All optional - a style is registered before its tech
-       * pack is final - and all printed on the cutting challan, so the unit
-       * works from the same size and the same artwork as the office.
-       */
-      title: 'Spec sheet',
-      fields: [
-        {
-          name: 'dimensionUom',
-          label: 'Measured in',
-          type: 'select',
-          options: [
-            { value: 'cm', label: 'Centimetres (cm)' },
-            { value: 'inch', label: 'Inches' },
-          ],
-          hint: 'Every measurement below is in this unit.',
-        },
-        { name: 'bagLength', label: 'Length', type: 'number', step: '0.01' },
-        { name: 'bagWidth', label: 'Width', type: 'number', step: '0.01' },
-        { name: 'bagHeight', label: 'Height', type: 'number', step: '0.01' },
-        { name: 'gussetWidth', label: 'Gusset', type: 'number', step: '0.01', hint: 'Width of the side / base panel.' },
-        { name: 'handleDrop', label: 'Handle drop', type: 'number', step: '0.01', hint: 'Top of the bag to the top of the handle.' },
-        { name: 'strapLength', label: 'Strap length', type: 'number', step: '0.01' },
-        { name: 'closure', label: 'Closure', type: 'master', listCode: 'Closure' },
-        { name: 'lining', label: 'Lining', type: 'master', listCode: 'Lining' },
-        { name: 'artworkVersion', label: 'Artwork version', type: 'text', hint: 'e.g. v3 - printed on the cutting challan.' },
-        { name: 'printPlacement', label: 'Print placement', type: 'textarea', span: 2, hint: 'e.g. Front centre, 25 cm below top edge, 20x20 cm.' },
       ],
     },
   ],
@@ -486,17 +440,12 @@ export const styleMaster = {
     qtyPerCarton: optCount('Qty / Ctn'),
     status,
     remarks: opt(2000),
-    dimensionUom: z.enum(['cm', 'inch']).catch('cm'),
-    bagLength: optMeasure('Length'),
-    bagWidth: optMeasure('Width'),
-    bagHeight: optMeasure('Height'),
-    gussetWidth: optMeasure('Gusset'),
-    handleDrop: optMeasure('Handle drop'),
-    strapLength: optMeasure('Strap length'),
-    closure: opt(60),
-    lining: opt(60),
-    artworkVersion: opt(40),
-    printPlacement: opt(1000),
+    /*
+     * No spec sheet (measurements, closure, lining, artwork) on this form, by
+     * request. The columns are still on the style and still print on the
+     * cutting challan where a style already has them; leaving them out of the
+     * form sends nothing for them, so an edit here does not blank them.
+     */
   }),
 };
 

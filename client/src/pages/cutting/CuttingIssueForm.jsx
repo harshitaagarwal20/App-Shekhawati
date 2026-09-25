@@ -46,7 +46,7 @@ import {
   QtyStepper,
 } from '../../components/mobile.jsx';
 import { ExcessPanel } from '../../components/workflow.jsx';
-import { Field, MasterSelect, PageHeader, TextArea, TextInput } from '../../components/ui.jsx';
+import { Field, PageHeader, TextArea, TextInput } from '../../components/ui.jsx';
 import { fmtNum, todayInput } from '../../utils/format.js';
 import { loadFailed } from '../../services/loadFailures.js';
 
@@ -64,8 +64,6 @@ export default function CuttingIssueForm() {
   const [planningId, setPlanningId] = useState('');
   const [fabricIssueId, setFabricIssueId] = useState('');
   const [containerNo, setContainerNo] = useState('');
-  const [firmName, setFirmName] = useState('');
-  const [unitPcs, setUnitPcs] = useState('');
   const [cuttingPcs, setCuttingPcs] = useState('');
   const [cuttingPcsDamaged, setCuttingPcsDamaged] = useState('');
   const [handleIssued, setHandleIssued] = useState('');
@@ -142,8 +140,6 @@ export default function CuttingIssueForm() {
           planApprovalId: approvalId || null,
           fabricIssueId: fabricIssueId || null,
           containerNo: containerNo || null,
-          firmName: firmName || null,
-          unitWiseCuttingPcsToBeIssued: unitPcs === '' ? undefined : String(unitPcs),
           cuttingPcsIssued: cuttingPcs === '' ? undefined : String(cuttingPcs),
         }),
       );
@@ -152,7 +148,7 @@ export default function CuttingIssueForm() {
       setPreview(null);
       setError(e.message);
     }
-  }, [orderId, planningId, approvalId, fabricIssueId, containerNo, firmName, unitPcs, cuttingPcs]);
+  }, [orderId, planningId, approvalId, fabricIssueId, containerNo, cuttingPcs]);
 
   useEffect(() => {
     const id = setTimeout(runPreview, 350);
@@ -178,9 +174,7 @@ export default function CuttingIssueForm() {
         planApprovalId: approvalId || null,
         fabricIssueId: fabricIssueId || null,
         containerNo: containerNo || null,
-        firmName,
         plannedCutting: preview?.context.plannedCuttingPcs ?? undefined,
-        unitWiseCuttingPcsToBeIssued: unitPcs === '' ? undefined : String(unitPcs),
         cuttingPcsIssued: String(cuttingPcs),
         cuttingPcsDamaged: String(cuttingPcsDamaged || 0),
         // Derived on the server from the style's panel list where it has one.
@@ -229,7 +223,7 @@ export default function CuttingIssueForm() {
   })();
 
   const ready =
-    preview?.canPost && Number(cuttingPcs) > 0 && firmName && eq.balances;
+    preview?.canPost && Number(cuttingPcs) > 0 && eq.balances;
 
   return (
     <div className="floor-page">
@@ -391,16 +385,8 @@ export default function CuttingIssueForm() {
             </div>
           )}
 
-          <Field label="Firm / unit" required>
-            <MasterSelect
-              listCode="StitchingUnit"
-              value={firmName}
-              currentValue={firmName}
-              onChange={(e) => setFirmName(e.target.value)}
-              placeholder="Choose the receiving unit..."
-            />
-          </Field>
-
+          {/* No Firm / unit and no unit-wise pieces: cutting is not tracked
+              by unit. The server stores a blank unit. */}
           {/* Inherited from the plan when left blank. Typed, not chosen -
               see planning.service.js. */}
           <Field label="Container No" hint="Leave blank to take it from the plan.">
@@ -411,17 +397,6 @@ export default function CuttingIssueForm() {
             />
           </Field>
 
-          <Field label="Unit-wise pieces to be issued" hint="From the plan. Leave blank to use the whole plan.">
-            <QtyStepper
-              value={unitPcs}
-              onChange={setUnitPcs}
-              uom="Pcs"
-              label="Unit-wise pcs"
-              max={ctx?.plannedCuttingPcs}
-              compact
-            />
-          </Field>
-
           <div style={{ marginTop: 12 }}>
             <QtyStepper
               value={cuttingPcs}
@@ -429,7 +404,7 @@ export default function CuttingIssueForm() {
               uom="Pcs"
               label="Good cut pieces given to stitching"
               available={preview?.excess?.maxPermittedQty}
-              max={unitPcs || ctx?.plannedCuttingPcs}
+              max={ctx?.plannedCuttingPcs}
               compact
             />
           </div>
@@ -565,13 +540,12 @@ export default function CuttingIssueForm() {
         open={confirming}
         title="Cut and issue this cloth?"
         summary={
-          `${fmtNum(cuttingPcs)} pieces to ${firmName}, against ${ctx?.orderNo ?? ''}` +
+          `${fmtNum(cuttingPcs)} pieces to stitching, against ${ctx?.orderNo ?? ''}` +
           `${containerNo ? ` / ${containerNo}` : ''}.`
         }
         lines={[
           { label: 'Order', value: ctx?.orderNo },
           { label: 'Style', value: ctx?.styleNo },
-          { label: 'Unit', value: firmName },
           { label: 'Cutting pieces', value: fmtNum(cuttingPcs) },
           {
             label: 'Handles',

@@ -21,6 +21,7 @@ import {
   Spinner,
   TextArea,
   TextInput,
+  VarietySelect,
 } from '../../components/ui.jsx';
 import { loadFailed } from '../../services/loadFailures.js';
 import { focusFirstError } from '../../components/form.jsx';
@@ -265,17 +266,24 @@ export default function QuotationForm({ quotation, onSaved, onCancel }) {
               listCode="AccessoriesItem"
               currentValue={form.accessoriesItem}
               value={form.accessoriesItem}
-              onChange={set('accessoriesItem')}
+              // A button variety means nothing on a zipper.
+              onChange={(e) => setForm((f) => ({ ...f, accessoriesItem: e.target.value, accessoryType: '' }))}
             />
           </Field>
 
           <Field
-            label="Accessory Type"
+            label="Variety"
             error={fieldErrors.accessoryType}
-            hint="e.g. for a Button: 4-hole horn, 18L"
+            hint="Which one - e.g. for a Button: 4-hole horn 18L. Add new ones in Dropdown Lists."
             htmlFor="q-acc-type"
           >
-            <TextInput id="q-acc-type" maxLength={120} value={form.accessoryType} onChange={set('accessoryType')} />
+            <VarietySelect
+              id="q-acc-type"
+              accessoriesItem={form.accessoriesItem}
+              currentValue={form.accessoryType}
+              value={form.accessoryType}
+              onChange={set('accessoryType')}
+            />
           </Field>
 
           <Field label="UOM" required error={fieldErrors.uom} htmlFor="q-uom">

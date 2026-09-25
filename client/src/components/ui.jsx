@@ -182,10 +182,13 @@ export const EnumSelect = forwardRef(function EnumSelect(
  * @param {string} listCode  A Master List code, e.g. 'ColorCode', 'UOM'
  */
 export const MasterSelect = forwardRef(function MasterSelect(
-  { listCode, error, placeholder = 'Select...', includeBlank = true, currentValue, ...props },
+  { listCode, error, placeholder = 'Select...', includeBlank = true, currentValue, filter, ...props },
   ref,
 ) {
-  const { values, loading, error: loadError } = useMasterList(listCode);
+  const { values: all, loading, error: loadError } = useMasterList(listCode);
+  // `filter` narrows one list by another choice on the form - the varieties of
+  // the accessories item picked beside it. See VarietySelect.
+  const values = filter ? all.filter(filter) : all;
 
   // A record may hold a value that has since been deactivated. Keep showing it
   // rather than silently blanking the field on edit.
@@ -203,6 +206,33 @@ export const MasterSelect = forwardRef(function MasterSelect(
       placeholder={loadError ? 'List unavailable' : placeholder}
       includeBlank={includeBlank}
       emptyLabel={loadError ? 'List unavailable' : 'No match'}
+      {...props}
+    />
+  );
+});
+
+/**
+ * The Variety of an accessory: only the varieties of the item chosen beside it.
+ *
+ * Each AccessoryVariety value names its item in `attributes.item`, so picking
+ * Button offers "4-hole horn 18L" and never "#5 metal 20cm". A value tagged
+ * with no item fits every item. Until an item is chosen there is nothing to
+ * offer, and the box says so rather than showing an empty list.
+ *
+ * The same component on every screen - Style BOM, quotation, PO - so a
+ * variety reads identically wherever it is chosen and lands on one stock item.
+ */
+export const VarietySelect = forwardRef(function VarietySelect(
+  { accessoriesItem, placeholder, disabled, ...props },
+  ref,
+) {
+  return (
+    <MasterSelect
+      ref={ref}
+      listCode="AccessoryVariety"
+      filter={(v) => !v.attributes?.item || v.attributes.item === accessoriesItem}
+      placeholder={accessoriesItem ? (placeholder ?? 'Select variety...') : 'Choose the item first'}
+      disabled={!accessoriesItem || disabled}
       {...props}
     />
   );

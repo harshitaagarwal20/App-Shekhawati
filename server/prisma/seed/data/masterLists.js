@@ -114,6 +114,25 @@ export const masterLists = [
     ],
   },
   {
+    /*
+     * Which button, which zipper. Each value names the Accessories Item it
+     * belongs to in `attributes.item`, and the Variety dropdown shows only the
+     * values of the item chosen beside it.
+     */
+    code: 'AccessoryVariety',
+    name: 'Accessory Variety',
+    description: 'Which kind of an accessories item - Button: 4-hole horn 18L. Each value belongs to one item.',
+    values: [
+      { value: '4-hole horn 18L', attributes: { item: 'Button' } },
+      { value: '2-hole plastic 24L', attributes: { item: 'Button' } },
+      { value: 'Metal shank 20L', attributes: { item: 'Button' } },
+      { value: '#5 metal 20cm', attributes: { item: 'Zipper' } },
+      { value: '#3 nylon 15cm', attributes: { item: 'Zipper' } },
+      { value: '1.25" webbing', attributes: { item: 'Cotton Handle' } },
+      { value: '1.5" webbing', attributes: { item: 'Cotton Handle' } },
+    ],
+  },
+  {
     code: 'ColorCode',
     name: 'Color Code',
     description: 'Order / PO / Fabric Issue / Dye issue - Colour dropdown (L_ColorCode)',

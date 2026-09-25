@@ -158,10 +158,8 @@ export function CuttingIssueList() {
                 <SortableTh field="issueDate" label="Date" sortBy={list.sortBy} sortDir={list.sortDir} onSort={list.toggleSort} />
                 <th>Order</th>
                 <th>Style</th>
-                <SortableTh field="firmName" label="Unit" sortBy={list.sortBy} sortDir={list.sortDir} onSort={list.toggleSort} />
                 <th>Container</th>
                 <SortableTh field="plannedCutting" label="Planned" sortBy={list.sortBy} sortDir={list.sortDir} onSort={list.toggleSort} className="num" />
-                <th className="num">Unit-wise</th>
                 <SortableTh field="cuttingPcsIssued" label="Issued" sortBy={list.sortBy} sortDir={list.sortDir} onSort={list.toggleSort} className="num" />
                 <th className="num">Handles</th>
                 <th>Approval</th>
@@ -171,7 +169,7 @@ export function CuttingIssueList() {
             <tbody>
               {list.loading && (
                 <tr>
-                  <td colSpan={12} className="loading-row">
+                  <td colSpan={10} className="loading-row">
                     <Spinner label="Loading challans..." />
                   </td>
                 </tr>
@@ -179,7 +177,7 @@ export function CuttingIssueList() {
 
               {!list.loading && list.rows.length === 0 && (
                 <tr>
-                  <td colSpan={12}>
+                  <td colSpan={10}>
                     <EmptyState title="No cutting challans found" />
                   </td>
                 </tr>
@@ -196,10 +194,8 @@ export function CuttingIssueList() {
                     <td className="nowrap">{fmtDate(c.issueDate)}</td>
                     <td className="code">{c.order?.orderNo ?? '-'}</td>
                     <td className="code">{c.style?.styleNo ?? '-'}</td>
-                    <td>{c.firmName}</td>
                     <td>{c.containerNo ?? '-'}</td>
                     <td className="num">{fmtNum(c.plannedCutting)}</td>
-                    <td className="num">{fmtNum(c.unitWiseCuttingPcsToBeIssued)}</td>
                     <td className="num">
                       <strong>{fmtNum(c.cuttingPcsIssued)}</strong>
                       {c.variancePct && c.variancePct !== '0.00' && (

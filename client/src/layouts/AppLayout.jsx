@@ -167,7 +167,7 @@ export default function AppLayout() {
   // follows the address bar, including a link followed from another screen.
   useEffect(() => {
     if (!activeGroup) return;
-    setOpenGroups((prev) => (prev.includes(activeGroup) ? prev : [...prev, activeGroup]));
+    setOpenGroups([activeGroup]);
   }, [activeGroup]);
 
   useEffect(() => writeStored(OPEN_GROUPS_KEY, openGroups), [openGroups]);
@@ -197,7 +197,9 @@ export default function AppLayout() {
 
   /**
    * Typing in the filter box searches every group, so a user who knows the
-   * screen name does not have to remember which group it sits under.
+   * screen name does not have to remember which group it sits under. The hint
+   * is searched too: somebody who does not know the word "GRN" can type
+   * "arrived" and still land on Goods Received.
    */
   const query = filter.trim().toLowerCase();
   const shown = useMemo(() => {
@@ -205,7 +207,8 @@ export default function AppLayout() {
     return groups
       .map((group) => ({
         ...group,
-        items: group.items.filter((item) => item.label.toLowerCase().includes(query)),
+        items: group.items.filter((item) =>
+          `${item.label} ${item.hint ?? ''}`.toLowerCase().includes(query)),
       }))
       .filter((group) => group.items.length > 0);
   }, [groups, query]);
@@ -217,14 +220,16 @@ export default function AppLayout() {
    * items - a flyout would be clipped by the scroll container. So a click on a
    * group icon expands the sidebar and opens that group, which is what the user
    * wanted to see anyway.
+   *
+   * One group open at a time: opening a group closes the others.
    */
   function toggleGroup(label) {
     if (collapsed) {
       setCollapsed(false);
-      setOpenGroups((prev) => (prev.includes(label) ? prev : [...prev, label]));
+      setOpenGroups([label]);
       return;
     }
-    setOpenGroups((prev) => (prev.includes(label) ? prev.filter((l) => l !== label) : [...prev, label]));
+    setOpenGroups((prev) => (prev.includes(label) ? [] : [label]));
   }
 
   async function handleLogout() {
@@ -299,10 +304,10 @@ export default function AppLayout() {
                   <div className="nav-items-inner">
                     {group.items.map((item) => {
                       /* A plain Link, not a NavLink. NavLink decides for
-                         itself what "active" means, and it cannot know that
-                         Approvals owns `/plan-approvals` - so the class and
-                         the aria both come from the one answer above, and
-                         they cannot disagree with each other. */
+                         itself what "active" means, and it cannot know about
+                         an entry's `covers` - so the class and the aria both
+                         come from the one answer above, and they cannot
+                         disagree with each other. */
                       const isActive = activeItem?.to === item.to;
                       return (
                         <Link
@@ -310,8 +315,12 @@ export default function AppLayout() {
                           to={item.to}
                           className={`nav-link ${isActive ? 'active' : ''}`}
                           aria-current={isActive ? 'page' : undefined}
+                          title={item.hint ? `${item.label} - ${item.hint}` : item.label}
                         >
-                          {item.label}
+                          <span className="nav-link-label">{item.label}</span>
+                          {/* What the screen is FOR, in plain words, for staff
+                              who do not know the trade name of the document. */}
+                          {item.hint && <span className="nav-link-hint">{item.hint}</span>}
                         </Link>
                       );
                     })}

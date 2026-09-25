@@ -91,6 +91,8 @@ function LineTable({ lines = [] }) {
                 <td>{l.lineNo}</td>
                 <td>
                   {l.description ?? l.accessoriesItem ?? l.subCategory ?? l.itemCategory}
+                  {/* Which button: the line an 18L and a 24L button split into. */}
+                  {l.accessoryType && <span className="muted"> · {l.accessoryType}</span>}
                   {/* The multiplication, in words, so a signed figure can always
                       be re-checked by hand. */}
                   {l.requirementBasis && <div className="faint small">{l.requirementBasis}</div>}
@@ -128,7 +130,8 @@ function SkippedNotice({ skipped = [] }) {
         {skipped.map((s, i) => (
           <li key={i}>
             {s.itemCategory}
-            {s.accessoriesItem ? ` / ${s.accessoriesItem}` : ''} — {s.reason}
+            {s.accessoriesItem ? ` / ${s.accessoriesItem}` : ''}
+            {s.accessoryType ? ` / ${s.accessoryType}` : ''} — {s.reason}
           </li>
         ))}
       </ul>

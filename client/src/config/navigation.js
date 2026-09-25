@@ -11,15 +11,17 @@
  *  The seven middle groups ARE the process, in the order the work happens:
  *
  *      Dashboard                 Dashboard, Reports, Approvals (queue + plans)
- *    1 Masters                   Buyers, Vendors, Employees, Styles, Dropdown Lists
- *    2 Orders                    Buyer Orders, Planning (production + procurement)
+ *    1 Masters                   Dropdown Lists, Buyers, Vendors, Employees,
+ *                                Styles, Excess Rules
+ *    2 Orders                    Buyer Orders, Cost Sheets, Planning (production +
+ *                                procurement)
  *    3 Procurement               Vendor Quotations, Purchase Orders
  *    4 Stores                    Gate Pass, Goods Received, Inventory (stock +
  *                                movement + rolls), Fabric Issue
  *    5 Processing                Job Work (dyeing / printing), Fabric Scrutiny
- *    6 Plan Approval             (folded into Dashboard > Approvals)
- *    6 Cutting                   Cutting Challan, Cutting Issue
- *      Administration            Users, Roles, Audit
+ *    6 Cutting                   Plan Approval, Cutting Challan, Cut Pieces
+ *                                Receipt, Cutting Issue
+ *      Administration            Roles, Users, Audit
  *
  *  which is the pipeline the README states and the dashboard's own STAGES list
  *  walks:
@@ -105,12 +107,12 @@ export const NAV_GROUPS = [
   {
     label: 'Dashboard',
     items: [
-      { to: '/', label: 'Dashboard', end: true },
+      { to: '/', label: 'Dashboard', end: true, hint: "Today's work at a glance" },
       /**
        * Fourteen operational reports, one per implemented module. Each declares
        * its own permission; the catalogue is filtered by it.
        */
-      { to: '/reports', label: 'Reports', permission: 'REPORT.VIEW' },
+      { to: '/reports', label: 'Reports', permission: 'REPORT.VIEW', hint: 'View and print reports' },
       /**
        * Everything waiting on a decision, across every module. Behind
        * REPORT.VIEW because it is a read across the whole system, and the
@@ -143,15 +145,7 @@ export const NAV_GROUPS = [
       {
         to: '/approvals',
         label: 'Approvals',
-        /*
-         * The plan register keeps its own path, and a plan opened from the
-         * queue lands on `/plan-approvals/:id` - which is not under
-         * `/approvals`, so without this the menu would go blank underneath
-         * somebody who had not left the Approvals screen.
-         *
-         * See `navMatch` at the foot of this file.
-         */
-        covers: ['/plan-approvals'],
+        hint: 'Waiting for a decision',
         permission: ['REPORT.VIEW', 'PLAN_APPROVAL.VIEW'],
       },
     ],
@@ -159,27 +153,32 @@ export const NAV_GROUPS = [
   {
     label: 'Masters',
     stage: 1,
+    /*
+     * In the order the one-time setup is done (Screen - Flow.docx, Setup 3-6):
+     * the dropdown values first, because buyers, vendors and styles pick from
+     * them; styles after the parties; the tolerances last.
+     */
     items: [
-      { to: '/masters/buyers', label: 'Buyers', permission: 'BUYER.VIEW' },
-      { to: '/masters/vendors', label: 'Vendors', permission: 'VENDOR.VIEW' },
-      { to: '/masters/employees', label: 'Employees', permission: 'EMPLOYEE.VIEW' },
-      { to: '/masters/styles', label: 'Styles & Materials', permission: 'STYLE.VIEW' },
-      { to: '/masters/list-master', label: 'Dropdown Lists', permission: 'MASTER_LIST.VIEW' },
+      { to: '/masters/list-master', label: 'Dropdown Lists', permission: 'MASTER_LIST.VIEW', hint: 'Colours, units, categories' },
+      { to: '/masters/buyers', label: 'Buyers', permission: 'BUYER.VIEW', hint: 'Customers who give orders' },
+      { to: '/masters/vendors', label: 'Vendors', permission: 'VENDOR.VIEW', hint: 'Suppliers, dyers, printers' },
+      { to: '/masters/employees', label: 'Employees', permission: 'EMPLOYEE.VIEW', hint: 'Staff named on documents' },
+      { to: '/masters/styles', label: 'Styles & Materials', permission: 'STYLE.VIEW', hint: 'Material needed per piece' },
       /**
        * Every tolerance in the system, as data. Under Masters rather than under
        * a transaction module because it IS configuration - the same kind of
        * thing as adding a colour to a dropdown - and it belongs to Head Office
        * rather than to the store that would benefit from a looser limit.
        */
-      { to: '/masters/excess-rules', label: 'Excess Rules', permission: 'MASTER_LIST.VIEW' },
+      { to: '/masters/excess-rules', label: 'Excess Rules', permission: 'MASTER_LIST.VIEW', hint: 'Allowed extra % limits' },
     ],
   },
   {
     label: 'Orders',
     stage: 2,
     items: [
-      { to: '/orders', label: 'Buyer Orders', permission: 'BUYER_ORDER.VIEW' },
-      { to: '/cost-sheets', label: 'Cost Sheets', permission: 'COST_SHEET.VIEW' },
+      { to: '/orders', label: 'Buyer Orders', permission: 'BUYER_ORDER.VIEW', hint: "Enter the buyer's order" },
+      { to: '/cost-sheets', label: 'Cost Sheets', permission: 'COST_SHEET.VIEW', hint: 'Cost of making a style' },
       /*
        * ONE ENTRY, TWO REGISTERS.
        *
@@ -194,23 +193,23 @@ export const NAV_GROUPS = [
        * somebody holding only one of the two still gets the link, and the hub
        * offers them only the register they may actually see.
        */
-      { to: '/planning', label: 'Planning', permission: ['PLANNING.VIEW', 'MATERIAL_PLAN.VIEW'] },
+      { to: '/planning', label: 'Planning', permission: ['PLANNING.VIEW', 'MATERIAL_PLAN.VIEW'], hint: 'Production and material plans' },
     ],
   },
   {
     label: 'Procurement',
     stage: 3,
     items: [
-      { to: '/quotations', label: 'Vendor Quotations', permission: 'VENDOR_QUOTATION.VIEW' },
-      { to: '/purchase-orders', label: 'Purchase Orders', permission: 'PURCHASE_ORDER.VIEW' },
+      { to: '/quotations', label: 'Vendor Quotations', permission: 'VENDOR_QUOTATION.VIEW', hint: 'Rates quoted by vendors' },
+      { to: '/purchase-orders', label: 'Purchase Orders', permission: 'PURCHASE_ORDER.VIEW', hint: 'Order material from vendors' },
     ],
   },
   {
     label: 'Stores',
     stage: 4,
     items: [
-      { to: '/gate-passes', label: 'Gate Pass', permission: 'GATE_PASS.VIEW' },
-      { to: '/grns', label: 'Goods Received', permission: 'GRN.VIEW' },
+      { to: '/gate-passes', label: 'Gate Pass', permission: 'GATE_PASS.VIEW', hint: 'Goods coming in or going out' },
+      { to: '/grns', label: 'Goods Received', permission: 'GRN.VIEW', hint: 'Record material that arrived' },
       /*
        * ONE ENTRY, THREE VIEWS.
        *
@@ -236,7 +235,7 @@ export const NAV_GROUPS = [
         label: 'Inventory',
         permission: ['INVENTORY.VIEW', 'STOCK_LEDGER.VIEW', 'FABRIC_ROLL.VIEW'],
       },
-      { to: '/fabric-issues', label: 'Fabric Issue', permission: 'FABRIC_ISSUE.VIEW' },
+      { to: '/fabric-issues', label: 'Fabric Issue', permission: 'FABRIC_ISSUE.VIEW', hint: 'Send fabric out of the store' },
     ],
   },
   {
@@ -263,38 +262,49 @@ export const NAV_GROUPS = [
        * see only printing still gets the link, and the register shows them the
        * processes they hold.
        */
-      { to: '/job-works', label: 'Job Work', permission: ['DYE_ISSUE.VIEW', 'PRINTING.VIEW'] },
-      { to: '/scrutinies', label: 'Fabric Scrutiny', permission: 'FABRIC_SCRUTINY.VIEW' },
+      { to: '/job-works', label: 'Job Work', permission: ['DYE_ISSUE.VIEW', 'PRINTING.VIEW'], hint: 'Dyeing and printing by vendors' },
+      { to: '/scrutinies', label: 'Fabric Scrutiny', permission: 'FABRIC_SCRUTINY.VIEW', hint: 'Quality check after job work' },
     ],
   },
   {
     label: 'Cutting',
     stage: 6,
     items: [
+      /*
+       * Plan Approval is step 13 of the business flow, straight before the
+       * challan: a cutting challan can only be raised against an APPROVED plan
+       * version. So it opens this group rather than hiding behind Dashboard >
+       * Approvals, where the floor staff following the flow did not find it.
+       * Approvals still offers it as a second door.
+       */
+      { to: '/plan-approvals', label: 'Plan Approval', permission: 'PLAN_APPROVAL.VIEW', hint: 'Approve plan before cutting' },
       /** C5 - the requirement comes first; the issue fulfils it. */
-      { to: '/cutting-challans', label: 'Cutting Challan', permission: 'CUTTING_CHALLAN.VIEW' },
+      { to: '/cutting-challans', label: 'Cutting Challan', permission: 'CUTTING_CHALLAN.VIEW', hint: 'What has to be cut' },
       /** Cut pieces counted in from the cutting floor, before they are issued. */
-      { to: '/cut-pieces-receipts', label: 'Cut Pieces Receipt', permission: 'CUT_PIECES_RECEIPT.VIEW' },
+      { to: '/cut-pieces-receipts', label: 'Cut Pieces Receipt', permission: 'CUT_PIECES_RECEIPT.VIEW', hint: 'Count pieces from cutting' },
       /** The last module in the application. Nothing follows it. */
-      { to: '/cutting-issues', label: 'Cutting Issue', permission: 'CUTTING_ISSUE.VIEW' },
+      { to: '/cutting-issues', label: 'Cutting Issue', permission: 'CUTTING_ISSUE.VIEW', hint: 'Final cutting record' },
     ],
   },
   {
     label: 'Administration',
     items: [
-      { to: '/admin/users', label: 'Users', permission: 'USER.VIEW' },
       /**
        * What each role may do. Its own permission rather than USER.VIEW:
        * granting permissions is a broader act than administering logins, and
        * the server gates the endpoints behind ROLE.* accordingly.
+       *
+       * Above Users because setup goes in that order: a user is given roles,
+       * so the roles have to exist first.
        */
-      { to: '/admin/roles', label: 'Roles', permission: 'ROLE.VIEW' },
+      { to: '/admin/roles', label: 'Roles', permission: 'ROLE.VIEW', hint: 'What each role may do' },
+      { to: '/admin/users', label: 'Users', permission: 'USER.VIEW', hint: 'Logins and passwords' },
       /**
        * Who changed what. Its own permission rather than USER.VIEW: the trail
        * carries the before-and-after of every rate, price and approval in the
        * system, so seeing it is a broader grant than administering logins.
        */
-      { to: '/admin/audit', label: 'Audit Trail', permission: 'AUDIT.VIEW' },
+      { to: '/admin/audit', label: 'Audit Trail', permission: 'AUDIT.VIEW', hint: 'Who changed what' },
     ],
   },
 ];

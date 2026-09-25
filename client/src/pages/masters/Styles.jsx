@@ -12,7 +12,7 @@ import { useEffect, useState } from 'react';
 import { useFieldArray, useWatch } from 'react-hook-form';
 import MasterPage from './MasterPage.jsx';
 import { styleMaster } from '../../config/masters.jsx';
-import { EnumSelect, MasterSelect, TextInput } from '../../components/ui.jsx';
+import { EnumSelect, MasterSelect, TextInput, VarietySelect } from '../../components/ui.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
 
 const BLANK_LINE = {
@@ -20,6 +20,7 @@ const BLANK_LINE = {
   variant: '',
   subCategory: '',
   accessoriesItem: '',
+  accessoryType: '',
   description: '',
   colorCode: '',
   content: '',
@@ -49,6 +50,7 @@ function BomEditor({ form, editing, isNew }) {
         itemCategory: l.itemCategory ?? '',
         subCategory: l.subCategory ?? '',
         accessoriesItem: l.accessoriesItem ?? '',
+        accessoryType: l.accessoryType ?? '',
         description: l.description ?? '',
         colorCode: l.colorCode ?? '',
         content: l.content ?? '',
@@ -90,7 +92,7 @@ function BomEditor({ form, editing, isNew }) {
               <th style={{ minWidth: 120 }}>Sub Category</th>
               <th style={{ minWidth: 140 }}>Accessories Item</th>
               <th style={{ minWidth: 150 }}>Description</th>
-              <th style={{ minWidth: 110 }}>Size / Spec</th>
+              <th style={{ minWidth: 150 }}>Variety / Size</th>
               <th style={{ minWidth: 110 }}>Colour</th>
               <th style={{ minWidth: 100 }}>UOM</th>
               <th style={{ minWidth: 110 }}>HSN</th>
@@ -134,7 +136,10 @@ function BomEditor({ form, editing, isNew }) {
                       listCode="AccessoriesItem"
                       currentValue={bom[i]?.accessoriesItem} value={bom[i]?.accessoriesItem ?? ''}
                       disabled={!isAccessory}
-                      {...register(`bom.${i}.accessoriesItem`)}
+                      {...register(`bom.${i}.accessoriesItem`, {
+                        // A button variety means nothing on a zipper.
+                        onChange: () => setValue(`bom.${i}.accessoryType`, ''),
+                      })}
                     />
                   </td>
                   <td>
@@ -147,12 +152,25 @@ function BomEditor({ form, editing, isNew }) {
                     />
                   </td>
                   <td>
-                    {/* 25 mm, 1.25", 5/1000 mtr - the measurement that tells
-                        two otherwise identical lines apart. */}
-                    <TextInput
-                      placeholder='25 mm'
-                      {...register(`bom.${i}.variant`)}
-                    />
+                    {/* ONE column, two kinds of answer. An accessory picks its
+                        Variety from the list - the value that follows it to
+                        the PO and keeps its stock apart from other buttons.
+                        Anything else keeps the free-text size: 25 mm, 5/1000
+                        mtr - the measurement that tells two otherwise
+                        identical lines apart. */}
+                    {isAccessory ? (
+                      <VarietySelect
+                        accessoriesItem={bom[i]?.accessoriesItem}
+                        currentValue={bom[i]?.accessoryType}
+                        value={bom[i]?.accessoryType ?? ''}
+                        {...register(`bom.${i}.accessoryType`)}
+                      />
+                    ) : (
+                      <TextInput
+                        placeholder='25 mm'
+                        {...register(`bom.${i}.variant`)}
+                      />
+                    )}
                   </td>
                   <td>
                     <MasterSelect
@@ -368,6 +386,8 @@ function buildPayload(values, form) {
       itemCategory: l.itemCategory,
       subCategory: l.subCategory || null,
       accessoriesItem: l.accessoriesItem || null,
+      // Only an accessory has a variety; a row switched to Fabric drops it.
+      accessoryType: (l.accessoriesItem && l.accessoryType) || null,
       description: l.description || null,
       colorCode: l.colorCode || null,
       content: l.content || null,

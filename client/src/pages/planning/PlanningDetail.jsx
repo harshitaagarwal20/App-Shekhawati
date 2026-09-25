@@ -377,7 +377,7 @@ export default function PlanningDetail() {
         <div className="card-header">
           <span>Unit allocation</span>
           <span className="faint" style={{ fontWeight: 400, fontSize: 12 }}>
-            what each stitching unit is due &mdash; Cutting Issue draws from these
+            what each stitching unit is due
           </span>
         </div>
         {unitAllocation.length === 0 ? (
