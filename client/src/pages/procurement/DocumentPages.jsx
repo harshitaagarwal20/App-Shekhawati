@@ -54,7 +54,9 @@ const money = (v) =>
 const qty = (v) => (v === null || v === undefined ? '-' : Number(v).toLocaleString('en-IN', { maximumFractionDigits: 4 }));
 const isAccessory = (l) => l.item === 'Accessories' || Boolean(l.accessoriesItem);
 const describe = (l) =>
-  [l.item, l.subCategory, l.accessoriesItem, l.accessoryType, l.colorCode].filter(Boolean).join(' · ');
+  [l.item, l.subCategory, l.accessoriesItem, l.accessoryType, l.size ? `Size ${l.size}` : null, l.colorCode]
+    .filter(Boolean)
+    .join(' · ');
 
 const DOC_BADGE = {
   PENDING: 'badge-pending',
@@ -126,17 +128,17 @@ function MaterialCells({ line, set }) {
   );
 }
 
-function NumCell({ value, onChange, label, width = 100 }) {
+function NumCell({ value, onChange, label, width = 110 }) {
   return (
-    <td className="num">
+    <td className="num" style={{ minWidth: width }}>
       <TextInput type="number" inputMode="decimal" min="0" step="any" aria-label={label} value={value}
-        style={{ maxWidth: width, textAlign: 'right' }} onChange={(e) => onChange(e.target.value)} />
+        style={{ width, textAlign: 'right' }} onChange={(e) => onChange(e.target.value)} />
     </td>
   );
 }
 
 const blankPoLine = () => ({
-  key: key(), item: '', subCategory: '', accessoriesItem: '', accessoryType: '', colorCode: '', uom: '',
+  key: key(), item: '', subCategory: '', accessoriesItem: '', accessoryType: '', size: '', colorCode: '', uom: '',
   orderQty: '', rate: '', hsnCode: '', orderMode: 'AS_PER_STYLE', orderId: '', remarks: '',
 });
 
@@ -180,6 +182,7 @@ export function PoDocumentForm() {
           subCategory: isAccessory(l) ? undefined : l.subCategory || undefined,
           accessoriesItem: isAccessory(l) ? l.accessoriesItem || undefined : undefined,
           accessoryType: isAccessory(l) ? l.accessoryType || undefined : undefined,
+          size: l.size.trim() || undefined,
           colorCode: l.colorCode || undefined,
           uom: l.uom,
           orderQty: String(l.orderQty),
@@ -245,7 +248,7 @@ export function PoDocumentForm() {
           <table className="data">
             <thead>
               <tr>
-                <th>#</th><th>Item</th><th>Detail</th><th>Colour</th><th>UOM</th>
+                <th>#</th><th>Item</th><th>Detail</th><th>Colour</th><th>UOM</th><th>Size</th>
                 <th className="num">Qty</th><th className="num">Rate</th><th className="num">Amount</th>
                 <th>Mode</th><th>Order</th><th>HSN</th><th />
               </tr>
@@ -255,6 +258,11 @@ export function PoDocumentForm() {
                 <tr key={l.key} className={badLine === i ? 'row-bad' : ''}>
                   <td>{i + 1}</td>
                   <MaterialCells line={l} set={(p) => setLine(l.key, p)} />
+                  {/* Free text, as the vendor must read it: 18L, 20 cm, 12 x 16. */}
+                  <td style={{ minWidth: 110 }}>
+                    <TextInput value={l.size} placeholder="e.g. 20 cm" aria-label="Size"
+                      onChange={(e) => setLine(l.key, { size: e.target.value })} />
+                  </td>
                   <NumCell label="Quantity" value={l.orderQty} onChange={(v) => setLine(l.key, { orderQty: v })} />
                   <NumCell label="Rate" value={l.rate} onChange={(v) => setLine(l.key, { rate: v })} />
                   <td className="num">{money((Number(l.orderQty) || 0) * (Number(l.rate) || 0))}</td>

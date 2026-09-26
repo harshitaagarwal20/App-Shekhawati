@@ -213,10 +213,12 @@ const bomLineSchema = z
      * silently zero. The reasoning holds; the refusal was in the wrong place.
      * `requirementFor()` already treats a per-piece figure of <= 0 as NO
      * REQUIREMENT rather than as a requirement of nothing - it returns
-     * NO_UTILISATION naming this very line - and `assertRequirement()` turns
-     * that into a refusal on the purchase order and the cutting challan. So a
-     * zero here is not silent: it stops the two documents that would otherwise
-     * be bounded by a number nobody has worked out.
+     * NO_UTILISATION naming this very line. So a zero here is never read as
+     * "this style consumes none of it".
+     *
+     * It no longer STOPS the purchase order either: see REPORTED_NOT_REFUSED
+     * in domain/requirement.js. Such a line is bought unbounded and recorded
+     * as unbounded. Nothing but this figure being filled in restores the cap.
      *
      * What the old rule actually prevented was REGISTERING a style before its
      * sampling decided the average, which forced somebody to invent a figure -
@@ -338,10 +340,10 @@ export const createStyleSchema = z.object({
   colorCode: dropdown(60),
   /**
    * Zero means the sampling has not decided it yet. See the BOM line's
-   * avgUtilisationPerPiece above: the guard that matters lives in
-   * requirementFor(), which refuses to compute against <= 0, so a style can be
-   * registered before its average is known without that gap reaching a
-   * purchase order or a cutting challan unannounced.
+   * avgUtilisationPerPiece above: requirementFor() refuses to COMPUTE against
+   * <= 0, so a style can be registered before its average is known and the
+   * gap is never mistaken for a requirement of nothing. The purchase order is
+   * no longer refused over it - it is recorded as unbounded instead.
    */
   avgFabricUtilizationPerPc: decimal('Average fabric utilisation', { min: 0 }),
   avgUtilizationUom: requiredDropdown(20, 'Utilisation UOM').default('Mtrs'),

@@ -277,7 +277,7 @@ describe('§39 - the navigation shows the current scope and nothing else', () =>
   /** The groups the business named, in the order it named them. */
   const EXPECTED_GROUPS = [
     'Dashboard', 'Masters', 'Orders', 'Procurement', 'Stores',
-    'Processing', 'Cutting', 'Administration',
+    'Job Work', 'Cutting', 'Administration',
   ];
 
   test('the groups are the ones the business named, in order', () => {
@@ -306,7 +306,7 @@ describe('§39 - the navigation shows the current scope and nothing else', () =>
   test('the pipeline groups are numbered in flow order', () => {
     const PIPELINE = [
       'Masters', 'Orders', 'Procurement', 'Stores',
-      'Processing', 'Cutting',
+      'Job Work', 'Cutting',
     ];
 
     // Each group's label paired with the `stage` that follows it, if any.

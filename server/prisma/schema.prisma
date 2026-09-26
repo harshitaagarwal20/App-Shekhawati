@@ -2124,6 +2124,9 @@ model PurchaseOrder {
   accessoriesItem String?       @map("accessories_item") @db.VarChar(80)
   /// Free-text type of the accessory - for a Button, "4-hole horn, 18L"
   accessoryType   String?       @map("accessory_type") @db.VarChar(120)
+  /// Size as the vendor must supply it - "18L", "20 cm", "1.25 in", "12 x 16".
+  /// Free text: it prints on the PO and the vendor reads it as written.
+  size            String?       @db.Text
   /// Excel: "Excess Allowed" - sheet note "2-3%". Fraction (0.02 = 2%).
   /// Process Doc: accessories may be ordered only 1% over requirement.
   excessAllowed   Decimal       @default(0) @map("excess_allowed") @db.Decimal(9, 6)

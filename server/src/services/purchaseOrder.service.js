@@ -93,7 +93,7 @@ export const SORTABLE = [
   'createdAt',
 ];
 
-const SEARCH = ['poId', 'item', 'subCategory', 'accessoriesItem', 'accessoryType', 'hsnCode', 'remarks', 'address'];
+const SEARCH = ['poId', 'item', 'subCategory', 'accessoriesItem', 'accessoryType', 'size', 'hsnCode', 'remarks', 'address'];
 
 const D = (v) => new Prisma.Decimal(v ?? 0);
 const ZERO = D(0);
@@ -356,7 +356,8 @@ export function checkOrderCeiling(line, mode, category, tolerances = EXCESS_CEIL
       variancePct: null,
       basis:
         'No style requirement could be computed for this line, so the BOM cannot bound ' +
-        'this quantity. Raise it as a bulk order if the quantity is deliberate.',
+        'this quantity. The order is allowed and recorded as unbounded - add the material ' +
+        'to the style BOM if it should be capped.',
     };
   }
 
@@ -1122,7 +1123,8 @@ async function createDocumentInternal(input, actorId) {
   const poDate = input.poDate ? new Date(input.poDate) : new Date();
 
   const dup = duplicateMaterial(input.lines, (l) =>
-    [l.item, l.subCategory ?? '', l.accessoriesItem ?? '', l.accessoryType ?? '', l.colorCode ?? '',
+    // Two sizes of one material are two lines, not a duplicate.
+    [l.item, l.subCategory ?? '', l.accessoriesItem ?? '', l.accessoryType ?? '', l.size ?? '', l.colorCode ?? '',
       l.uom, l.orderId ?? input.orderId ?? '', l.styleId ?? ''].join('|'),
   );
   if (dup) {
@@ -1303,6 +1305,7 @@ async function writeLine(tx, ctx, { header, lineNo, actorId }) {
       subCategory: input.subCategory ?? null,
       accessoriesItem: input.accessoriesItem ?? null,
       accessoryType: input.accessoryType ?? null,
+      size: input.size ?? null,
       excessAllowed: D(input.excessAllowed ?? 0),
       vendorId: vendor.id,
       address: header.address,
@@ -1436,6 +1439,7 @@ export async function printDocument(headerId) {
       subCategory: l.subCategory,
       accessoriesItem: l.accessoriesItem,
       accessoryType: l.accessoryType,
+      size: l.size,
       colorCode: l.colorCode,
       gsm: l.gsm,
       content: l.content,
@@ -1602,6 +1606,7 @@ export async function update(id, input, actorId) {
       ...(input.subCategory !== undefined ? { subCategory: input.subCategory } : {}),
       ...(input.accessoriesItem !== undefined ? { accessoriesItem: input.accessoriesItem } : {}),
       ...(input.accessoryType !== undefined ? { accessoryType: input.accessoryType } : {}),
+      ...(input.size !== undefined ? { size: input.size } : {}),
       ...(input.excessAllowed !== undefined ? { excessAllowed: D(input.excessAllowed) } : {}),
       ...(input.vendorId !== undefined ? { vendorId: input.vendorId } : {}),
       ...(input.address !== undefined ? { address: input.address } : {}),
@@ -2105,7 +2110,9 @@ export async function printView(id) {
       subCategory: po.subCategory,
       accessoriesItem: po.accessoriesItem,
       accessoryType: po.accessoryType,
-      description: [po.item, po.subCategory, po.accessoriesItem, po.accessoryType, po.content, po.gsm, po.count, po.colorCode]
+      size: po.size,
+      description: [po.item, po.subCategory, po.accessoriesItem, po.accessoryType,
+        po.size ? `Size ${po.size}` : null, po.content, po.gsm, po.count, po.colorCode]
         .filter(Boolean)
         .join(' / '),
       hsnCode: po.hsnCode,
@@ -2219,6 +2226,7 @@ export async function options({ vendorId, orderId, approvedOnly, openOnly } = {}
       subCategory: true,
       accessoriesItem: true,
       accessoryType: true,
+      size: true,
       uom: true,
       orderQty: true,
       receivedQty: true,

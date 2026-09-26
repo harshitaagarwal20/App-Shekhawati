@@ -40,11 +40,16 @@
  *  ZERO IS NEVER SILENTLY RETURNED.
  *
  *  A style with no utilisation cannot have a requirement computed. This
- *  function returns null and names why; `assertRequirement()` turns that into
- *  a refusal with a message. What it will not do is return 0, which would read
- *  as "this style needs no fabric" and would let an AS_PER_STYLE purchase
- *  order be capped at nothing - or, worse, pass a ceiling check by being
- *  compared against a ceiling of zero that nothing can exceed.
+ *  function returns null and names why. What it will not do is return 0,
+ *  which would read as "this style needs no fabric" and would let an
+ *  AS_PER_STYLE purchase order be capped at nothing - or, worse, pass a
+ *  ceiling check by being compared against a ceiling of zero that nothing can
+ *  exceed.
+ *
+ *  Whether null then REFUSES the document or merely reports it as unbounded
+ *  is `assertRequirement()`'s decision, not this function's - see
+ *  REPORTED_NOT_REFUSED. Callers that only report (Planning, the Cutting
+ *  Challan) are unaffected either way.
  * ---------------------------------------------------------------------------
  */
 
@@ -263,11 +268,51 @@ export function requirementFor({ style, order, line, on } = {}) {
 }
 
 /**
+ * Reasons that are reported but NOT refused.
+ *
+ * A BOM that cannot state a requirement is a gap in the BOM, not a bad
+ * purchase order. Two gaps are treated the same way:
+ *
+ *   NOT_IN_BOM       the BOM never mentions the material. Refusing here
+ *                    stopped the office buying thread against a style whose
+ *                    BOM had never listed thread.
+ *
+ *   NO_UTILISATION   the BOM names the material, or the style header names a
+ *                    fabric, but the per-piece figure is blank or zero -
+ *                    sampling has not decided it yet. Refusing here stopped
+ *                    the same purchase one step further along, after the
+ *                    line had been added.
+ *
+ * In both cases the only way past the refusal was to re-raise the line as
+ * BULK, which mislabels a deliberate as-per-style purchase as an unplanned
+ * one. So both now pass through: the document is written, and
+ * `checkOrderCeiling()` reports it as UNBOUNDED (bounded: false) with a basis
+ * saying the BOM could not bound it. Nothing is silently capped at zero, and
+ * nothing pretends a requirement was checked when none existed.
+ *
+ * WHAT THIS COSTS. A zero utilisation no longer stops procurement, so nothing
+ * now forces the sampling figure to be filled in before the material is
+ * bought. The quantity on such a line is bounded by nobody. That is a
+ * deliberate trade, recorded here rather than discovered later: the cap
+ * returns the moment the BOM line carries a figure.
+ *
+ * NO_STYLE still refuses. "As per style" with no style is not a gap in the
+ * data - it is a contradiction in the document.
+ */
+const REPORTED_NOT_REFUSED = new Set([
+  NO_REQUIREMENT.NOT_IN_BOM,
+  NO_REQUIREMENT.NO_UTILISATION,
+]);
+
+/**
  * The same, but refusing rather than reporting.
  *
- * C9: "Style without utilisation cannot create AS_PER_STYLE PO. Clear
+ * C9 read: "Style without utilisation cannot create AS_PER_STYLE PO. Clear
  * validation error is returned. Requirement is never silently treated as
- * zero." This is where that happens, once, for all three callers.
+ * zero." The second half still holds everywhere - a missing requirement is
+ * null, never 0. The first half was relaxed deliberately: see
+ * REPORTED_NOT_REFUSED above for which gaps are now reported as unbounded
+ * instead of refused, and what that costs.
  *
  * @param {object} args   Same as requirementFor()
  * @param {string} [args.forDocument]  What to name in the message
@@ -275,7 +320,7 @@ export function requirementFor({ style, order, line, on } = {}) {
 export function assertRequirement(args) {
   const result = requirementFor(args);
 
-  if (result.requirement === null) {
+  if (result.requirement === null && !REPORTED_NOT_REFUSED.has(result.reason)) {
     throw ApiError.badRequest(
       `${args.forDocument ?? 'This document'} cannot be raised: ${result.basis}`,
       {

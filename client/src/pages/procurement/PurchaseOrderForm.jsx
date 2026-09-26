@@ -65,6 +65,7 @@ const schema = z.object({
   subCategory: z.string().optional(),
   accessoriesItem: z.string().optional(),
   accessoryType: z.string().max(120, 'At most 120 characters').optional(),
+  size: z.string().max(500, 'At most 500 characters').optional(),
   uom: z.string().min(1, 'Choose a UOM'),
   orderQty: z.coerce.number().positive('Quantity must be greater than zero'),
   rate: z.coerce.number().min(0, 'Rate cannot be negative'),
@@ -110,6 +111,7 @@ export default function PurchaseOrderForm({ purchaseOrder, onSaved, onCancel }) 
     subCategory: purchaseOrder?.subCategory ?? '',
     accessoriesItem: purchaseOrder?.accessoriesItem ?? '',
     accessoryType: purchaseOrder?.accessoryType ?? '',
+    size: purchaseOrder?.size ?? '',
     uom: purchaseOrder?.uom ?? '',
     orderQty: purchaseOrder?.orderQty ?? '',
     rate: purchaseOrder?.rate ?? '',
@@ -213,6 +215,7 @@ export default function PurchaseOrderForm({ purchaseOrder, onSaved, onCancel }) 
         subCategory: values.subCategory || null,
         accessoriesItem: values.accessoriesItem || null,
         accessoryType: values.accessoryType || null,
+        size: values.size?.trim() || null,
         uom: values.uom,
         orderQty: String(values.orderQty),
         rate: String(values.rate),
@@ -394,6 +397,7 @@ export default function PurchaseOrderForm({ purchaseOrder, onSaved, onCancel }) 
               hint="Which one - e.g. for a Button: 4-hole horn 18L. Add new ones in Dropdown Lists."
             />
           )}
+          <RHFInput form={form} name="size" label="Size" hint="As the vendor must supply it, e.g. 20 cm, 18L, 12 x 16." />
           <RHFMasterSelect form={form} name="uom" label="UOM" listCode="UOM" required />
           <RHFQty form={form} name="orderQty" label="Order Qty" required uom={uom} />
           <RHFQty form={form} name="rate" label="Rate" required />

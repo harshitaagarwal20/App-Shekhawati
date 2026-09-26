@@ -118,6 +118,23 @@ export default function PurchaseOrderDetail() {
                 Edit
               </button>
             )}
+            {/*
+              * The decision itself. `editable.canDecide` is the server's own
+              * answer - still pending, not cancelled, and complete enough for a
+              * vendor to act on - so the button is offered only when pressing it
+              * would succeed. Without these two the Approvals queue sent an
+              * approver to a screen with nothing to approve with.
+              */}
+            {canApprove && editable.canDecide && (
+              <>
+                <button type="button" className="btn btn-primary" onClick={() => setDialog('approve')}>
+                  Approve
+                </button>
+                <button type="button" className="btn btn-danger" onClick={() => setDialog('reject')}>
+                  Reject
+                </button>
+              </>
+            )}
             {canApprove && editable.canReopen && (
               <button type="button" className="btn" onClick={() => setDialog('reopen')}>
                 Reopen
@@ -150,6 +167,21 @@ export default function PurchaseOrderDetail() {
         <Alert kind="success">
           Approved by {po.approvedByName} on {fmtDate(po.approvedAt)}. Goods may be received
           against it.
+        </Alert>
+      )}
+
+      {/*
+        * Why there is no Approve button. An approver who arrives from the
+        * queue and finds nothing to press has been told nothing; the server
+        * already lists every gap at once, so say all of them here rather than
+        * let them discover one per attempt.
+        */}
+      {canApprove && po.approvalStatus === 'PENDING' && !editable.canDecide
+        && editable.missingForApproval?.length > 0 && (
+        <Alert kind="warning">
+          This purchase order cannot be approved yet: it does not specify{' '}
+          {editable.missingForApproval.map((m) => m.label).join(', ')}. A vendor cannot act on
+          a purchase order that does not say these things.
         </Alert>
       )}
 
@@ -496,6 +528,7 @@ function MaterialSpec({ po }) {
     ['Sub Category', po.subCategory],
     ['Accessories Item', po.accessoriesItem],
     ['Variety', po.accessoryType],
+    ['Size', po.size],
     ['Colour', po.colorCode],
     ['Content', po.content],
     ['GSM', po.gsm],

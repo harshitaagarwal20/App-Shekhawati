@@ -431,12 +431,11 @@ describe('C9 - one requirement calculation, three callers', () => {
     assert.equal(r.reason, NO_REQUIREMENT.NO_STYLE);
   });
 
-  test('assertRequirement turns the refusal into a clear validation error', () => {
-    const bare = { ...STYLE, avgFabricUtilizationPerPc: '0' };
+  test('assertRequirement turns a refusal into a clear validation error', () => {
     assert.throws(
       () =>
         assertRequirement({
-          style: bare,
+          style: null,
           order: ORDER,
           line: { item: 'Fabric' },
           forDocument: 'An "as per style" purchase order',
@@ -444,10 +443,65 @@ describe('C9 - one requirement calculation, three callers', () => {
       (err) => {
         assert.equal(err.status, 400);
         assert.match(err.message, /as per style.*cannot be raised/i);
-        assert.equal(err.details.reason, NO_REQUIREMENT.NO_UTILISATION);
+        assert.equal(err.details.reason, NO_REQUIREMENT.NO_STYLE);
         return true;
       },
     );
+  });
+
+  /*
+   * The two gaps that are REPORTED rather than refused. Both still compute no
+   * requirement - `requirementFor()` is unchanged and still returns null, as
+   * the tests above assert. What changed is that `assertRequirement()` lets
+   * the document through, and `checkOrderCeiling()` records it as unbounded.
+   */
+  test('a BOM line with no utilisation no longer refuses the document', () => {
+    const blank = {
+      ...STYLE,
+      bomLines: [{ ...STYLE.bomLines[0], avgUtilisationPerPiece: '0' }],
+    };
+    const r = assertRequirement({
+      style: blank,
+      order: ORDER,
+      line: { item: 'Accessories', accessoriesItem: 'Cotton Handle' },
+      forDocument: 'An "as per style" purchase order',
+    });
+    assert.equal(r.requirement, null, 'still no requirement - just no refusal');
+    assert.equal(r.reason, NO_REQUIREMENT.NO_UTILISATION);
+  });
+
+  test('a material the BOM does not mention no longer refuses the document', () => {
+    const r = assertRequirement({
+      style: STYLE,
+      order: ORDER,
+      line: { item: 'Accessories', accessoriesItem: 'Thread' },
+      forDocument: 'An "as per style" purchase order',
+    });
+    assert.equal(r.requirement, null);
+    assert.equal(r.reason, NO_REQUIREMENT.NOT_IN_BOM);
+  });
+
+  test('a fabric style with no utilisation no longer refuses the document', () => {
+    const bare = { ...STYLE, avgFabricUtilizationPerPc: '0' };
+    const r = assertRequirement({
+      style: bare,
+      order: ORDER,
+      line: { item: 'Fabric' },
+      forDocument: 'An "as per style" purchase order',
+    });
+    assert.equal(r.requirement, null);
+    assert.equal(r.reason, NO_REQUIREMENT.NO_UTILISATION);
+  });
+
+  test('an unbounded line is recorded as unbounded, never capped at zero', () => {
+    const verdict = checkOrderCeiling(
+      { qty: '500', computedRequirementQty: null },
+      'AS_PER_STYLE',
+      'Accessories',
+    );
+    assert.equal(verdict.bounded, false);
+    assert.equal(verdict.withinCeiling, true, 'it must not be blocked');
+    assert.equal(verdict.ceiling, null, 'and must not be capped at zero');
   });
 
   /**

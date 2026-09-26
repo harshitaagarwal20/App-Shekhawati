@@ -81,7 +81,7 @@ const ICONS = {
       <line x1="21" y1="8" x2="12" y2="12.5" />
     </>
   ),
-  Processing: (
+  'Job Work': (
     <>
       <circle cx="12" cy="12" r="6.5" />
       <line x1="12" y1="5.5" x2="12" y2="2.5" />

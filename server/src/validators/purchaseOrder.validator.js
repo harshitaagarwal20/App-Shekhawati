@@ -55,6 +55,8 @@ const poBody = z.object({
   accessoriesItem: optionalText(80),
   /// Free-text type of the accessory - "4-hole horn, 18L" for a Button.
   accessoryType: optionalText(120),
+  /// Size as the vendor must supply it - "18L", "20 cm", "12 x 16". Free text.
+  size: optionalText(500),
 
   /// Excel: "Vender Name" (Dropdown -> Vendor Master)
   vendorId: uuid,

@@ -18,7 +18,7 @@
  *    3 Procurement               Vendor Quotations, Purchase Orders
  *    4 Stores                    Gate Pass, Goods Received, Inventory (stock +
  *                                movement + rolls), Fabric Issue
- *    5 Processing                Job Work (dyeing / printing), Fabric Scrutiny
+ *    5 Job Work                   Job Work (dyeing / printing), Fabric Scrutiny
  *    6 Cutting                   Plan Approval, Cutting Challan, Cut Pieces
  *                                Receipt, Cutting Issue
  *      Administration            Roles, Users, Audit
@@ -239,7 +239,7 @@ export const NAV_GROUPS = [
     ],
   },
   {
-    label: 'Processing',
+    label: 'Job Work',
     stage: 5,
     items: [
       /**
