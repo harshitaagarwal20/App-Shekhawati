@@ -94,6 +94,11 @@ export const setStatus = asyncHandler(async (req, res) =>
  */
 export const preview = asyncHandler(async (req, res) => ok(res, await service.preview(req.body)));
 
+/** Adds a stationery article to L_StationeryItem from the PO screen. */
+export const addStationeryItem = asyncHandler(async (req, res) =>
+  ok(res, await service.addStationeryItem(req.body, actor(req)), 201),
+);
+
 /** The printable purchase order, assembled on the server. */
 export const printView = asyncHandler(async (req, res) =>
   ok(res, await service.printView(req.params.id)),

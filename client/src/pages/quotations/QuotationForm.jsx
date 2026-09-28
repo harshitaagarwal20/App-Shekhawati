@@ -21,6 +21,7 @@ import {
   Spinner,
   TextArea,
   TextInput,
+  StationerySelect,
   VarietySelect,
 } from '../../components/ui.jsx';
 import { loadFailed } from '../../services/loadFailures.js';
@@ -236,24 +237,49 @@ export default function QuotationForm({ quotation, onSaved, onCancel }) {
               listCode="ItemCategory"
               currentValue={form.item}
               value={form.item}
-              onChange={set('item')}
+              // Sub Category is a fabric weight on one item and a stationery
+              // article on the other, so it does not survive a switch.
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  item: e.target.value,
+                  subCategory:
+                    (f.item === 'Stationery') === (e.target.value === 'Stationery') ? f.subCategory : '',
+                }))
+              }
             />
           </Field>
 
-          <Field
-            label="Sub Category"
-            error={fieldErrors.subCategory}
-            hint="Fabric detail, e.g. 10 oz."
-            htmlFor="q-sub"
-          >
-            <MasterSelect
-              id="q-sub"
-              listCode="FabricSubCat"
-              currentValue={form.subCategory}
-              value={form.subCategory}
-              onChange={set('subCategory')}
-            />
-          </Field>
+          {form.item === 'Stationery' ? (
+            <Field
+              label="Stationery Item"
+              error={fieldErrors.subCategory}
+              hint="Not listed? + New adds it."
+              htmlFor="q-sub"
+            >
+              <StationerySelect
+                id="q-sub"
+                currentValue={form.subCategory}
+                value={form.subCategory}
+                onChange={set('subCategory')}
+              />
+            </Field>
+          ) : (
+            <Field
+              label="Sub Category"
+              error={fieldErrors.subCategory}
+              hint="Fabric detail, e.g. 10 oz."
+              htmlFor="q-sub"
+            >
+              <MasterSelect
+                id="q-sub"
+                listCode="FabricSubCat"
+                currentValue={form.subCategory}
+                value={form.subCategory}
+                onChange={set('subCategory')}
+              />
+            </Field>
+          )}
 
           <Field
             label="Accessories Item"

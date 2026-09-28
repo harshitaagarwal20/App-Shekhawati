@@ -20,6 +20,8 @@ mobile/keystore.properties
 # --- Data and build output -------------------------------------------------
 backups/
 *.sql
+# ...except Prisma migrations, which ARE the schema and must be deployed.
+!server/prisma/migrations/**/migration.sql
 *.apk
 *.aab
 mobile/android/build/

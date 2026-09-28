@@ -37,6 +37,7 @@ import {
   PageHeader,
   RecordSelect,
   Spinner,
+  StationerySelect,
   StatusBadge,
   TextArea,
   TextInput,
@@ -53,6 +54,7 @@ const money = (v) =>
     : Number(v).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const qty = (v) => (v === null || v === undefined ? '-' : Number(v).toLocaleString('en-IN', { maximumFractionDigits: 4 }));
 const isAccessory = (l) => l.item === 'Accessories' || Boolean(l.accessoriesItem);
+const isStationery = (l) => l.item === 'Stationery';
 const describe = (l) =>
   [l.item, l.subCategory, l.accessoriesItem, l.accessoryType, l.size ? `Size ${l.size}` : null, l.colorCode]
     .filter(Boolean)
@@ -96,10 +98,22 @@ function MaterialCells({ line, set }) {
     <>
       <td style={{ minWidth: 150 }}>
         <MasterSelect listCode="ItemCategory" value={line.item} currentValue={line.item} aria-label="Item"
-          onChange={(e) => set({ item: e.target.value, subCategory: '', accessoriesItem: '', accessoryType: '' })} />
+          onChange={(e) =>
+            set({
+              item: e.target.value,
+              subCategory: '',
+              accessoriesItem: '',
+              accessoryType: '',
+              // Stationery is never ordered against a style.
+              ...(e.target.value === 'Stationery' ? { orderMode: 'BULK' } : {}),
+            })
+          } />
       </td>
-      <td style={{ minWidth: 160 }}>
-        {acc ? (
+      <td style={{ minWidth: 200 }}>
+        {isStationery(line) ? (
+          <StationerySelect value={line.subCategory} currentValue={line.subCategory} aria-label="Stationery item"
+            onChange={(e) => set({ subCategory: e.target.value })} />
+        ) : acc ? (
           <>
             {/* Changing the item clears the variety: a button variety means
                 nothing on a zipper. */}
@@ -268,6 +282,7 @@ export function PoDocumentForm() {
                   <td className="num">{money((Number(l.orderQty) || 0) * (Number(l.rate) || 0))}</td>
                   <td style={{ minWidth: 120 }}>
                     <EnumSelect options={ORDER_MODES} includeBlank={false} value={l.orderMode} aria-label="Order mode"
+                      disabled={isStationery(l)} title={isStationery(l) ? 'Stationery is always bought in bulk' : undefined}
                       onChange={(e) => setLine(l.key, { orderMode: e.target.value })} />
                   </td>
                   <td style={{ minWidth: 120 }}>
@@ -914,7 +929,7 @@ export function GrnDocumentForm() {
                   <TextInput type="number" min="0" step="any" value={l.inventoryRate} onChange={(e) => setLine(l.key, { inventoryRate: e.target.value })} />
                 </Field>
               </div>
-              {po && !isAccessory(po) && (
+              {po && !isAccessory(po) && !isStationery(po) && (
                 <div style={{ marginTop: 8 }}>
                   {l.rolls.length > 0 && (
                     <TableWrap>

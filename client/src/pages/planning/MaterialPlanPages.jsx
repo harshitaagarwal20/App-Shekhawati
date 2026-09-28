@@ -64,6 +64,7 @@ const CATEGORY_LABEL = {
   FABRIC: 'Fabric',
   ACCESSORIES: 'Accessories',
   PACKAGING: 'Packaging',
+  STATIONERY: 'Stationery',
 };
 
 /** The requirement table. Shared by the preview and the saved plan. */

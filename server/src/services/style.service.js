@@ -18,6 +18,7 @@ import { OPTIONS_LIMIT } from '../utils/http.js';
 import { requirementFor as resolveRequirement } from '../domain/requirement.js';
 import { computeRequirement } from '../domain/requirement.js';
 import { perBag } from '../domain/panels.js';
+import { isStationery } from '../domain/itemCategory.js';
 
 export const SORTABLE = ['styleNo', 'styleDescription', 'category', 'status', 'createdAt'];
 const SEARCH = ['styleNo', 'styleDescription', 'category', 'fabricContent', 'colorCode', 'sizeGroup'];
@@ -102,6 +103,11 @@ async function validateBomLine(line, index, keepCategories = null, keepVarieties
     required: true,
     allow: keepCategories,
   });
+  if (isStationery(line.itemCategory)) {
+    throw ApiError.badRequest('Stationery is office stock, not part of a bag - it cannot go on a style BOM.', {
+      field: `${at}.itemCategory`,
+    });
+  }
   await assertValueInList('UOM', line.uom, { field: `${at}.uom`, required: true });
   if (line.subCategory) await assertValueInList('FabricSubCat', line.subCategory, { field: `${at}.subCategory` });
   if (line.accessoriesItem) await assertValueInList('AccessoriesItem', line.accessoriesItem, { field: `${at}.accessoriesItem` });

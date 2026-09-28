@@ -119,6 +119,8 @@ function BomEditor({ form, editing, isNew }) {
                   <td>
                     <MasterSelect
                       listCode="ItemCategory"
+                      /* Stationery is bought for the office, never for a bag. */
+                      filter={(v) => v.value !== 'Stationery'}
                       currentValue={bom[i]?.itemCategory} value={bom[i]?.itemCategory ?? ''}
                       {...register(`bom.${i}.itemCategory`)}
                     />

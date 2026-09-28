@@ -12,7 +12,7 @@
 import { z } from 'zod';
 import { fraction, optionalText, requiredText, uuid } from './common.validator.js';
 
-export const ITEM_CATEGORIES = ['FABRIC', 'ACCESSORIES', 'PACKAGING'];
+export const ITEM_CATEGORIES = ['FABRIC', 'ACCESSORIES', 'PACKAGING', 'STATIONERY'];
 export const JOB_WORK_PROCESSES = ['DYEING', 'PRINTING', 'FINISHING'];
 
 // `fraction` from common.validator.js already refuses anything outside [0, 1)

@@ -262,6 +262,9 @@ export const purchaseOrders = {
   /** Multi-line: one PO, many items. */
   createDocument: (body) => request({ method: 'POST', url: '/purchase-orders/documents', data: body }),
   getDocument: (id) => request({ method: 'GET', url: `/purchase-orders/documents/${id}` }),
+  /** Adds a stationery article to L_StationeryItem; returns { value, created }. */
+  addStationeryItem: (value) =>
+    request({ method: 'POST', url: '/purchase-orders/stationery-items', data: { value } }),
   printDocument: (id) => request({ method: 'GET', url: `/purchase-orders/documents/${id}/print` }),
   approveDocument: (id, body) => request({ method: 'POST', url: `/purchase-orders/documents/${id}/approve`, data: body ?? {} }),
   rejectDocument: (id, reason) => request({ method: 'POST', url: `/purchase-orders/documents/${id}/reject`, data: { reason } }),

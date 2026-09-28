@@ -34,6 +34,7 @@ import { assertAccessoryVariety, assertValueInList } from './masterList.service.
 import { nextNumber } from './documentNumber.service.js';
 import * as engine from './approvalEngine.js';
 import { documentStatus, duplicateMaterial, lineNumber } from '../domain/documentLines.js';
+import { subCategoryListFor } from '../domain/itemCategory.js';
 
 export const SORTABLE = [
   'quotationNo',
@@ -128,7 +129,8 @@ async function validateDropdowns(data, existing = null) {
   }
   // Sub-category and accessory detail follow the item, exactly as on the PO sheet.
   if (data.subCategory !== undefined) {
-    await assertValueInList('FabricSubCat', data.subCategory, { field: 'subCategory' });
+    const item = data.item !== undefined ? data.item : existing?.item;
+    await assertValueInList(subCategoryListFor(item), data.subCategory, { field: 'subCategory' });
   }
   if (data.accessoriesItem !== undefined) {
     await assertValueInList('AccessoriesItem', data.accessoriesItem, { field: 'accessoriesItem' });

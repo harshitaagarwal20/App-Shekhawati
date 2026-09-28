@@ -13,6 +13,7 @@ import {
   rejectPoSchema,
   reopenPoSchema,
   setPoStatusSchema,
+  stationeryItemSchema,
   updatePoSchema,
 } from '../validators/purchaseOrder.validator.js';
 
@@ -27,6 +28,19 @@ router.post(
   can('PURCHASE_ORDER.VIEW'),
   validate({ body: previewPoSchema }),
   c.preview,
+);
+
+/**
+ * Adds a stationery article to L_StationeryItem. Behind the PO / quotation
+ * CREATE permissions rather than MASTER_LIST.EDIT: whoever raises the document
+ * is who knows the office needs something new, and the list is not a rule
+ * anything is judged by.
+ */
+router.post(
+  '/stationery-items',
+  can('PURCHASE_ORDER.CREATE', 'VENDOR_QUOTATION.CREATE'),
+  validate({ body: stationeryItemSchema }),
+  c.addStationeryItem,
 );
 
 router.get('/', can('PURCHASE_ORDER.VIEW'), validate({ query: poListQuery }), c.list);

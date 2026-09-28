@@ -13,7 +13,8 @@
 
 import { forwardRef, useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useMasterList } from '../hooks/useMasterList.js';
+import { invalidateMasterList, useMasterList } from '../hooks/useMasterList.js';
+import { purchaseOrders as poApi } from '../services/erp.js';
 import { Combobox } from './Combobox.jsx';
 
 // --- Feedback --------------------------------------------------------------
@@ -235,6 +236,93 @@ export const VarietySelect = forwardRef(function VarietySelect(
       disabled={!accessoriesItem || disabled}
       {...props}
     />
+  );
+});
+
+/**
+ * The stationery article (L_StationeryItem), with "+ New" to add one that is
+ * not listed yet without leaving the PO. The server returns an existing
+ * article as it is already spelt, so typing "pen" picks "Pen" rather than
+ * creating a second stock item.
+ */
+export const StationerySelect = forwardRef(function StationerySelect(
+  { name, onChange, disabled, ...props },
+  ref,
+) {
+  const [version, setVersion] = useState(0);
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  async function add() {
+    const value = draft.trim();
+    if (!value) return;
+    setBusy(true);
+    setError('');
+    try {
+      const saved = await poApi.addStationeryItem(value);
+      invalidateMasterList('StationeryItem');
+      setVersion((v) => v + 1);
+      onChange?.({ target: { name, value: saved.value, type: 'text' } });
+      setAdding(false);
+      setDraft('');
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (adding) {
+    return (
+      <div>
+        <div style={{ display: 'flex', gap: 4 }}>
+          <input
+            autoFocus
+            value={draft}
+            maxLength={60}
+            placeholder="New stationery item"
+            aria-label="New stationery item"
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') { e.preventDefault(); add(); }
+              if (e.key === 'Escape') { e.preventDefault(); setAdding(false); }
+            }}
+          />
+          <button type="button" className="btn btn-sm btn-primary" disabled={busy || !draft.trim()} onClick={add}>
+            {busy ? 'Adding...' : 'Add'}
+          </button>
+          <button type="button" className="btn btn-sm" disabled={busy} onClick={() => setAdding(false)}>
+            Cancel
+          </button>
+        </div>
+        {error && <span className="err">{error}</span>}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', gap: 4 }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <MasterSelect
+          key={version}
+          ref={ref}
+          listCode="StationeryItem"
+          name={name}
+          onChange={onChange}
+          disabled={disabled}
+          placeholder="Select stationery..."
+          {...props}
+        />
+      </div>
+      {!disabled && (
+        <button type="button" className="btn btn-sm" title="Add a stationery item that is not listed"
+          onClick={() => { setDraft(''); setError(''); setAdding(true); }}>
+          + New
+        </button>
+      )}
+    </div>
   );
 });
 

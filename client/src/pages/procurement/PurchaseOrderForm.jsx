@@ -37,7 +37,7 @@ import {
   useSubmit,
   useZodForm,
 } from '../../components/form.jsx';
-import { Alert, Spinner } from '../../components/ui.jsx';
+import { Alert, Field, Spinner, StationerySelect } from '../../components/ui.jsx';
 import { fmtNum, todayInput, toDateInput } from '../../utils/format.js';
 import { loadFailed } from '../../services/loadFailures.js';
 
@@ -235,6 +235,7 @@ export default function PurchaseOrderForm({ purchaseOrder, onSaved, onCancel }) 
   );
 
   const isAccessory = item === 'Accessories' || Boolean(accessoriesItem);
+  const isStationery = item === 'Stationery';
 
   /*
    * A HIDDEN FIELD MUST NOT KEEP ITS VALUE.
@@ -253,18 +254,35 @@ export default function PurchaseOrderForm({ purchaseOrder, onSaved, onCancel }) 
   useEffect(() => {
     if (!item) return;
     const accessory = item === 'Accessories';
-    for (const [field, keepWhenAccessory] of [
-      ['subCategory', false],
-      ['gsm', false],
-      ['content', false],
-      ['accessoriesItem', true],
-      ['accessoryType', true],
+    const stationery = item === 'Stationery';
+    for (const [field, keep] of [
+      ['subCategory', !accessory],
+      ['gsm', !accessory && !stationery],
+      ['content', !accessory && !stationery],
+      ['accessoriesItem', accessory],
+      ['accessoryType', accessory],
     ]) {
-      if (accessory !== keepWhenAccessory && form.getValues(field)) {
+      if (!keep && form.getValues(field)) {
         form.setValue(field, '', { shouldDirty: true });
       }
     }
+    // Stationery is never ordered against a style.
+    if (stationery && form.getValues('orderMode') !== 'BULK') {
+      form.setValue('orderMode', 'BULK', { shouldDirty: true });
+    }
   }, [item, form]);
+
+  /*
+   * Sub Category means a fabric weight on one item and a stationery article on
+   * the other, so switching between them clears it. Only on a CHANGE, so a PO
+   * opened for edit keeps what it was saved with.
+   */
+  const lastStationery = useRef(isStationery);
+  useEffect(() => {
+    if (lastStationery.current === isStationery) return;
+    lastStationery.current = isStationery;
+    if (form.getValues('subCategory')) form.setValue('subCategory', '', { shouldDirty: true });
+  }, [isStationery, form]);
 
   /*
    * A variety belongs to one accessories item: a button variety means nothing
@@ -348,15 +366,21 @@ export default function PurchaseOrderForm({ purchaseOrder, onSaved, onCancel }) 
             }
           />
 
-          <RHFEnumSelect
-            form={form}
-            name="orderMode"
-            label="Order mode"
-            required
-            includeBlank={false}
-            options={ORDER_MODES}
-            hint="As per style caps the quantity at the BOM requirement plus the tolerance. Bulk is exempt — deliberately, and it is recorded as a choice."
-          />
+          {isStationery ? (
+            <Field label="Order mode" hint="Stationery is not bought against a style, so it is always bulk.">
+              <div style={{ padding: '6px 0' }}>Bulk</div>
+            </Field>
+          ) : (
+            <RHFEnumSelect
+              form={form}
+              name="orderMode"
+              label="Order mode"
+              required
+              includeBlank={false}
+              options={ORDER_MODES}
+              hint="As per style caps the quantity at the BOM requirement plus the tolerance. Bulk is exempt — deliberately, and it is recorded as a choice."
+            />
+          )}
         </FieldGroup>
 
         <FieldGroup title="What is being bought">
@@ -368,7 +392,19 @@ export default function PurchaseOrderForm({ purchaseOrder, onSaved, onCancel }) 
             screen with dashes - and the Accessories Item hint already claimed
             it appeared "when the item is an accessory", which it did not.
           */}
-          {!isAccessory && (
+          {isStationery && (
+            <Field label="Stationery Item" htmlFor="subCategory" required
+              error={form.formState.errors.subCategory?.message}
+              hint="Not listed? + New adds it.">
+              <StationerySelect
+                id="subCategory"
+                value={form.watch('subCategory') ?? ''}
+                currentValue={form.watch('subCategory')}
+                onChange={(e) => form.setValue('subCategory', e.target.value, { shouldDirty: true, shouldValidate: true })}
+              />
+            </Field>
+          )}
+          {!isAccessory && !isStationery && (
             <RHFMasterSelect
               form={form}
               name="subCategory"
@@ -420,8 +456,8 @@ export default function PurchaseOrderForm({ purchaseOrder, onSaved, onCancel }) 
 
         <FieldGroup title="Specification">
           <RHFInput form={form} name="hsnCode" label="HSN Code" />
-          {/* GSM and Content describe cloth. A zip has neither. */}
-          {!isAccessory && (
+          {/* GSM and Content describe cloth. A zip or a pen has neither. */}
+          {!isAccessory && !isStationery && (
             <>
               <RHFMasterSelect form={form} name="gsm" label="GSM" listCode="GSM" />
               <RHFMasterSelect form={form} name="content" label="Content" listCode="FabricContent" />

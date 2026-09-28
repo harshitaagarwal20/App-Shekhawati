@@ -49,7 +49,8 @@ const poBody = z.object({
 
   /// Excel: "Item" (Dropdown -> L_ItemCategory)
   item: z.string().trim().min(1, 'Item is required').max(60),
-  /// Excel: "sub - category" (Dropdown -> L_FabricSubCat), e.g. "10 oz"
+  /// Excel: "sub - category" (Dropdown -> L_FabricSubCat), e.g. "10 oz".
+  /// For Item = Stationery, the article instead (L_StationeryItem), e.g. "Pen".
   subCategory: optionalText(60),
   /// Excel: "Accessories item" - shown only when Item = Accessories
   accessoriesItem: optionalText(80),
@@ -157,6 +158,11 @@ export const setPoStatusSchema = z.object({
  * the excess ceiling and the style ceiling. The browser asks rather than
  * calculating, so the figures on screen are the figures that will be stored.
  */
+/** A new stationery article, added to L_StationeryItem from the PO screen. */
+export const stationeryItemSchema = z.object({
+  value: z.string().trim().min(1, 'Stationery item is required').max(60),
+});
+
 export const previewPoSchema = z.object({
   item: z.string().trim().min(1, 'Item is required').max(60),
   subCategory: optionalText(60),

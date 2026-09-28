@@ -63,13 +63,14 @@ import { Prisma } from '@prisma/client';
 import prisma from '../config/prisma.js';
 import { ApiError } from '../utils/ApiError.js';
 import { OPTIONS_LIMIT, searchFilter } from '../utils/http.js';
+import * as masterLists from './masterList.service.js';
 import { assertAccessoryVariety, assertValueInList } from './masterList.service.js';
 import { nextNumber, peekNumber } from './documentNumber.service.js';
 import * as engine from './approvalEngine.js';
 import { env } from '../config/env.js';
 import { documentStatus, duplicateMaterial, lineNumber } from '../domain/documentLines.js';
 // C2 / C9 - the category, the tolerance master, and the one requirement formula.
-import { categoryOfLine } from '../domain/itemCategory.js';
+import { categoryOfLine, isStationery, STATIONERY_ITEM, subCategoryListFor } from '../domain/itemCategory.js';
 import { assertRequirement, requirementFor } from '../domain/requirement.js';
 // Named `toleranceMaster`, not `tolerance`: `checkOrderCeiling()` already has a
 // local `tolerance` holding the resolved fraction, and a module alias that
@@ -415,7 +416,6 @@ export function styleRequirementFor(style, order, line, on) {
 
 const LIST_FIELDS = [
   ['item', 'ItemCategory'],
-  ['subCategory', 'FabricSubCat'],
   ['accessoriesItem', 'AccessoriesItem'],
   ['uom', 'UOM'],
   ['gsm', 'GSM'],
@@ -428,6 +428,16 @@ async function validateDropdowns(data, existing = null) {
   for (const [field, listCode] of LIST_FIELDS) {
     if (data[field] === undefined) continue;
     await assertValueInList(listCode, data[field], { field });
+  }
+
+  // Sub-category follows the item: a fabric weight, or the stationery article.
+  // The value the row already holds is kept only while the item is unchanged.
+  const item = data.item !== undefined ? data.item : existing?.item;
+  if (data.subCategory !== undefined) {
+    await assertValueInList(subCategoryListFor(item), data.subCategory, {
+      field: 'subCategory',
+      allow: existing?.subCategory && existing.item === item ? [existing.subCategory] : null,
+    });
   }
 
   /*
@@ -539,6 +549,20 @@ function assertOrderMode(mode) {
     );
   }
   return mode;
+}
+
+/**
+ * Stationery is bought for the office, never against a style, so there is no
+ * requirement for AS_PER_STYLE to be bounded by. Said plainly here rather than
+ * left to surface as a "no requirement" refusal that would not explain why.
+ */
+function assertStationeryIsBulk(line, orderMode) {
+  if (isStationery(line.item) && orderMode !== 'BULK') {
+    throw ApiError.badRequest(
+      'Stationery is not ordered against a style, so it can only be ordered in BULK mode.',
+      { field: 'orderMode', received: orderMode, allowed: ['BULK'] },
+    );
+  }
 }
 
 function assertExcessWithinCeiling(line, resolvedTolerance) {
@@ -764,6 +788,7 @@ const APPROVAL_REQUIREMENTS = [
   ['colorCode', 'a colour', (po) => po.item === 'Fabric'],
   ['subCategory', 'a sub-category', (po) => po.item === 'Fabric'],
   ['accessoriesItem', 'an accessory item', (po) => po.item === 'Accessories'],
+  ['subCategory', 'a stationery item', (po) => isStationery(po.item)],
 ];
 
 /** Everything this PO still has to say before a vendor could act on it. */
@@ -1221,6 +1246,7 @@ async function prepareLine(input, { vendor, poDate }) {
 
   // C1: the mode is explicit. There is no default here and none on the column.
   const orderMode = assertOrderMode(input.orderMode);
+  assertStationeryIsBulk(line, orderMode);
 
   // ---- C2: THE TOLERANCE, RESOLVED ONCE ---------------------------------
   //
@@ -1528,6 +1554,7 @@ export async function update(id, input, actorId) {
   };
   // C1: an edit may switch mode, but it may not leave it unstated.
   const orderMode = assertOrderMode(input.orderMode ?? existing.orderMode);
+  assertStationeryIsBulk(merged, orderMode);
   const orderQty = input.orderQty !== undefined ? D(input.orderQty) : D(existing.orderQty);
   const rate = input.rate !== undefined ? D(input.rate) : D(existing.rate);
 
@@ -2204,6 +2231,32 @@ function indianWords(n) {
   const tail = n % 100;
   if (tail > 0) parts.push(twoDigits(tail));
   return parts.join(' ');
+}
+
+/**
+ * Adds a stationery article to L_StationeryItem from the PO screen, so whoever
+ * raises the PO can buy something new without holding MASTER_LIST.EDIT.
+ *
+ * Idempotent: an article already listed (in any letter case) is returned as it
+ * is spelt there, and one withdrawn earlier is brought back - two spellings of
+ * "Pen" would become two stock items with two balances.
+ */
+export async function addStationeryItem({ value }, actorId) {
+  const list = await prisma.masterList.findFirst({ where: { code: 'StationeryItem', deletedAt: null } });
+  if (!list) throw ApiError.notFound('Master list "StationeryItem"');
+
+  const name = value.trim();
+  const existing = await prisma.masterListValue.findFirst({
+    where: { listId: list.id, value: { equals: name, mode: 'insensitive' } },
+  });
+
+  if (existing && !existing.deletedAt) {
+    if (!existing.isActive) await masterLists.setValueActive(existing.id, true, actorId);
+    return { item: STATIONERY_ITEM, value: existing.value, created: false };
+  }
+
+  const row = await masterLists.addValue(list.id, { value: existing?.value ?? name }, actorId);
+  return { item: STATIONERY_ITEM, value: row.value, created: true };
 }
 
 /** Approved-PO dropdown for the Gate Pass and GRN modules. */

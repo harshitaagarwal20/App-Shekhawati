@@ -12,8 +12,7 @@
  *
  * Tolerance is not agreed per dropdown value. Nobody has ever negotiated a
  * separate receipt tolerance for zippers as against buttons. It is agreed per
- * COMMERCIAL CATEGORY, and there are exactly three: fabric, accessories,
- * packaging.
+ * COMMERCIAL CATEGORY: fabric, accessories, packaging and stationery.
  *
  * So the open list stays open, an enum-backed `category` sits beside it, and
  * this file is the single place one becomes the other. Every writer calls
@@ -42,8 +41,11 @@
 
 import { ApiError } from '../utils/ApiError.js';
 
-/** The three commercial categories, and the enum values behind them. */
-export const ITEM_CATEGORIES = ['FABRIC', 'ACCESSORIES', 'PACKAGING'];
+/** The commercial categories, and the enum values behind them. */
+export const ITEM_CATEGORIES = ['FABRIC', 'ACCESSORIES', 'PACKAGING', 'STATIONERY'];
+
+/** The L_ItemCategory value for office stationery - pens, registers, paper. */
+export const STATIONERY_ITEM = 'Stationery';
 
 /**
  * L_ItemCategory value -> commercial category.
@@ -67,6 +69,12 @@ const MAPPING = {
   // The workbook writes it in full; people type the short form.
   'packaging material': 'PACKAGING',
   packaging: 'PACKAGING',
+
+  // Office consumables. Bought in bulk for the office, never against a style,
+  // so they get their own category rather than borrowing a material's
+  // tolerance.
+  stationery: 'STATIONERY',
+  stationary: 'STATIONERY',
 };
 
 /** Human-readable labels, so screens do not each invent their own wording. */
@@ -74,6 +82,7 @@ export const CATEGORY_LABEL = {
   FABRIC: 'Fabric',
   ACCESSORIES: 'Accessories',
   PACKAGING: 'Packaging',
+  STATIONERY: 'Stationery',
 };
 
 /**
@@ -86,7 +95,7 @@ export const CATEGORY_LABEL = {
  * @param {string} itemCategory  An L_ItemCategory value, e.g. "Packaging Material"
  * @param {object} [opts]
  * @param {string} [opts.field]  Field name to attach to the error
- * @returns {'FABRIC'|'ACCESSORIES'|'PACKAGING'}
+ * @returns {'FABRIC'|'ACCESSORIES'|'PACKAGING'|'STATIONERY'}
  */
 export function categoryOf(itemCategory, { field = 'item' } = {}) {
   const key = String(itemCategory ?? '').trim().toLowerCase();
@@ -94,7 +103,7 @@ export function categoryOf(itemCategory, { field = 'item' } = {}) {
 
   if (!resolved) {
     throw ApiError.badRequest(
-      `"${itemCategory}" is not mapped to one of the three purchase categories ` +
+      `"${itemCategory}" is not mapped to one of the purchase categories ` +
         `(${ITEM_CATEGORIES.join(' / ')}). Tolerances are set per category, so an item ` +
         'that belongs to none of them cannot be ordered or received. Add the mapping in ' +
         'src/domain/itemCategory.js.',
@@ -109,7 +118,7 @@ export function categoryOf(itemCategory, { field = 'item' } = {}) {
  * The same question, without the throw, for callers that are surveying rather
  * than writing - a report counting unmapped master-list values, for instance.
  *
- * @returns {'FABRIC'|'ACCESSORIES'|'PACKAGING'|null}
+ * @returns {'FABRIC'|'ACCESSORIES'|'PACKAGING'|'STATIONERY'|null}
  */
 export function tryCategoryOf(itemCategory) {
   return MAPPING[String(itemCategory ?? '').trim().toLowerCase()] ?? null;
@@ -121,12 +130,26 @@ export function tryCategoryOf(itemCategory) {
  * dropdown values a percentage they are editing will govern.
  */
 export function mappingByCategory() {
-  const grouped = { FABRIC: [], ACCESSORIES: [], PACKAGING: [] };
+  const grouped = Object.fromEntries(ITEM_CATEGORIES.map((c) => [c, []]));
   for (const [value, category] of Object.entries(MAPPING)) {
     if (!grouped[category]) continue;
     grouped[category].push(value);
   }
   return grouped;
+}
+
+/** Whether an L_ItemCategory value is office stationery. */
+export function isStationery(itemCategory) {
+  return tryCategoryOf(itemCategory) === 'STATIONERY';
+}
+
+/**
+ * The master list a line's `subCategory` is chosen from. Fabric (and anything
+ * else) names a weight from L_FabricSubCat; stationery names the article
+ * itself - Pen, Register - from L_StationeryItem.
+ */
+export function subCategoryListFor(itemCategory) {
+  return isStationery(itemCategory) ? 'StationeryItem' : 'FabricSubCat';
 }
 
 /**

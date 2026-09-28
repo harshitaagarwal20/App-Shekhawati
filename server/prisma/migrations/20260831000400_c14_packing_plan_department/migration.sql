@@ -1,0 +1,31 @@
+-- ===========================================================================
+--  C14 - PACKING IS A PLANNING DEPARTMENT
+-- ===========================================================================
+--
+--  The Planning sheet's "Planning Department" dropdown offered Cutting,
+--  Stitching and Shipping. The office also plans PACKING, and could not record
+--  it - so a packing plan was being kept outside the system.
+--
+--  ---------------------------------------------------------------------------
+--   THIS IS NOT THE PACKING MODULE, AND THE SCOPE GUARD STILL HOLDS
+--
+--   A packing PLAN is a sheet of paper saying how many pieces are to be packed
+--   and by when, signed before the work starts. Packing EXECUTION - a packing
+--   list, a carton, a packed quantity - remains entirely absent: no table, no
+--   route, no service, no menu item.
+--
+--   That is the same distinction prisma/verify-scope.js already draws for
+--   STITCHING and SHIPPING, which have sat in this enum since Phase 0 while
+--   the guard refuses a stitching_records table. The guard's Packing patterns
+--   are `model Packing` and `@@map("packings")` - they match a MODEL, never an
+--   enum value - so naming the department here does not loosen it, and
+--   `npm run verify:scope` still fails the build if a packing module appears.
+--
+--   ---------------------------------------------------------------------------
+--   NO BACKFILL, AND NOTHING MOVES
+--
+--   Adding a value to a PostgreSQL enum leaves every existing row untouched.
+--   No plan changes department, and no plan becomes invalid.
+-- ===========================================================================
+
+ALTER TYPE "PlanDepartment" ADD VALUE IF NOT EXISTS 'PACKING' AFTER 'SHIPPING';

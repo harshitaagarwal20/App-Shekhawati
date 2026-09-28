@@ -1,0 +1,98 @@
+# Deploys Shekhawati Impex ERP to Azure on every push to main.
+#
+#   verify    lint, rule tests, production build - nothing ships if these fail
+#   backend   prisma migrate deploy, then the API to Azure App Service
+#   frontend  the React build to Azure Static Web Apps
+#
+# Setup (once): docs/AZURE-DEPLOYMENT.md. GitHub needs these repository secrets:
+#   AZURE_WEBAPP_PUBLISH_PROFILE   App Service -> Overview -> Download publish profile
+#   DATABASE_URL                   the Azure PostgreSQL connection string (sslmode=require)
+#   SWA_DEPLOYMENT_TOKEN           Static Web App -> Overview -> Manage deployment token
+# and these repository variables (Settings -> Secrets and variables -> Actions -> Variables):
+#   AZURE_WEBAPP_NAME              e.g. app-shekhawati-erp-api-prod
+#   API_URL                        e.g. https://app-shekhawati-erp-api-prod.azurewebsites.net/api
+
+name: Deploy to Azure
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Two overlapping deploys would run two `migrate deploy`s against one database.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      # Placeholders so config validation passes; nothing here touches a database.
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+      JWT_SECRET: ci-only-placeholder-secret-at-least-32-chars
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm --workspace server run db:generate
+      - run: npm run lint
+      - run: npm run test:rules
+      - run: npm run build
+
+  backend:
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # A full install: `prisma` (the CLI) is a devDependency of the server.
+      - run: npm ci
+      - run: npm --workspace server run db:generate
+
+      # Migrations run BEFORE the new code. `migrate deploy` only applies
+      # pending migrations - it never resets and never seeds.
+      - name: Apply database migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npm --workspace server run db:deploy
+
+      - name: Package
+        run: zip -qr api.zip server node_modules package.json package-lock.json -x 'server/test/*' 'server/.env*'
+
+      - uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ vars.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: api.zip
+
+  frontend:
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+        env:
+          # The API is on another host, so the default "/api" would resolve
+          # against the Static Web App.
+          VITE_API_URL: ${{ vars.API_URL }}
+      - uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
+          action: upload
+          app_location: client/dist
+          skip_app_build: true

@@ -74,7 +74,7 @@ export const masterLists = [
     name: 'Item Category',
     description: 'Quotation / PO / GRN - Item dropdown (L_ItemCategory)',
     /*
-     * TWO VALUES, NOT SEVEN.
+     * FABRIC AND ACCESSORIES, NOT SEVEN.
      *
      * Handle, Zipper, Label, Thread and Button used to sit here as categories
      * AND in L_AccessoriesItem as items, so one black zipper could be recorded
@@ -84,11 +84,30 @@ export const masterLists = [
      * and nothing downstream noticed because categoryOf() resolves all five to
      * ACCESSORIES anyway.
      *
-     * Trim is now recorded one way: Accessories, plus the item.
+     * Trim is now recorded one way: Accessories, plus the item. Stationery
+     * follows the same shape: Stationery, plus the L_StationeryItem article.
      */
     values: [
       'Fabric',
       'Accessories',
+      'Stationery',
+    ],
+  },
+  {
+    code: 'StationeryItem',
+    name: 'Stationery Item',
+    description: 'PO - the stationery article, shown only when Item = Stationery (Pen, Register, A4 Paper)',
+    values: [
+      'Pen',
+      'Pencil',
+      'Marker',
+      'Register',
+      'A4 Paper',
+      'File / Folder',
+      'Stapler',
+      'Stapler Pins',
+      'Tape',
+      'Printer Toner',
     ],
   },
   {

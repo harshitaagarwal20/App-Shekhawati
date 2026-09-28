@@ -21,7 +21,13 @@
 import test, { describe } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { categoryOf, tryCategoryOf, mappingByCategory } from '../src/domain/itemCategory.js';
+import {
+  categoryOf,
+  isStationery,
+  mappingByCategory,
+  subCategoryListFor,
+  tryCategoryOf,
+} from '../src/domain/itemCategory.js';
 import {
   computeRequirement,
   requirementFor,
@@ -39,7 +45,7 @@ import { calculateRequirement } from '../src/services/buyerOrder.service.js';
 //  C2 - ITEM CATEGORY
 // ===========================================================================
 
-describe('C2 - the three commercial categories', () => {
+describe('C2 - the commercial categories', () => {
   test('fabric maps to FABRIC', () => {
     assert.equal(categoryOf('Fabric'), 'FABRIC');
   });
@@ -54,6 +60,19 @@ describe('C2 - the three commercial categories', () => {
     assert.equal(categoryOf('Packaging Material'), 'PACKAGING');
   });
 
+  test('stationery maps to its own category, never to a material', () => {
+    assert.equal(categoryOf('Stationery'), 'STATIONERY');
+    assert.equal(categoryOf('stationary'), 'STATIONERY', 'the common misspelling resolves too');
+    assert.ok(isStationery('Stationery'));
+    assert.ok(!isStationery('Fabric'));
+  });
+
+  test('sub-category is a stationery article on stationery, a fabric weight elsewhere', () => {
+    assert.equal(subCategoryListFor('Stationery'), 'StationeryItem');
+    assert.equal(subCategoryListFor('Fabric'), 'FabricSubCat');
+    assert.equal(subCategoryListFor(undefined), 'FabricSubCat');
+  });
+
   test('the mapping is case- and whitespace-insensitive', () => {
     assert.equal(categoryOf('  fabric  '), 'FABRIC');
     assert.equal(categoryOf('PACKAGING MATERIAL'), 'PACKAGING');
@@ -65,13 +84,13 @@ describe('C2 - the three commercial categories', () => {
    * to a material nobody classified.
    */
   test('an unmapped value is REFUSED, not guessed', () => {
-    assert.throws(() => categoryOf('Interlining'), /not mapped to one of the three/);
+    assert.throws(() => categoryOf('Interlining'), /not mapped to one of the purchase categories/);
     assert.equal(tryCategoryOf('Interlining'), null, 'the survey form returns null instead');
   });
 
   test('every category has at least one dropdown value behind it', () => {
     const m = mappingByCategory();
-    for (const c of ['FABRIC', 'ACCESSORIES', 'PACKAGING']) {
+    for (const c of ['FABRIC', 'ACCESSORIES', 'PACKAGING', 'STATIONERY']) {
       assert.ok(m[c].length > 0, `${c} governs no dropdown value`);
     }
   });
