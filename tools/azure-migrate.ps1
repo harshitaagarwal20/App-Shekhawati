@@ -28,7 +28,7 @@ $repo = Split-Path -Parent $PSScriptRoot
 try {
   $ip = (Invoke-RestMethod https://api.ipify.org).Trim()
   Write-Host "Opening the database firewall for $ip ..." -ForegroundColor Cyan
-  az postgres flexible-server firewall-rule create -g $rg --server-name $server --rule-name $rule `
+  az postgres flexible-server firewall-rule create -g $rg --server-name $server --name $rule `
     --start-ip-address $ip --end-ip-address $ip --output none
   if ($LASTEXITCODE -ne 0) { throw 'Could not create the firewall rule.' }
 
@@ -57,5 +57,5 @@ try {
 } finally {
   Remove-Item Env:DATABASE_URL -ErrorAction SilentlyContinue
   Write-Host 'Closing the database firewall rule ...' -ForegroundColor Cyan
-  az postgres flexible-server firewall-rule delete -g $rg --server-name $server --rule-name $rule --yes --output none 2>$null
+  az postgres flexible-server firewall-rule delete -g $rg --server-name $server --name $rule --yes --output none 2>$null
 }
