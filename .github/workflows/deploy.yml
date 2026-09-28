@@ -1,16 +1,17 @@
-# Deploys Shekhawati Impex ERP to Azure on every push to main.
+# Deploys Shekhawati Impex ERP to the existing Azure setup on every push to main.
+# See docs/HOSTING-AND-SECRETS.md for what runs where.
 #
 #   verify    lint, rule tests, production build - nothing ships if these fail
-#   backend   prisma migrate deploy, then the API to Azure App Service
-#   frontend  the React build to Azure Static Web Apps
+#   backend   prisma migrate deploy, then the API zip to App Service
+#             (package.json + src + prisma + public, built on Azure by Oryx,
+#             exactly as the manual redeploy does)
+#   frontend  the React build to the Static Web App
 #
-# Setup (once): docs/AZURE-DEPLOYMENT.md. GitHub needs these repository secrets:
+# GitHub repository secrets needed:
 #   AZURE_WEBAPP_PUBLISH_PROFILE   App Service -> Overview -> Download publish profile
-#   DATABASE_URL                   the Azure PostgreSQL connection string (sslmode=require)
+#   DATABASE_URL                   same value as Key Vault secret DATABASE-URL
 #   SWA_DEPLOYMENT_TOKEN           Static Web App -> Overview -> Manage deployment token
-# and these repository variables (Settings -> Secrets and variables -> Actions -> Variables):
-#   AZURE_WEBAPP_NAME              e.g. app-shekhawati-erp-api-prod
-#   API_URL                        e.g. https://app-shekhawati-erp-api-prod.azurewebsites.net/api
+# GitHub-hosted runners reach the database through its "allow Azure services" rule.
 
 name: Deploy to Azure
 
@@ -24,6 +25,10 @@ concurrency:
   group: deploy-production
   cancel-in-progress: false
 
+env:
+  AZURE_WEBAPP_NAME: shekhawati-erp-u4dfh
+  API_URL: https://shekhawati-erp-u4dfh.azurewebsites.net/api
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -35,7 +40,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
       - run: npm --workspace server run db:generate
@@ -51,12 +56,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
-
-      # A full install: `prisma` (the CLI) is a devDependency of the server.
       - run: npm ci
-      - run: npm --workspace server run db:generate
 
       # Migrations run BEFORE the new code. `migrate deploy` only applies
       # pending migrations - it never resets and never seeds.
@@ -65,31 +67,42 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: npm --workspace server run db:deploy
 
+      # The App Service still serves the combined site from public/ while
+      # CLIENT_DIST is set, so the client build ships inside the API zip too.
+      - run: npm run build
+        env:
+          VITE_API_URL: ${{ env.API_URL }}
       - name: Package
-        run: zip -qr api.zip server node_modules package.json package-lock.json -x 'server/test/*' 'server/.env*'
+        run: |
+          mkdir -p pkg
+          cp server/package.json pkg/
+          cp -r server/src server/prisma pkg/
+          cp -r client/dist pkg/public
+          find pkg -name '*.map' -delete
+          cd pkg && zip -qr ../api.zip .
 
       - uses: azure/webapps-deploy@v3
         with:
-          app-name: ${{ vars.AZURE_WEBAPP_NAME }}
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
           package: api.zip
 
   frontend:
-    needs: verify
+    # After the backend, so the new client never talks to the old API.
+    needs: backend
     runs-on: ubuntu-latest
     environment: production
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
       - run: npm run build
         env:
-          # The API is on another host, so the default "/api" would resolve
-          # against the Static Web App.
-          VITE_API_URL: ${{ vars.API_URL }}
+          VITE_API_URL: ${{ env.API_URL }}
+      - run: find client/dist -name '*.map' -delete
       - uses: Azure/static-web-apps-deploy@v1
         with:
           azure_static_web_apps_api_token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
