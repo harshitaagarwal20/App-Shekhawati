@@ -112,10 +112,9 @@ export default function PlanningHub() {
   // One register to see is not a choice; go straight to it.
   const kind = allowed.length === 1 ? allowed[0].value : valid;
 
+  // A history entry, not `replace`, so Back returns to the question.
   const setKind = (next) => {
-    // `replace`, so flicking between the two does not fill the back button
-    // with a screen the user was passing through.
-    setParams(next ? { kind: next } : {}, { replace: true });
+    setParams(next ? { kind: next } : {});
   };
 
   // ---- Nothing chosen yet: the question, and nothing else. ----------------

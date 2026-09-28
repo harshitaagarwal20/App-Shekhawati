@@ -73,7 +73,7 @@ export default function ExcessRules() {
   return (
     <>
       <PageHeader
-        title="Excess Control"
+        title="Excess Rules"
       />
 
       <div className="row" style={{ gap: 8, marginBottom: 16 }}>

@@ -121,8 +121,7 @@ export function useHubChoice(param, choices) {
   return {
     allowed,
     chosen: allowed.find((c) => c.value === value) ?? null,
-    // `replace`, so a screen the user was only passing through does not end up
-    // in the back button.
-    choose: (next) => setParams(next ? { [param]: next } : {}, { replace: true }),
+    // A history entry, not `replace`, so Back returns to the question.
+    choose: (next) => setParams(next ? { [param]: next } : {}),
   };
 }
