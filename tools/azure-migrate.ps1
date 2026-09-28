@@ -7,8 +7,9 @@
   What it does:
     1. Opens the database firewall to THIS machine's current IP (rule
        "migrate-temp").
-    2. Reads DATABASE_URL from Key Vault into this process only. It is never
-       printed and never written to disk.
+    2. Reads DATABASE_URL from the web app's settings (following a Key Vault
+       reference if it is one) into this process only. It is never printed
+       and never written to disk.
     3. Shows `prisma migrate status` and asks before applying anything.
     4. Runs `prisma migrate deploy`. That only applies pending migrations; it
        never resets and never seeds.
@@ -22,6 +23,7 @@ $ErrorActionPreference = 'Stop'
 $rg = 'shekhawati-erp'
 $server = 'shekhawati-db-u4dfh'
 $vault = 'shekhawati-kv-u4dfh'
+$webapp = 'shekhawati-erp-u4dfh'
 $rule = 'migrate-temp'
 $repo = Split-Path -Parent $PSScriptRoot
 
@@ -32,10 +34,15 @@ try {
     --start-ip-address $ip --end-ip-address $ip --output none
   if ($LASTEXITCODE -ne 0) { throw 'Could not create the firewall rule.' }
 
-  Write-Host 'Reading DATABASE_URL from Key Vault ...' -ForegroundColor Cyan
-  $env:DATABASE_URL = az keyvault secret show --vault-name $vault --name DATABASE-URL --query value -o tsv
-  if ($LASTEXITCODE -ne 0 -or -not $env:DATABASE_URL) {
-    throw 'Could not read the DATABASE-URL secret. Your account needs the "Key Vault Secrets Officer" role on the vault.'
+  # The web app's own DATABASE_URL setting is the source of truth: it may be
+  # the connection string itself or a Key Vault reference to it.
+  Write-Host "Reading DATABASE_URL from the web app's settings ..." -ForegroundColor Cyan
+  $env:DATABASE_URL = az webapp config appsettings list -g $rg -n $webapp `
+    --query "[?name=='DATABASE_URL'].value | [0]" -o tsv
+  if ($LASTEXITCODE -ne 0 -or -not $env:DATABASE_URL) { throw 'Could not read DATABASE_URL from the web app.' }
+  if ($env:DATABASE_URL.StartsWith('@Microsoft.KeyVault')) {
+    $env:DATABASE_URL = az keyvault secret show --vault-name $vault --name DATABASE-URL --query value -o tsv
+    if ($LASTEXITCODE -ne 0 -or -not $env:DATABASE_URL) { throw 'Could not read the DATABASE-URL secret from Key Vault.' }
   }
 
   Push-Location (Join-Path $repo 'server')
