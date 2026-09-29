@@ -413,7 +413,7 @@ function PurchaseOrderBody({ doc }) {
             <li>Quantity in excess of the order is liable to be refused at the gate.</li>
           )}
           <li>Delivery is to the Ship to address above, against a gate pass.</li>
-          {doc.remarks && <li>{doc.remarks}</li>}
+          {doc.remarks && <li style={{ whiteSpace: 'pre-line' }}>{doc.remarks}</li>}
         </ol>
       </div>
 

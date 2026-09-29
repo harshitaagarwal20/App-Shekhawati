@@ -133,7 +133,7 @@ export function isAccessoryLine({ item, accessoriesItem }) {
 }
 
 const INCLUDE = {
-  header: { select: { id: true, poNo: true, deliveryDate: true, paymentTerms: true, _count: { select: { lines: { where: { deletedAt: null } } } } } },
+  header: { select: { id: true, poNo: true, deliveryDate: true, paymentTerms: true, remarks: true, _count: { select: { lines: { where: { deletedAt: null } } } } } },
   vendor: {
     select: {
       id: true,
@@ -1476,6 +1476,8 @@ export async function printDocument(headerId) {
       amount: l.amount,
       approvalStatus: l.approvalStatus,
       orderNo: l.order?.orderNo ?? null,
+      // Single-form POs keep their remarks on the line, not the header.
+      remarks: l.remarks && l.remarks !== doc.remarks ? l.remarks : null,
     })),
     totalAmount: total.toFixed(2),
     amountInWords: amountInWords(total),
@@ -1487,6 +1489,12 @@ export async function printDocument(headerId) {
       gstin: env.COMPANY_GSTIN,
     },
   };
+}
+
+/** Header and line remarks as one printed note, without repeating a shared one. */
+function joinRemarks(...parts) {
+  const unique = [...new Set(parts.map((p) => p?.trim()).filter(Boolean))];
+  return unique.length ? unique.join('\n') : null;
 }
 
 /** The vendor's PO series key - "Vendor initial + no" on the PO sheet. */
@@ -2171,7 +2179,9 @@ export async function printView(id) {
       decidedAt: po.decidedAt,
       rejectionReason: po.rejectionReason,
     },
-    remarks: po.remarks,
+    // A PO raised on the multi-line form keeps its remarks on the header, one
+    // raised on the single form keeps them on the line: print whichever exist.
+    remarks: joinRemarks(po.header?.remarks, po.remarks),
     printedAt: new Date().toISOString(),
   };
 }

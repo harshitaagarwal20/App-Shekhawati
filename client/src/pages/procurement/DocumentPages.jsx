@@ -537,7 +537,10 @@ export function PoDocumentPrint() {
             {p.lines.map((l) => (
               <tr key={l.poId}>
                 <td>{l.lineNo}</td>
-                <td>{describe(l)}{l.gsm ? ` · ${l.gsm}` : ''}</td>
+                <td>
+                  {describe(l)}{l.gsm ? ` · ${l.gsm}` : ''}
+                  {l.remarks && <div className="muted" style={{ whiteSpace: 'pre-line' }}>{l.remarks}</div>}
+                </td>
                 <td>{l.hsnCode ?? ''}</td>
                 <td className="num">{qty(l.orderQty)}</td>
                 <td>{l.uom}</td>
@@ -551,7 +554,7 @@ export function PoDocumentPrint() {
           </tfoot>
         </table>
         <p><strong>Amount in words:</strong> {p.amountInWords}</p>
-        {p.header.remarks && <p className="muted">{p.header.remarks}</p>}
+        {p.header.remarks && <p className="muted" style={{ whiteSpace: 'pre-line' }}><strong>Remarks:</strong> {p.header.remarks}</p>}
         <div className="doc-sign"><div>Prepared by</div><div>Authorised signatory</div></div>
       </div>
     </div>
