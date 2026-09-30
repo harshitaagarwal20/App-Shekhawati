@@ -283,7 +283,7 @@ export function FabricIssueDetail() {
   }
   if (!issue) return <Alert kind="error">{error || 'Fabric issue not found'}</Alert>;
 
-  const { movements, jobWorks, cuttingIssues, editable } = issue;
+  const { movements, jobWorks, cuttingIssues } = issue;
 
   return (
     <>

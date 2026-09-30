@@ -48,6 +48,7 @@ router.get('/', can('PURCHASE_ORDER.VIEW'), validate({ query: poListQuery }), c.
 // ---------------------------------------------------------------------------
 //  MULTI-LINE: the PO as the vendor receives it. Before '/:id'.
 // ---------------------------------------------------------------------------
+router.get('/documents', can('PURCHASE_ORDER.VIEW'), validate({ query: poListQuery }), c.listDocuments);
 router.post(
   '/documents',
   can('PURCHASE_ORDER.CREATE'),

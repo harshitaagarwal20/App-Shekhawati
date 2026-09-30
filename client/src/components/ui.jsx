@@ -62,6 +62,7 @@ export function StatusBadge({ status }) {
     APPROVED: 'badge-approved',
     REJECTED: 'badge-rejected',
     IN_PROGRESS: 'badge-info',
+    PARTLY_APPROVED: 'badge-info',
     COMPLETED: 'badge-approved',
     ON_HOLD: 'badge-pending',
     CANCELLED: 'badge-inactive',

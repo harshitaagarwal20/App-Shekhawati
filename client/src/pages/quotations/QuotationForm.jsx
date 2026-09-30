@@ -342,7 +342,7 @@ export default function QuotationForm({ quotation, onSaved, onCancel }) {
           </Field>
         </div>
 
-        <AmountPanel preview={preview} loading={previewing} uom={form.uom} />
+        <AmountPanel preview={preview} loading={previewing} />
       </div>
 
       <div className="modal-footer">
@@ -362,7 +362,7 @@ export default function QuotationForm({ quotation, onSaved, onCancel }) {
  * input: there is nothing for a user to type here, because there is nothing the
  * server would accept.
  */
-function AmountPanel({ preview, loading, uom }) {
+function AmountPanel({ preview, loading }) {
   if (loading && !preview) {
     return (
       <div style={{ marginTop: 16 }}>

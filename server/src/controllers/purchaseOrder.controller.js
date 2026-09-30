@@ -36,6 +36,37 @@ export const list = asyncHandler(async (req, res) => {
   );
 });
 
+/** One row per PO document rather than per line. Same filters as `list`. */
+export const listDocuments = asyncHandler(async (req, res) => {
+  const q = parseListQuery(req, {
+    sortable: service.DOCUMENT_SORTABLE,
+    defaultSort: 'poDate',
+    defaultDir: 'desc',
+  });
+  const {
+    approvalStatus, status, vendorId, orderId, quotationId, item, orderMode, uom,
+    dateFrom, dateTo, pendingReceipt,
+  } = req.query;
+
+  return okList(
+    res,
+    await service.listDocuments({
+      ...q,
+      approvalStatus,
+      status,
+      vendorId,
+      orderId,
+      quotationId,
+      item,
+      orderMode,
+      uom,
+      dateFrom,
+      dateTo,
+      pendingReceipt,
+    }),
+  );
+});
+
 export const get = asyncHandler(async (req, res) =>
   // F-10: the screen is told whether THIS user may approve THIS document, so
   // it never offers a button the server will refuse.

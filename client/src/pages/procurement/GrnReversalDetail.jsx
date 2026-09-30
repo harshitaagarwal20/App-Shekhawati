@@ -32,7 +32,7 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import { grnReversals as revApi } from '../../services/erp.js';
 import { Alert, PageHeader, Spinner, StatusBadge } from '../../components/ui.jsx';
 import { Detail, DetailGrid } from '../shared/Detail.jsx';
-import { fmtDate, fmtDateTime, fmtMoney, fmtNum } from '../../utils/format.js';
+import { fmtDate, fmtDateTime, fmtNum } from '../../utils/format.js';
 
 export default function GrnReversalDetail() {
   const { id } = useParams();

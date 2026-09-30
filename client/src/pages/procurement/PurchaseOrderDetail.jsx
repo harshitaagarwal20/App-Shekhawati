@@ -93,7 +93,7 @@ export default function PurchaseOrderDetail() {
   }
   if (!po) return <Alert kind="error">{banner?.text ?? 'Purchase order not found'}</Alert>;
 
-  const { traceability, receipts, gatePasses, editable, history, usage } = po;
+  const { traceability, receipts, gatePasses, editable, history } = po;
 
   return (
     <>

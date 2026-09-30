@@ -260,6 +260,7 @@ export const purchaseOrders = {
   options: (params) => request({ method: 'GET', url: '/purchase-orders/options', params }),
   create: (body) => request({ method: 'POST', url: '/purchase-orders', data: body }),
   /** Multi-line: one PO, many items. */
+  listDocuments: (params) => requestList({ method: 'GET', url: '/purchase-orders/documents', params }),
   createDocument: (body) => request({ method: 'POST', url: '/purchase-orders/documents', data: body }),
   getDocument: (id) => request({ method: 'GET', url: `/purchase-orders/documents/${id}` }),
   /** Adds a stationery article to L_StationeryItem; returns { value, created }. */

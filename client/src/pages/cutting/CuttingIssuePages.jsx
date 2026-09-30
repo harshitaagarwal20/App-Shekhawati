@@ -26,7 +26,6 @@ import {
   RecordSelect,
   SortableTh,
   Spinner,
-  StatusBadge,
   TextArea,
   TextInput,
 } from '../../components/ui.jsx';

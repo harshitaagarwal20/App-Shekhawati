@@ -13,7 +13,6 @@ import { orders as ordersApi } from '../../services/erp.js';
 import {
   Alert,
   ConfirmDialog,
-  EnumSelect,
   Field,
   Modal,
   PageHeader,
@@ -32,21 +31,6 @@ const fmtMoney = (v, currency) =>
   v === null || v === undefined || v === ''
     ? null
     : `${Number(v).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${currency ? ` ${currency}` : ''}`;
-
-const EXCESS_BADGE = {
-  NOT_REQUIRED: 'badge-inactive',
-  PENDING: 'badge-pending',
-  APPROVED: 'badge-approved',
-  REJECTED: 'badge-rejected',
-};
-
-const STATUS_OPTIONS = [
-  { value: 'PENDING', label: 'Pending' },
-  { value: 'IN_PROGRESS', label: 'In Progress' },
-  { value: 'COMPLETED', label: 'Completed' },
-  { value: 'ON_HOLD', label: 'On Hold' },
-  { value: 'CANCELLED', label: 'Cancelled' },
-];
 
 export default function OrderDetail() {
   const { id } = useParams();
@@ -83,19 +67,6 @@ export default function OrderDetail() {
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
-
-  async function changeStatus(status) {
-    setBusy(true);
-    try {
-      await ordersApi.setStatus(id, status);
-      setBanner({ kind: 'success', text: `Status changed to ${status.replace('_', ' ').toLowerCase()}.` });
-      await load();
-    } catch (e) {
-      setBanner({ kind: 'error', text: e.message });
-    } finally {
-      setBusy(false);
-    }
-  }
 
   async function doDelete() {
     setBusy(true);

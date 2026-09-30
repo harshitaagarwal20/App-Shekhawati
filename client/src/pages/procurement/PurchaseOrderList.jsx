@@ -1,6 +1,9 @@
 /**
  * Purchase Order list. Sheet: "PO".
  *
+ * One row per PO DOCUMENT - a multi-item PO is one entry, not one per item.
+ * Its lines are listed on the document page.
+ *
  * Server-side paginated, filtered and sorted - `useResourceList` sends the
  * query and the API answers with one page. Nothing here loads a table of
  * purchase orders into the browser and filters it locally.
@@ -31,7 +34,6 @@ import {
   StatusBadge,
   TextInput,
 } from '../../components/ui.jsx';
-import { StateBadge } from '../../components/workflow.jsx';
 import { fmtDate, fmtMoney, fmtNum } from '../../utils/format.js';
 import PurchaseOrderForm from './PurchaseOrderForm.jsx';
 import { loadFailed } from '../../services/loadFailures.js';
@@ -64,9 +66,9 @@ const ORDER_TYPE_OPTIONS = [
  * one click away for whoever is chasing approvals.
  */
 const COLUMNS = [
-  { key: 'poId', label: 'PO ID' },
+  { key: 'poId', label: 'PO No' },
   { key: 'date', label: 'Date' },
-  { key: 'item', label: 'Item' },
+  { key: 'item', label: 'Items' },
   { key: 'vendor', label: 'Vendor' },
   { key: 'uom', label: 'UOM', optional: true },
   { key: 'orderQty', label: 'Order Qty' },
@@ -74,7 +76,7 @@ const COLUMNS = [
   { key: 'amount', label: 'Amount' },
   { key: 'received', label: 'Received', optional: true },
   { key: 'orderNo', label: 'Order No', optional: true },
-  { key: 'workflow', label: 'Workflow', optional: true },
+  { key: 'workflow', label: 'Approval', optional: true },
   { key: 'status', label: 'Status' },
 ];
 
@@ -84,7 +86,7 @@ export default function PurchaseOrderList() {
 
   const cols = useOptionalColumns('purchase-orders', COLUMNS);
 
-  const list = useResourceList((params) => poApi.list(params), {
+  const list = useResourceList((params) => poApi.listDocuments(params), {
     defaultSort: 'poDate',
     defaultDir: 'desc',
     initialFilters: {
@@ -207,18 +209,18 @@ export default function PurchaseOrderList() {
           <table className="data">
             <thead>
               <tr>
-                <SortableTh field="poId" label="PO ID" sortBy={list.sortBy} sortDir={list.sortDir} onSort={list.toggleSort} />
+                <SortableTh field="poNo" label="PO No" sortBy={list.sortBy} sortDir={list.sortDir} onSort={list.toggleSort} />
                 <SortableTh field="poDate" label="Date" sortBy={list.sortBy} sortDir={list.sortDir} onSort={list.toggleSort} />
-                <SortableTh field="item" label="Item" sortBy={list.sortBy} sortDir={list.sortDir} onSort={list.toggleSort} />
+                <th>Items</th>
                 <th>Vendor</th>
                 {cols.show('uom') && <th>UOM</th>}
-                <SortableTh field="orderQty" label="Order Qty" sortBy={list.sortBy} sortDir={list.sortDir} onSort={list.toggleSort} className="num" />
-                {cols.show('rate') && <SortableTh field="rate" label="Rate" sortBy={list.sortBy} sortDir={list.sortDir} onSort={list.toggleSort} className="num" />}
-                <SortableTh field="amount" label="Amount" sortBy={list.sortBy} sortDir={list.sortDir} onSort={list.toggleSort} className="num" />
-                {cols.show('received') && <SortableTh field="receivedQty" label="Received" sortBy={list.sortBy} sortDir={list.sortDir} onSort={list.toggleSort} className="num" />}
+                <th className="num">Order Qty</th>
+                {cols.show('rate') && <th className="num">Rate</th>}
+                <th className="num">Amount</th>
+                {cols.show('received') && <th className="num">Received</th>}
                 {cols.show('orderNo') && <th>Order No</th>}
-                {cols.show('workflow') && <th>Workflow</th>}
-                <SortableTh field="status" label="Status" sortBy={list.sortBy} sortDir={list.sortDir} onSort={list.toggleSort} />
+                {cols.show('workflow') && <th>Approval</th>}
+                <th>Status</th>
                 <ColumnMenu {...cols} />
               </tr>
             </thead>
@@ -249,48 +251,49 @@ export default function PurchaseOrderList() {
               )}
 
               {!list.loading &&
-                list.rows.map((po) => (
+                list.rows.map((doc) => {
+                  const [first] = doc.lines;
+                  const more = doc.lineCount - 1;
+                  const single = doc.lineCount === 1 ? first : null;
+                  return (
                   <tr
-                    key={po.id}
-                    onClick={() => navigate(`/purchase-orders/${po.id}`)}
-                    className={`clickable ${po.approvalStatus === 'REJECTED' || po.status === 'CANCELLED' ? 'inactive' : ''}`}
+                    key={doc.id}
+                    onClick={() => navigate(`/purchase-orders/documents/${doc.id}`)}
+                    className={`clickable ${doc.approvalStatus === 'REJECTED' || doc.status === 'CANCELLED' ? 'inactive' : ''}`}
                   >
-                    <td className="code">{po.poId}</td>
-                    <td className="nowrap">{fmtDate(po.poDate)}</td>
+                    <td className="code">{doc.poNo}</td>
+                    <td className="nowrap">{fmtDate(doc.poDate)}</td>
                     <td>
-                      {po.item}
-                      {(po.subCategory || po.accessoriesItem) && (
-                        <div className="faint">{po.subCategory ?? [po.accessoriesItem, po.accessoryType].filter(Boolean).join(' · ')}</div>
+                      {first?.item}
+                      {first && (first.subCategory || first.accessoriesItem) && (
+                        <span className="faint"> · {first.subCategory ?? [first.accessoriesItem, first.accessoryType].filter(Boolean).join(' · ')}</span>
                       )}
+                      {more > 0 && <div className="faint">+ {more} more item{more === 1 ? '' : 's'}</div>}
                     </td>
-                    <td>{po.vendor?.vendorName ?? '-'}</td>
-                    {cols.show('uom') && <td>{po.uom}</td>}
-                    <td className="num">{fmtNum(po.orderQty)}</td>
-                    {cols.show('rate') && <td className="num">{fmtNum(po.rate, { decimals: 4 })}</td>}
+                    <td>{doc.vendor?.vendorName ?? '-'}</td>
+                    {cols.show('uom') && <td>{doc.uom ?? 'Mixed'}</td>}
+                    <td className="num">{doc.orderQty == null ? <span className="faint">Mixed UOM</span> : fmtNum(doc.orderQty)}</td>
+                    {cols.show('rate') && <td className="num">{single ? fmtNum(single.rate, { decimals: 4 }) : '-'}</td>}
                     <td className="num">
-                      <strong>{fmtMoney(po.amount)}</strong>
-                      <div className="faint">{po.amountCalculation}</div>
+                      <strong>{fmtMoney(doc.totalAmount)}</strong>
+                      {doc.lineCount > 1 && <div className="faint">{doc.lineCount} lines</div>}
                     </td>
                     {cols.show('received') && (
-                      <td className="num">
-                        {fmtNum(po.receivedQty)}
-                        {Number(po.pendingQty) > 0 && (
-                          <div className="faint">{fmtNum(po.pendingQty)} due</div>
-                        )}
-                      </td>
+                      <td className="num">{doc.receivedQty == null ? '-' : fmtNum(doc.receivedQty)}</td>
                     )}
-                    {cols.show('orderNo') && <td className="code">{po.order?.orderNo ?? '-'}</td>}
+                    {cols.show('orderNo') && <td className="code">{doc.orderNos.length ? doc.orderNos.join(', ') : '-'}</td>}
                     {cols.show('workflow') && (
                       <td>
-                        <StateBadge state={po.workflowState} />
+                        <StatusBadge status={doc.approvalStatus} />
                       </td>
                     )}
                     <td>
-                      <StatusBadge status={po.status} />
+                      <StatusBadge status={doc.status} />
                     </td>
                     <td />
                   </tr>
-                ))}
+                  );
+                })}
             </tbody>
           </table>
         </TableWrap>

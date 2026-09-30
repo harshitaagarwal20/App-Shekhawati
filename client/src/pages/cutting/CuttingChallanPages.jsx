@@ -47,7 +47,6 @@ import {
   TextArea,
   TextInput,
 } from '../../components/ui.jsx';
-import { ServerValue } from '../../components/form.jsx';
 import { StateBadge } from '../../components/workflow.jsx';
 import { fmtDate, fmtEnum, fmtNum, todayInput } from '../../utils/format.js';
 import { loadFailed } from '../../services/loadFailures.js';

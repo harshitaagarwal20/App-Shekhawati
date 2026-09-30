@@ -74,7 +74,6 @@ export function validateCuttingIssueVsPlan(issuedQty, plannedQty, allowVariance 
   const variance = issued.minus(planned);
   const variancePct = planned.isZero() ? 0 : variance.div(planned).mul(100).toNumber();
 
-  const maxVariance = D(allowVariance);
   const isValid = Math.abs(variancePct) <= allowVariance;
 
   let message = null;

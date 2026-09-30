@@ -924,6 +924,117 @@ export async function list(query) {
   return { rows: rows.map(project), total, page, pageSize };
 }
 
+/** What the document register can sort by - columns of the header itself. */
+export const DOCUMENT_SORTABLE = ['poNo', 'poDate', 'createdAt'];
+
+/**
+ * The register as the vendor sees it: ONE ROW PER PURCHASE ORDER DOCUMENT.
+ *
+ * `list()` answers per line, which is right for a GRN picking what to receive
+ * against, but a three-item PO read there as three purchase orders. This pages
+ * the headers instead; every line-level filter still applies, as "the document
+ * has at least one line that matches".
+ */
+export async function listDocuments(query) {
+  const {
+    page, pageSize, skip, take, orderBy, search, includeDeleted,
+    approvalStatus, status, vendorId, orderId, quotationId, item, orderMode,
+    uom, dateFrom, dateTo, pendingReceipt,
+  } = query;
+
+  const lineWhere = {
+    deletedAt: null,
+    ...(approvalStatus ? { approvalStatus } : {}),
+    ...(status ? { status } : {}),
+    ...(orderId ? { orderId } : {}),
+    ...(quotationId ? { quotationId } : {}),
+    ...(item ? { item } : {}),
+    ...(orderMode ? { orderMode } : {}),
+    ...(uom ? { uom } : {}),
+    ...(pendingReceipt
+      ? { approvalStatus: 'APPROVED', status: { notIn: ['COMPLETED', 'CANCELLED'] } }
+      : {}),
+    ...searchFilter(search, SEARCH),
+  };
+
+  const where = {
+    ...(includeDeleted ? {} : { deletedAt: null }),
+    ...(vendorId ? { vendorId } : {}),
+    ...(dateFrom || dateTo
+      ? {
+          poDate: {
+            ...(dateFrom ? { gte: new Date(dateFrom) } : {}),
+            ...(dateTo ? { lte: new Date(dateTo) } : {}),
+          },
+        }
+      : {}),
+    lines: { some: lineWhere },
+  };
+
+  const [headers, total] = await Promise.all([
+    prisma.purchaseOrderHeader.findMany({
+      where,
+      orderBy,
+      skip,
+      take,
+      include: {
+        vendor: LIST_INCLUDE.vendor,
+        lines: {
+          where: { deletedAt: null },
+          orderBy: { lineNo: 'asc' },
+          select: {
+            id: true, poId: true, lineNo: true, item: true, subCategory: true,
+            accessoriesItem: true, accessoryType: true, uom: true, orderQty: true,
+            receivedQty: true, rate: true, amount: true, status: true, approvalStatus: true,
+            workflowState: true, orderId: true,
+          },
+        },
+      },
+    }),
+    prisma.purchaseOrderHeader.count({ where }),
+  ]);
+
+  const orderIds = [...new Set(headers.flatMap((h) => [h.orderId, ...h.lines.map((l) => l.orderId)]).filter(Boolean))];
+  const orders = orderIds.length
+    ? await prisma.buyerOrder.findMany({ where: { id: { in: orderIds } }, select: { id: true, orderNo: true } })
+    : [];
+  const orderNo = new Map(orders.map((o) => [o.id, o.orderNo]));
+
+  const rows = headers.map((h) => {
+    const live = h.lines.filter((l) => l.approvalStatus !== 'REJECTED' && l.status !== 'CANCELLED');
+    // With every line rejected, the fulfilment status is still the lines' own.
+    const notCancelled = h.lines.filter((l) => l.status !== 'CANCELLED');
+    const statuses = [...new Set((live.length ? live : notCancelled).map((l) => l.status))];
+    const uoms = [...new Set(h.lines.map((l) => l.uom))];
+    const sum = (key) => live.reduce((a, l) => a.plus(D(l[key])), ZERO).toFixed(4);
+    return {
+      id: h.id,
+      poNo: h.poNo,
+      poDate: h.poDate,
+      vendor: h.vendor,
+      deliveryDate: h.deliveryDate,
+      lineCount: h.lines.length,
+      lines: h.lines,
+      totalAmount: live.reduce((a, l) => a.plus(D(l.amount)), ZERO).toFixed(2),
+      /** Quantities only add up when every line is in the same unit. */
+      uom: uoms.length === 1 ? uoms[0] : null,
+      orderQty: uoms.length === 1 ? sum('orderQty') : null,
+      receivedQty: uoms.length === 1 ? sum('receivedQty') : null,
+      orderNos: [...new Set([h.orderId, ...h.lines.map((l) => l.orderId)].filter(Boolean).map((id) => orderNo.get(id)).filter(Boolean))],
+      approvalStatus: documentStatus(h.lines.map((l) => ({ status: l.status === 'CANCELLED' ? 'CANCELLED' : l.approvalStatus }))),
+      /**
+       * Fulfilment: the one status every live line shares, or "in progress"
+       * when they differ. A rejected PO is not a cancelled one - its lines keep
+       * their own fulfilment status; only all-cancelled lines read Cancelled.
+       */
+      status: statuses.length === 1 ? statuses[0] : statuses.length ? 'IN_PROGRESS' : 'CANCELLED',
+      workflowState: h.lines.length === 1 ? h.lines[0].workflowState : null,
+    };
+  });
+
+  return { rows, total, page, pageSize };
+}
+
 /**
  * Full detail: the PO, the chain it came from, what has been received against
  * it, whether it may still be changed, and the trail.
@@ -2256,9 +2367,12 @@ export async function addStationeryItem({ value }, actorId) {
   if (!list) throw ApiError.notFound('Master list "StationeryItem"');
 
   const name = value.trim();
-  const existing = await prisma.masterListValue.findFirst({
+  // Every spelling, live or withdrawn: a live one must win, or a withdrawn
+  // "pen" could be revived beside an active "Pen".
+  const matches = await prisma.masterListValue.findMany({
     where: { listId: list.id, value: { equals: name, mode: 'insensitive' } },
   });
+  const existing = matches.find((m) => !m.deletedAt) ?? matches[0];
 
   if (existing && !existing.deletedAt) {
     if (!existing.isActive) await masterLists.setValueActive(existing.id, true, actorId);

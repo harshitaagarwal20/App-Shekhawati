@@ -32,11 +32,11 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { grns as grnApi, grnReversals as revApi } from '../../services/erp.js';
-import { Alert, PageHeader, Spinner, StatusBadge } from '../../components/ui.jsx';
+import { Alert, PageHeader, Spinner } from '../../components/ui.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
 import { PartOfDocument } from './DocumentPages.jsx';
 import { Detail, DetailGrid, TraceChain } from '../shared/Detail.jsx';
-import { fmtDate, fmtDateTime, fmtEnum, fmtMoney, fmtNum } from '../../utils/format.js';
+import { fmtDate, fmtEnum, fmtMoney, fmtNum } from '../../utils/format.js';
 
 export default function GrnDetail() {
   const { id } = useParams();
@@ -129,7 +129,7 @@ export default function GrnDetail() {
   }
   if (!grn) return <Alert kind="error">{banner?.text ?? 'GRN not found'}</Alert>;
 
-  const { traceability, assessment, movements, rolls, editable, purchaseOrder } = grn;
+  const { traceability, assessment, movements, rolls, purchaseOrder } = grn;
 
   /*
    * `grn.reversed` and not a check on workflowState: a reversed receipt is

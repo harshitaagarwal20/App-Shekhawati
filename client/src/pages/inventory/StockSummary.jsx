@@ -57,14 +57,6 @@ export default function StockSummary() {
 
   const { rows, meta, loading, error, search, setSearch, filters, setFilter } = list;
 
-  /**
-   * Lines, value and the below-reorder tally, for the whole filter.
-   *
-   * The server sends them beside the page rather than in it, so they do not
-   * change when you turn the page. See okListWithTotals on the server.
-   */
-  const totals = meta?.totals;
-
   return (
     <>
       <PageHeader

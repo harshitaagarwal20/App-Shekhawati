@@ -475,7 +475,7 @@ export default function PurchaseOrderForm({ purchaseOrder, onSaved, onCancel }) 
         </FieldGroup>
       </div>
 
-      <ServerFigures preview={preview} loading={previewing} uom={uom} />
+      <ServerFigures preview={preview} loading={previewing} />
     </FormShell>
   );
 }
@@ -486,7 +486,7 @@ export default function PurchaseOrderForm({ purchaseOrder, onSaved, onCancel }) 
  * Deliberately not inputs. There is nothing here for a user to type, because
  * there is nothing here the server would accept.
  */
-function ServerFigures({ preview, loading, uom }) {
+function ServerFigures({ preview, loading }) {
   if (loading && !preview) {
     return (
       <div style={{ marginTop: 16 }}>

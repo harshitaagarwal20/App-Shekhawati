@@ -121,7 +121,7 @@ export default function GatePassDetail() {
   }
   if (!gp) return <Alert kind="error">{banner?.text ?? 'Gate pass not found'}</Alert>;
 
-  const { reference, editable, grns, usage } = gp;
+  const { reference, editable, grns } = gp;
 
   return (
     <>
