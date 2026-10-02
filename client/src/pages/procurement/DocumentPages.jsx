@@ -244,7 +244,8 @@ export function PoDocumentForm() {
             </Field>
             <Field label="PO date"><TextInput type="date" value={head.poDate} onChange={setH('poDate')} /></Field>
             <Field label="For buyer order" hint="Default for every line; a line may name another.">
-              <RecordSelect options={orders} getValue={(o) => o.id} getLabel={(o) => o.orderNo}
+              <RecordSelect options={orders} getValue={(o) => o.id}
+                getLabel={(o) => (o.style?.styleNo ? `${o.orderNo} — ${o.style.styleNo}` : o.orderNo)}
                 placeholder="None (bulk)" value={head.orderId} onChange={setH('orderId')} />
             </Field>
             <Field label="Container No" hint="Default for every line; a line may name another.">
@@ -268,15 +269,36 @@ export function PoDocumentForm() {
           <table className="data">
             <thead>
               <tr>
-                <th>#</th><th>Item</th><th>Detail</th><th>Colour</th><th>UOM</th><th>Size</th>
+                {/*
+                  ORDER SITS BESIDE ITEM, NOT OUT PAST THE AMOUNT.
+
+                  The office raises one PO per style, so on a multi-line
+                  document nearly every row is for a DIFFERENT buyer order -
+                  and the one column saying which was the eleventh, past
+                  Amount and Mode and usually off the right-hand edge. Reading
+                  a row meant scrolling away from the item to find its order
+                  and back again. They are one fact - "this material, for that
+                  order" - so they sit together.
+                */}
+                <th>#</th><th>Order</th><th>Item</th><th>Detail</th><th>Colour</th><th>UOM</th><th>Size</th>
                 <th className="num">Qty</th><th className="num">Rate</th><th className="num">Amount</th>
-                <th>Mode</th><th>Order</th><th>Container</th><th>HSN</th><th />
+                <th>Mode</th><th>Container</th><th>HSN</th><th />
               </tr>
             </thead>
             <tbody>
               {lines.map((l, i) => (
                 <tr key={l.key} className={badLine === i ? 'row-bad' : ''}>
                   <td>{i + 1}</td>
+                  <td style={{ minWidth: 170 }}>
+                    {/* The style is in the label, as on the single-PO form: the
+                        office raises one PO per style, so "which style" is the
+                        question being answered here and an order number on its
+                        own does not answer it. */}
+                    <RecordSelect options={orders} getValue={(o) => o.id} aria-label="Order"
+                      getLabel={(o) => (o.style?.styleNo ? `${o.orderNo} — ${o.style.styleNo}` : o.orderNo)}
+                      placeholder={head.orderId ? 'as document' : 'none'} value={l.orderId}
+                      onChange={(e) => setLine(l.key, { orderId: e.target.value })} />
+                  </td>
                   <MaterialCells line={l} set={(p) => setLine(l.key, p)} />
                   {/* Free text, as the vendor must read it: 18L, 20 cm, 12 x 16. */}
                   <td style={{ minWidth: 110 }}>
@@ -290,11 +312,6 @@ export function PoDocumentForm() {
                     <EnumSelect options={ORDER_MODES} includeBlank={false} value={l.orderMode} aria-label="Order mode"
                       disabled={isStationery(l)} title={isStationery(l) ? 'Stationery is always bought in bulk' : undefined}
                       onChange={(e) => setLine(l.key, { orderMode: e.target.value })} />
-                  </td>
-                  <td style={{ minWidth: 120 }}>
-                    <RecordSelect options={orders} getValue={(o) => o.id} getLabel={(o) => o.orderNo} aria-label="Order"
-                      placeholder={head.orderId ? 'as document' : 'none'} value={l.orderId}
-                      onChange={(e) => setLine(l.key, { orderId: e.target.value })} />
                   </td>
                   <td style={{ minWidth: 130 }}>
                     <TextInput value={l.containerNo} maxLength={40} aria-label="Container"
