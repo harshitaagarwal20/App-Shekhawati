@@ -287,6 +287,26 @@ export const documentSequences = [
   { documentType: 'CUTTING_ISSUE',    scopeKey: '', prefix: 'CH',  separator: '-', padLength: 3, nextNumber: 8,  description: 'Cutting Issue challan - CH-001' },
   { documentType: 'CUT_PIECES_RECEIPT', scopeKey: '', prefix: 'CPR', separator: '-', padLength: 4, nextNumber: 1,  description: 'Cut pieces received from cutting - CPR-0001' },
   { documentType: 'COST_SHEET', scopeKey: '', prefix: 'CS', separator: '-', padLength: 4, nextNumber: 1,  description: 'FOB cost sheet of a style - CS-0001' },
+  /*
+   * THESE THREE WERE ADDED BY MIGRATIONS AND LEFT OUT OF THIS LIST.
+   *
+   * The seed CLEARS `document_sequences` before writing it (see the `order`
+   * list in seed/index.js), so the list is not an addition to what the
+   * migrations inserted - it REPLACES it. While these three were missing,
+   * seeding a fully migrated database deleted counters the migrations had
+   * put there and did not put them back, and the first cutting challan
+   * somebody tried to save came back "No document sequence configured for
+   * CUTTING_CHALLAN". Material Plan and GRN Reversal were the same failure,
+   * waiting.
+   *
+   * ANY COUNTER A MIGRATION INSERTS HAS TO BE REPEATED HERE. The restoring
+   * migration is 20261002000200_restore_missing_document_sequences.
+   *
+   * The seed raises none of these three documents, so all three start at 1.
+   */
+  { documentType: 'CUTTING_CHALLAN', scopeKey: '', prefix: 'CC',  separator: '-', padLength: 4, nextNumber: 1, description: 'Cutting Challan - CC-0001 (migration 20260827001100)' },
+  { documentType: 'MATERIAL_PLAN',   scopeKey: '', prefix: 'MP',  separator: '-', padLength: 4, nextNumber: 1, description: 'Material Plan - MP-0001 (migration 20260831000200)' },
+  { documentType: 'GRN_REVERSAL',    scopeKey: '', prefix: 'GRV', separator: '-', padLength: 4, nextNumber: 1, description: 'GRN Reversal - GRV-0001 (migration 20260901000200)' },
   // PO IDs run one counter per vendor: "Vendor initial + no" (PO sheet, row 3).
   { documentType: 'PURCHASE_ORDER',   scopeKey: 'RF', prefix: 'RF', separator: '-', padLength: 3, nextNumber: 5, description: 'PO - Rajasthan Fabrics' },
   { documentType: 'PURCHASE_ORDER',   scopeKey: 'MA', prefix: 'MA', separator: '-', padLength: 3, nextNumber: 4, description: 'PO - Metro Accessories' },
