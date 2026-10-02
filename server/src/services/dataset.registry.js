@@ -213,7 +213,7 @@ const DATASETS = [
     group: 'Orders & planning',
     module: 'BUYER_ORDER',
     filters: [
-      'excessApprovalStatus', 'buyerId', 'styleId', 'currency',
+      'excessApprovalStatus', 'buyerId', 'styleId', 'currency', 'containerNo',
       'orderFrom', 'orderTo', 'deliveryFrom', 'deliveryTo',
     ],
     sortable: buyerOrderService.SORTABLE,
@@ -278,8 +278,8 @@ const DATASETS = [
     group: 'Procurement',
     module: 'PURCHASE_ORDER',
     filters: [
-      'approvalStatus', 'vendorId', 'orderId', 'quotationId', 'item', 'orderMode',
-      'uom', 'dateFrom', 'dateTo', 'pendingReceipt',
+      'approvalStatus', 'vendorId', 'orderId', 'quotationId', 'containerNo', 'item',
+      'orderMode', 'uom', 'dateFrom', 'dateTo', 'pendingReceipt',
     ],
     sortable: purchaseOrderService.SORTABLE,
     defaultSort: 'poDate',

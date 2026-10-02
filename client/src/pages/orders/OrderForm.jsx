@@ -66,6 +66,7 @@ const schema = z
     sizeGroup: optional(40),
     currency: optional(10),
     shipMode: optional(40),
+    containerNo: optional(40),
     billTo: optional(1000),
     shipTo: optional(1000),
     buyerDeliveryDate: optional(40),
@@ -163,6 +164,7 @@ export default function OrderForm({ order, onSaved, onCancel }) {
           sizeGroup: order.sizeGroup ?? '',
           currency: order.currency ?? '',
           shipMode: order.shipMode ?? '',
+          containerNo: order.containerNo ?? '',
           billTo: order.billTo ?? '',
           shipTo: order.shipTo ?? '',
           buyerDeliveryDate: asDateInput(order.buyerDeliveryDate),
@@ -402,6 +404,7 @@ export default function OrderForm({ order, onSaved, onCancel }) {
       sizeGroup: values.sizeGroup,
       currency: values.currency,
       shipMode: values.shipMode,
+      containerNo: values.containerNo,
       billTo: values.billTo,
       shipTo: values.shipTo,
       buyerDeliveryDate: values.buyerDeliveryDate || null,
@@ -616,6 +619,25 @@ export default function OrderForm({ order, onSaved, onCancel }) {
 
           <Field label="Ship Mode" error={errors.shipMode?.message} htmlFor="shipMode">
             <MasterSelect id="shipMode" listCode="ShipMode" currentValue={watch('shipMode')} value={watch('shipMode') ?? ''} {...register('shipMode')} />
+          </Field>
+
+          {/*
+            A CONTAINER NUMBER IS TYPED, NOT CHOSEN FROM A LIST.
+
+            The same box, with the same wording, as the Planning form - and for
+            the same reason: a container belongs to one shipment and is never
+            used again, so a master list of them could only grow into dead
+            entries with the one needed today missing. Recorded here so the
+            number is booked once, on the order, instead of first appearing at
+            Planning where somebody retypes it from an email.
+          */}
+          <Field
+            label="Container No"
+            error={errors.containerNo?.message}
+            htmlFor="containerNo"
+            hint="As printed on the container. Leave blank until it is booked."
+          >
+            <TextInput id="containerNo" placeholder="e.g. MSKU7654321" {...register('containerNo')} />
           </Field>
 
           <Field label="Buyer Delivery Date" error={errors.buyerDeliveryDate?.message} htmlFor="deliveryDate">

@@ -76,6 +76,7 @@ const COLUMNS = [
   { key: 'amount', label: 'Amount' },
   { key: 'received', label: 'Received', optional: true },
   { key: 'orderNo', label: 'Order No', optional: true },
+  { key: 'containerNo', label: 'Container', optional: true },
   { key: 'workflow', label: 'Approval', optional: true },
   { key: 'status', label: 'Status' },
 ];
@@ -155,7 +156,7 @@ export default function PurchaseOrderList() {
               <TextInput
                 id="po-search"
                 type="search"
-                placeholder="Search PO ID, item, HSN, remarks..."
+                placeholder="Search PO ID, item, HSN, container, remarks..."
                 value={list.search}
                 onChange={(e) => list.setSearch(e.target.value)}
               />
@@ -219,6 +220,7 @@ export default function PurchaseOrderList() {
                 <th className="num">Amount</th>
                 {cols.show('received') && <th className="num">Received</th>}
                 {cols.show('orderNo') && <th>Order No</th>}
+                {cols.show('containerNo') && <th>Container</th>}
                 {cols.show('workflow') && <th>Approval</th>}
                 <th>Status</th>
                 <ColumnMenu {...cols} />
@@ -282,6 +284,11 @@ export default function PurchaseOrderList() {
                       <td className="num">{doc.receivedQty == null ? '-' : fmtNum(doc.receivedQty)}</td>
                     )}
                     {cols.show('orderNo') && <td className="code">{doc.orderNos.length ? doc.orderNos.join(', ') : '-'}</td>}
+                    {/* A document may buy for more than one container, exactly as
+                        it may buy for more than one order - both are listed. */}
+                    {cols.show('containerNo') && (
+                      <td className="code">{doc.containerNos?.length ? doc.containerNos.join(', ') : '-'}</td>
+                    )}
                     {cols.show('workflow') && (
                       <td>
                         <StatusBadge status={doc.approvalStatus} />

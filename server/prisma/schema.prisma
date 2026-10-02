@@ -1516,6 +1516,19 @@ model BuyerOrder {
   currency          String?       @db.VarChar(10)
   /// Excel: "Ship Mode" (Dropdown -> L_ShipMode)
   shipMode          String?       @map("ship_mode") @db.VarChar(40)
+  /// Excel: "Container No" (Manual) - the container this order ships in.
+  ///
+  /// FREE TEXT, as everywhere else it appears in this schema. It was a
+  /// dropdown on the planning documents and became free text for the reason
+  /// set out in planning.service.js: a container number belongs to ONE
+  /// shipment and is never used again, so a master of them could only grow
+  /// into thousands of dead entries with the one needed today missing.
+  ///
+  /// Recorded here so the number can be held against the ORDER, which is
+  /// where it is agreed. The planning chain - Planning -> Plan Approval ->
+  /// Cutting Challan -> Cutting Issue - still carries and types its own: this
+  /// column does not feed it, and nothing downstream is made to match it.
+  containerNo       String?       @map("container_no") @db.VarChar(40)
   /// Excel: "Size Group" (Manual -> L_SizeGroup)
   sizeGroup         String?       @map("size_group") @db.VarChar(40)
   /// Excel: "Status" (Auto -> L_StatusGeneral)
@@ -1631,6 +1644,7 @@ model BuyerOrder {
   @@index([buyerDeliveryDate])
   @@index([exFactoryDate])
   @@index([buyerPoNo])
+  @@index([containerNo])
   @@index([deletedAt])
   @@map("buyer_orders")
 }
@@ -2158,6 +2172,15 @@ model PurchaseOrder {
   colorCode       String?       @map("color_code") @db.VarChar(60)
   /// Excel: "Count" (Manual -> L_Count)
   count           String?       @db.VarChar(20)
+  /// Excel: "Container No" (Manual) - the shipment this material is bought
+  /// FOR, not one it travels in: an export order ships in a container and the
+  /// cloth and trims for it are ordered against that container, which is how
+  /// the planning documents downstream already key their allotments.
+  ///
+  /// Free text, as on BuyerOrder and the planning chain. Defaults from the
+  /// document header when a line does not name its own, exactly as `orderId`
+  /// does - a multi-item PO is usually for one container, but need not be.
+  containerNo     String?       @map("container_no") @db.VarChar(40)
   /// Excel: "Status" (Dropdown -> L_StatusGeneral)
   status          StatusGeneral @default(PENDING)
   /// Excel: "Remarks" (Text) - the workbook writes the order type and order no
@@ -2277,6 +2300,7 @@ model PurchaseOrder {
   @@index([poDate])
   @@index([orderMode])
   @@index([category])
+  @@index([containerNo])
   @@index([deletedAt])
   @@map("purchase_orders")
 }
@@ -4806,6 +4830,8 @@ model PurchaseOrderHeader {
   address      String?   @db.Text
   /// The buyer order the document is mostly for; each line keeps its own.
   orderId      String?   @map("order_id") @db.Uuid
+  /// The container the document is mostly for; each line keeps its own.
+  containerNo  String?   @map("container_no") @db.VarChar(40)
   /// When the vendor is asked to deliver, and on what terms.
   deliveryDate DateTime? @map("delivery_date") @db.Date
   paymentTerms String?   @map("payment_terms") @db.VarChar(150)
@@ -4822,6 +4848,7 @@ model PurchaseOrderHeader {
 
   @@index([vendorId])
   @@index([orderId])
+  @@index([containerNo])
   @@index([poDate])
   @@index([deletedAt])
   @@map("purchase_order_headers")

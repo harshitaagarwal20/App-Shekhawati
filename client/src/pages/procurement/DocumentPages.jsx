@@ -153,7 +153,7 @@ function NumCell({ value, onChange, label, width = 110 }) {
 
 const blankPoLine = () => ({
   key: key(), item: '', subCategory: '', accessoriesItem: '', accessoryType: '', size: '', colorCode: '', uom: '',
-  orderQty: '', rate: '', hsnCode: '', orderMode: 'AS_PER_STYLE', orderId: '', remarks: '',
+  orderQty: '', rate: '', hsnCode: '', orderMode: 'AS_PER_STYLE', orderId: '', containerNo: '', remarks: '',
 });
 
 const ORDER_MODES = [
@@ -168,7 +168,7 @@ const ORDER_MODES = [
 export function PoDocumentForm() {
   const navigate = useNavigate();
   const { vendors, orders } = useVendorsAndOrders();
-  const [head, setHead] = useState({ vendorId: '', poDate: today(), orderId: '', deliveryDate: '', paymentTerms: '', headerRemarks: '' });
+  const [head, setHead] = useState({ vendorId: '', poDate: today(), orderId: '', containerNo: '', deliveryDate: '', paymentTerms: '', headerRemarks: '' });
   const [lines, setLines] = useState([blankPoLine()]);
   const [error, setError] = useState('');
   const [badLine, setBadLine] = useState(null);
@@ -188,6 +188,7 @@ export function PoDocumentForm() {
         vendorId: head.vendorId,
         poDate: head.poDate || undefined,
         orderId: head.orderId || null,
+        containerNo: head.containerNo.trim() || undefined,
         deliveryDate: head.deliveryDate || null,
         paymentTerms: head.paymentTerms || undefined,
         headerRemarks: head.headerRemarks || undefined,
@@ -204,6 +205,8 @@ export function PoDocumentForm() {
           hsnCode: l.hsnCode || undefined,
           orderMode: l.orderMode,
           orderId: l.orderId || undefined,
+          // Blank means "as the document" - the server fills it from the header.
+          containerNo: l.containerNo.trim() || undefined,
           remarks: l.remarks || undefined,
         })),
       });
@@ -244,6 +247,9 @@ export function PoDocumentForm() {
               <RecordSelect options={orders} getValue={(o) => o.id} getLabel={(o) => o.orderNo}
                 placeholder="None (bulk)" value={head.orderId} onChange={setH('orderId')} />
             </Field>
+            <Field label="Container No" hint="Default for every line; a line may name another.">
+              <TextInput value={head.containerNo} maxLength={40} placeholder="e.g. MSKU7654321" onChange={setH('containerNo')} />
+            </Field>
             <Field label="Deliver by"><TextInput type="date" value={head.deliveryDate} onChange={setH('deliveryDate')} /></Field>
             <Field label="Payment terms"><TextInput value={head.paymentTerms} maxLength={150} onChange={setH('paymentTerms')} /></Field>
             <Field label="Remarks" className="span-2"><TextArea rows={2} value={head.headerRemarks} onChange={setH('headerRemarks')} /></Field>
@@ -264,7 +270,7 @@ export function PoDocumentForm() {
               <tr>
                 <th>#</th><th>Item</th><th>Detail</th><th>Colour</th><th>UOM</th><th>Size</th>
                 <th className="num">Qty</th><th className="num">Rate</th><th className="num">Amount</th>
-                <th>Mode</th><th>Order</th><th>HSN</th><th />
+                <th>Mode</th><th>Order</th><th>Container</th><th>HSN</th><th />
               </tr>
             </thead>
             <tbody>
@@ -289,6 +295,11 @@ export function PoDocumentForm() {
                     <RecordSelect options={orders} getValue={(o) => o.id} getLabel={(o) => o.orderNo} aria-label="Order"
                       placeholder={head.orderId ? 'as document' : 'none'} value={l.orderId}
                       onChange={(e) => setLine(l.key, { orderId: e.target.value })} />
+                  </td>
+                  <td style={{ minWidth: 130 }}>
+                    <TextInput value={l.containerNo} maxLength={40} aria-label="Container"
+                      placeholder={head.containerNo ? 'as document' : 'none'}
+                      onChange={(e) => setLine(l.key, { containerNo: e.target.value })} />
                   </td>
                   <td><TextInput value={l.hsnCode} maxLength={8} style={{ maxWidth: 90 }} aria-label="HSN"
                     onChange={(e) => setLine(l.key, { hsnCode: e.target.value })} /></td>
@@ -432,6 +443,7 @@ export function PoDocumentDetail() {
             <Info label="Deliver by" value={fmtDate(doc.deliveryDate)} />
             <Info label="Payment terms" value={doc.paymentTerms} />
             <Info label="Buyer order" value={doc.order?.orderNo} />
+            <Info label="Container No" value={doc.containerNo} />
             <Info label="Address" value={doc.address} className="span-2" />
             {doc.remarks && <Info label="Remarks" value={doc.remarks} className="span-2" />}
           </div>
@@ -444,7 +456,7 @@ export function PoDocumentDetail() {
             <thead>
               <tr>
                 <th>Line</th><th>Material</th><th>UOM</th><th className="num">Ordered</th><th className="num">Received</th>
-                <th className="num">Rate</th><th className="num">Amount</th><th>Order</th><th>Approval</th><th>Status</th>
+                <th className="num">Rate</th><th className="num">Amount</th><th>Order</th><th>Container</th><th>Approval</th><th>Status</th>
               </tr>
             </thead>
             <tbody>
@@ -458,6 +470,7 @@ export function PoDocumentDetail() {
                   <td className="num">{money(l.rate)}</td>
                   <td className="num">{money(l.amount)}</td>
                   <td className="code">{l.order?.orderNo ?? '-'}</td>
+                  <td className="code">{l.containerNo ?? '-'}</td>
                   <td><StatusBadge status={l.approvalStatus} /></td>
                   <td><StatusBadge status={l.status} /></td>
                 </tr>

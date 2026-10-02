@@ -39,6 +39,7 @@ export const SORTABLE = [
   'orderDate',
   'buyerDeliveryDate',
   'exFactoryDate',
+  'containerNo',
   'orderValue',
   'orderQty',
   'status',
@@ -46,7 +47,7 @@ export const SORTABLE = [
   'createdAt',
 ];
 
-const SEARCH = ['orderNo', 'buyerPoNo', 'itemDescription', 'colorCode', 'remarks'];
+const SEARCH = ['orderNo', 'buyerPoNo', 'itemDescription', 'colorCode', 'containerNo', 'remarks'];
 
 const D = (v) => new Prisma.Decimal(v);
 const ZERO = D(0);
@@ -336,6 +337,16 @@ const LIST_FIELDS = [
   ['sizeGroup', 'SizeGroup'],
 ];
 
+/*
+ * CONTAINER NO IS NOT IN THAT LIST, AND MUST NOT BE.
+ *
+ * It is free text here exactly as it is on Planning and everything downstream
+ * of it - a container number belongs to ONE shipment and is never used again,
+ * so a master list of them could only grow into thousands of dead entries
+ * with the one needed today missing. The full reasoning is in
+ * planning.service.js, where the list check was removed.
+ */
+
 async function validateDropdowns(data) {
   for (const [field, listCode] of LIST_FIELDS) {
     if (data[field] === undefined) continue;
@@ -580,7 +591,7 @@ export async function list(query) {
   const {
     page, pageSize, skip, take, orderBy, search, includeDeleted,
     status, buyerId, styleId, excessApprovalStatus, deliveryFrom, deliveryTo,
-    orderFrom, orderTo, currency,
+    orderFrom, orderTo, currency, containerNo,
   } = query;
 
   const where = {
@@ -589,6 +600,7 @@ export async function list(query) {
     ...(buyerId ? { buyerId } : {}),
     ...(styleId ? { styleId } : {}),
     ...(currency ? { currency } : {}),
+    ...(containerNo ? { containerNo } : {}),
     ...(excessApprovalStatus ? { excessApprovalStatus } : {}),
     ...(orderFrom || orderTo
       ? {
@@ -822,6 +834,10 @@ export async function create(input, actorId) {
       // Currency and ship mode default from the buyer when not overridden.
       currency,
       shipMode: input.shipMode ?? buyer.shipMode ?? null,
+      // The container the goods go out in. Nothing defaults it - unlike
+      // currency and ship mode, a container is booked per shipment, so the
+      // buyer master has nothing to supply.
+      containerNo: input.containerNo ?? null,
       // Commercial terms. Price and payment terms default from the buyer's
       // standing terms, the same way currency and ship mode do.
       buyerPoNo: input.buyerPoNo ?? null,
@@ -1017,6 +1033,7 @@ export async function update(id, input, actorId) {
       ...(input.currency !== undefined ? { currency: input.currency } : {}),
       ...(input.shipMode !== undefined ? { shipMode: input.shipMode } : {}),
       ...(input.sizeGroup !== undefined ? { sizeGroup: input.sizeGroup } : {}),
+      ...(input.containerNo !== undefined ? { containerNo: input.containerNo } : {}),
       ...(input.remarks !== undefined ? { remarks: input.remarks } : {}),
       ...commercialPatch(input),
       ...(input.excessJustification !== undefined

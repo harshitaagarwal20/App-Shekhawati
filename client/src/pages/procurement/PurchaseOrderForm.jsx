@@ -74,6 +74,7 @@ const schema = z.object({
   gsm: z.string().optional(),
   content: z.string().optional(),
   colorCode: z.string().optional(),
+  containerNo: z.string().trim().max(40, 'At most 40 characters').optional(),
   address: z.string().trim().max(2000).optional(),
   remarks: z.string().trim().max(2000).optional(),
 });
@@ -120,6 +121,7 @@ export default function PurchaseOrderForm({ purchaseOrder, onSaved, onCancel }) 
     gsm: purchaseOrder?.gsm ?? '',
     content: purchaseOrder?.content ?? '',
     colorCode: purchaseOrder?.colorCode ?? '',
+    containerNo: purchaseOrder?.containerNo ?? '',
     address: purchaseOrder?.address ?? '',
     remarks: purchaseOrder?.remarks ?? '',
   });
@@ -224,6 +226,7 @@ export default function PurchaseOrderForm({ purchaseOrder, onSaved, onCancel }) 
         gsm: values.gsm || null,
         content: values.content || null,
         colorCode: values.colorCode || null,
+        containerNo: values.containerNo?.trim() || null,
         address: values.address || null,
         remarks: values.remarks || null,
         // `amount` is deliberately absent. The server computes qty x rate and
@@ -348,6 +351,19 @@ export default function PurchaseOrderForm({ purchaseOrder, onSaved, onCancel }) 
             loading={orderOptions === null}
             getLabel={(o) => `${o.orderNo} — ${o.style?.styleNo ?? ''}`}
             placeholder="No order reference"
+          />
+
+          {/*
+            Typed, not chosen - the same box as the Planning form carries, for
+            the reason set out there: a container number belongs to one
+            shipment and is never used again, so a master list of them is the
+            wrong shape for the thing.
+          */}
+          <RHFInput
+            form={form}
+            name="containerNo"
+            label="Container No"
+            hint="The shipment this material is bought for. As printed on the container."
           />
 
           <RHFRecordSelect

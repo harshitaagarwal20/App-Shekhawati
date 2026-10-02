@@ -89,12 +89,13 @@ export const SORTABLE = [
   // separating it from what was ordered.
   'payableQty',
   'category',
+  'containerNo',
   'status',
   'approvalStatus',
   'createdAt',
 ];
 
-const SEARCH = ['poId', 'item', 'subCategory', 'accessoriesItem', 'accessoryType', 'size', 'hsnCode', 'remarks', 'address'];
+const SEARCH = ['poId', 'item', 'subCategory', 'accessoriesItem', 'accessoryType', 'size', 'hsnCode', 'containerNo', 'remarks', 'address'];
 
 const D = (v) => new Prisma.Decimal(v ?? 0);
 const ZERO = D(0);
@@ -886,7 +887,7 @@ function project(po) {
 export async function list(query) {
   const {
     page, pageSize, skip, take, orderBy, search, includeDeleted,
-    approvalStatus, status, vendorId, orderId, quotationId, item, orderMode,
+    approvalStatus, status, vendorId, orderId, quotationId, containerNo, item, orderMode,
     uom, dateFrom, dateTo, pendingReceipt, headerId,
   } = query;
 
@@ -898,6 +899,7 @@ export async function list(query) {
     ...(vendorId ? { vendorId } : {}),
     ...(orderId ? { orderId } : {}),
     ...(quotationId ? { quotationId } : {}),
+    ...(containerNo ? { containerNo } : {}),
     ...(item ? { item } : {}),
     ...(orderMode ? { orderMode } : {}),
     ...(uom ? { uom } : {}),
@@ -938,7 +940,7 @@ export const DOCUMENT_SORTABLE = ['poNo', 'poDate', 'createdAt'];
 export async function listDocuments(query) {
   const {
     page, pageSize, skip, take, orderBy, search, includeDeleted,
-    approvalStatus, status, vendorId, orderId, quotationId, item, orderMode,
+    approvalStatus, status, vendorId, orderId, quotationId, containerNo, item, orderMode,
     uom, dateFrom, dateTo, pendingReceipt,
   } = query;
 
@@ -948,6 +950,7 @@ export async function listDocuments(query) {
     ...(status ? { status } : {}),
     ...(orderId ? { orderId } : {}),
     ...(quotationId ? { quotationId } : {}),
+    ...(containerNo ? { containerNo } : {}),
     ...(item ? { item } : {}),
     ...(orderMode ? { orderMode } : {}),
     ...(uom ? { uom } : {}),
@@ -986,7 +989,7 @@ export async function listDocuments(query) {
             id: true, poId: true, lineNo: true, item: true, subCategory: true,
             accessoriesItem: true, accessoryType: true, uom: true, orderQty: true,
             receivedQty: true, rate: true, amount: true, status: true, approvalStatus: true,
-            workflowState: true, orderId: true,
+            workflowState: true, orderId: true, containerNo: true,
           },
         },
       },
@@ -1021,6 +1024,8 @@ export async function listDocuments(query) {
       orderQty: uoms.length === 1 ? sum('orderQty') : null,
       receivedQty: uoms.length === 1 ? sum('receivedQty') : null,
       orderNos: [...new Set([h.orderId, ...h.lines.map((l) => l.orderId)].filter(Boolean).map((id) => orderNo.get(id)).filter(Boolean))],
+      /** The container(s) this document buys for - the header's, and any a line overrode. */
+      containerNos: [...new Set([h.containerNo, ...h.lines.map((l) => l.containerNo)].filter(Boolean))],
       approvalStatus: documentStatus(h.lines.map((l) => ({ status: l.status === 'CANCELLED' ? 'CANCELLED' : l.approvalStatus }))),
       /**
        * Fulfilment: the one status every live line shares, or "in progress"
@@ -1230,6 +1235,7 @@ export async function create(input, actorId) {
       vendorId: input.vendorId,
       address: input.address,
       orderId: input.orderId,
+      containerNo: input.containerNo,
       lines: [input],
     },
     actorId,
@@ -1259,9 +1265,12 @@ async function createDocumentInternal(input, actorId) {
   const poDate = input.poDate ? new Date(input.poDate) : new Date();
 
   const dup = duplicateMaterial(input.lines, (l) =>
-    // Two sizes of one material are two lines, not a duplicate.
+    // Two sizes of one material are two lines, not a duplicate - and nor are
+    // the same material for two different containers, which is two separate
+    // deliveries the vendor has to make.
     [l.item, l.subCategory ?? '', l.accessoriesItem ?? '', l.accessoryType ?? '', l.size ?? '', l.colorCode ?? '',
-      l.uom, l.orderId ?? input.orderId ?? '', l.styleId ?? ''].join('|'),
+      l.uom, l.orderId ?? input.orderId ?? '', l.styleId ?? '',
+      l.containerNo ?? input.containerNo ?? ''].join('|'),
   );
   if (dup) {
     throw ApiError.badRequest(
@@ -1275,7 +1284,16 @@ async function createDocumentInternal(input, actorId) {
   const prepared = [];
   for (const [i, line] of input.lines.entries()) {
     try {
-      prepared.push(await prepareLine({ ...line, orderId: line.orderId ?? input.orderId }, { vendor, poDate }));
+      prepared.push(
+        await prepareLine(
+          {
+            ...line,
+            orderId: line.orderId ?? input.orderId,
+            containerNo: line.containerNo ?? input.containerNo,
+          },
+          { vendor, poDate },
+        ),
+      );
     } catch (err) {
       if (input.lines.length > 1 && err?.message) err.message = `Line ${i + 1}: ${err.message}`;
       throw err;
@@ -1301,6 +1319,9 @@ async function createDocumentInternal(input, actorId) {
           // PO is a document that was sent.
           address: input.address ?? vendor.address ?? null,
           orderId: input.orderId ?? prepared[0].order?.id ?? null,
+          // The document default. Lines carry their own copy, so a report
+          // never has to read two rows to learn which container a line is for.
+          containerNo: input.containerNo ?? prepared[0].input.containerNo ?? null,
           deliveryDate: input.deliveryDate ? new Date(input.deliveryDate) : null,
           paymentTerms: input.paymentTerms ?? null,
           remarks: input.headerRemarks ?? null,
@@ -1455,6 +1476,8 @@ async function writeLine(tx, ctx, { header, lineNo, actorId }) {
       content: input.content ?? null,
       colorCode: input.colorCode ?? null,
       count: input.count ?? null,
+      // Already defaulted from the document header by createDocumentInternal.
+      containerNo: input.containerNo ?? null,
       status: 'PENDING',
       remarks: input.remarks ?? null,
       orderMode,
@@ -1762,6 +1785,7 @@ export async function update(id, input, actorId) {
       ...(input.content !== undefined ? { content: input.content } : {}),
       ...(input.colorCode !== undefined ? { colorCode: input.colorCode } : {}),
       ...(input.count !== undefined ? { count: input.count } : {}),
+      ...(input.containerNo !== undefined ? { containerNo: input.containerNo } : {}),
       ...(input.remarks !== undefined ? { remarks: input.remarks } : {}),
       orderMode,
       ...(input.orderId !== undefined ? { orderId: input.orderId } : {}),

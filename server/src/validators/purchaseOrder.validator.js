@@ -29,6 +29,8 @@ export const poListQuery = listQuery.extend({
   vendorId: uuid.optional(),
   orderId: uuid.optional(),
   quotationId: uuid.optional(),
+  /// Exact match, as on the planning lists - "what else is on this container".
+  containerNo: z.string().trim().max(40).optional(),
   item: z.string().trim().max(60).optional(),
   uom: z.string().trim().max(20).optional(),
   orderMode: orderMode.optional(),
@@ -88,6 +90,12 @@ const poBody = z.object({
   /// Excel: "Count" (Manual -> L_Count)
   count: optionalText(20),
 
+  /// Excel: "Container No" (Manual) - the shipment this material is bought
+  /// for. FREE TEXT, deliberately not checked against a List Master, for the
+  /// reason set out in planning.service.js. On a multi-line document an
+  /// omitted line container falls back to the header's, as `orderId` does.
+  containerNo: optionalText(40),
+
   /// C1 / Process Doc s.5. BULK exempts the quantity from the style ceiling,
   /// so it is an explicit choice rather than a default.
   ///
@@ -123,6 +131,8 @@ export const createPoDocumentSchema = z.object({
   address: optionalText(2000),
   /// The buyer order most lines are for. A line may name its own.
   orderId: uuid.nullish(),
+  /// The container most lines are for. A line may name its own.
+  containerNo: optionalText(40),
   deliveryDate: isoDate.nullish(),
   paymentTerms: optionalText(150),
   headerRemarks: optionalText(2000),

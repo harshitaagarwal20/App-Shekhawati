@@ -28,6 +28,8 @@ export const orderListQuery = listQuery.extend({
   buyerId: uuid.optional(),
   styleId: uuid.optional(),
   currency: z.string().trim().max(10).optional(),
+  /// Exact match, as on the planning lists - "show me this container".
+  containerNo: z.string().trim().max(40).optional(),
   orderFrom: isoDate.optional(),
   orderTo: isoDate.optional(),
   deliveryFrom: isoDate.optional(),
@@ -112,6 +114,10 @@ const orderBody = z.object({
   currency: optionalText(10),
   /// Excel: "Ship Mode" (Dropdown -> L_ShipMode) - defaults from the buyer.
   shipMode: optionalText(40),
+  /// Excel: "Container No" (Manual). FREE TEXT, deliberately not checked
+  /// against a List Master - see the note in planning.service.js. It is not in
+  /// LIST_FIELDS in buyerOrder.service.js for the same reason.
+  containerNo: optionalText(40),
   /// Excel: "Size Group" (Manual -> L_SizeGroup) - defaults from the style.
   sizeGroup: optionalText(40),
   /// Excel: "Remarks" (Manual)

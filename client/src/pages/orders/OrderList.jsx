@@ -55,6 +55,7 @@ const COLUMNS = [
   { key: 'colour', label: 'Colour', optional: true },
   { key: 'currency', label: 'Currency', optional: true },
   { key: 'buyerPoNo', label: 'Buyer PO', optional: true },
+  { key: 'containerNo', label: 'Container', optional: true },
   { key: 'orderValue', label: 'Order Value', optional: true },
   { key: 'exFactory', label: 'Ex-Factory', optional: true },
   { key: 'delivery', label: 'Delivery' },
@@ -157,7 +158,7 @@ export default function OrderList() {
               <TextInput
                 id="o-search"
                 type="search"
-                placeholder="Search order no, description, colour, remarks..."
+                placeholder="Search order no, description, colour, container, remarks..."
                 value={list.search}
                 onChange={(e) => list.setSearch(e.target.value)}
               />
@@ -222,6 +223,7 @@ export default function OrderList() {
                 {cols.show('colour') && <th>Colour</th>}
                 {cols.show('currency') && <th>Curr.</th>}
                 {cols.show('buyerPoNo') && <th>Buyer PO</th>}
+                {cols.show('containerNo') && <th>Container</th>}
                 {cols.show('orderValue') && <SortableTh field="orderValue" label="Value" sortBy={list.sortBy} sortDir={list.sortDir} onSort={list.toggleSort} className="num" />}
                 {cols.show('exFactory') && <SortableTh field="exFactoryDate" label="Ex-Factory" sortBy={list.sortBy} sortDir={list.sortDir} onSort={list.toggleSort} />}
                 <SortableTh field="buyerDeliveryDate" label="Delivery" sortBy={list.sortBy} sortDir={list.sortDir} onSort={list.toggleSort} />
@@ -288,6 +290,7 @@ export default function OrderList() {
                     {cols.show('colour') && <td>{o.colorCode ?? '-'}</td>}
                     {cols.show('currency') && <td>{o.currency ?? '-'}</td>}
                     {cols.show('buyerPoNo') && <td className="code">{o.buyerPoNo ?? '-'}</td>}
+                    {cols.show('containerNo') && <td className="code">{o.containerNo ?? '-'}</td>}
                     {cols.show('orderValue') && (
                       <td className="num">
                         {o.orderValue != null

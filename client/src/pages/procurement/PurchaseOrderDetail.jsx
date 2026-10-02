@@ -243,6 +243,7 @@ export default function PurchaseOrderDetail() {
             <Detail label="PO ID" value={po.poId} mono />
             <Detail label="Date" value={fmtDate(po.poDate)} />
             <Detail label="Order mode" value={po.orderMode.replace(/_/g, ' ').toLowerCase()} />
+            <Detail label="Container No" value={po.containerNo} mono />
             <Detail label="Vendor" value={`${po.vendor?.vendorName} (${po.vendor?.vendorCode})`} />
             <Detail label="Address" value={po.address} className="span-2" />
             <Detail label="GST No" value={po.vendor?.gstNo} />

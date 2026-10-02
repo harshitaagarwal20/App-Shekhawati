@@ -187,6 +187,7 @@ export default function OrderDetail() {
             <Detail label="Size Group" value={order.sizeGroup} />
             <Detail label="Currency" value={order.currency} />
             <Detail label="Ship Mode" value={order.shipMode} />
+            <Detail label="Container No" value={order.containerNo} mono />
             <Detail label="Bill To" value={order.billTo} className="span-2" />
             <Detail label="Ship To" value={order.shipTo} className="span-2" />
             {order.excessJustification && (
