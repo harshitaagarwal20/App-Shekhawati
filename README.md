@@ -48,11 +48,22 @@ those things is **[docs/USE-CASE-DIAGRAM.md](docs/USE-CASE-DIAGRAM.md)**.
 | **32** | Reporting: fourteen operational reports, one per implemented module, RBAC-filtered, CSV export | **Delivered** |
 | **33** | Excel reconciliation: every workbook column traced Excel → ERP → column → API → screen, with every deliberate omission documented | **Delivered** |
 
-> **Migration and seed have not yet been run against a live database.**
-> Everything verifiable without one has been verified (see [Verification](#verification)):
+> **Live on Azure.** The application is deployed and in use — App Service for the
+> API, a Static Web App for the client, PostgreSQL Flexible Server behind both.
+> Pushing to `main` deploys it: see [AZURE-DEPLOYMENT.md](docs/AZURE-DEPLOYMENT.md)
+> and [.github/workflows/deploy.yml](.github/workflows/deploy.yml), which applies
+> migrations with `prisma migrate deploy` before shipping the new code.
+>
+> **`db:seed` must never touch that database.** It clears every in-scope table and
+> rebuilds it from demo data — read
+> ["Two things that will bite you"](docs/AZURE-DEPLOYMENT.md#two-things-that-will-bite-you)
+> before running anything against production. `db:deploy` is the only database
+> command that belongs in a pipeline.
+>
+> Everything verifiable without a database still is (see [Verification](#verification)):
 > the schema validates, the scope guard passes, every seed cross-reference resolves,
-> 308 rule tests pass with no database, lint is clean and the client builds.
-> Two commands bring the database up — see [Setup](#setup).
+> 433 rule tests pass with no database, lint is clean and the client builds.
+> Two commands bring a *local* database up — see [Setup](#setup).
 
 ---
 
@@ -271,12 +282,12 @@ Current results:
 | Check | Result |
 |---|---|
 | `npm run lint` | **0 problems** |
-| `npm run build` | **clean** — 166 modules, split per route: 357 kB initial (112 kB gzip) |
-| `prisma validate` | valid — 43 models · 24 enums · 30 migrations |
+| `npm run build` | **clean** — 186 modules, split per route: 402 kB initial (124 kB gzip) |
+| `prisma validate` | valid — 59 models · 25 enums · 73 migrations |
 | `verify:scope` | no out-of-scope module present; `CuttingIssue` is terminal |
 | `verify:seed` | all cross-references resolve (1 warning on workbook sample data) |
-| `npm run test:rules` | **341/341 pass** — every calculation, state rule, report descriptor, dashboard permission, RBAC route guard, page boundary and list URL |
-| `npm test` | **not yet run** — needs the database |
+| `npm run test:rules` | **433/433 pass** — every calculation, state rule, report descriptor, dashboard permission, RBAC route guard, page boundary and list URL |
+| `npm test` | needs a seeded database — run it locally, never against production |
 
 `npm run test:rules` drives the exported pure functions directly, so it runs on a
 laptop with nothing installed but Node. The 74 cases cover:

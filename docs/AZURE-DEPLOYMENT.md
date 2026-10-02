@@ -59,6 +59,35 @@ npm --workspace server run db:deploy    # prisma migrate deploy — migrations o
 Never give the production connection string to a `db:setup` or `db:reset` step
 in any pipeline. The workflow in Step 10 deliberately runs `db:deploy` only.
 
+#### ...and it deletes counters the migrations created
+
+A subtler consequence of the same clearing, and one that has already bitten
+once. `document_sequences` is in the wipe list, so the seed does not *add* to
+the counters the migrations inserted - it **replaces** them with whatever
+`seed/data/transactions.js` lists.
+
+Three counters were added by migrations after that list was last updated:
+
+| Migration | Counter |
+|---|---|
+| `20260827001100` | `CUTTING_CHALLAN` - CC-0001 |
+| `20260831000200` | `MATERIAL_PLAN` - MP-0001 |
+| `20260901000200` | `GRN_REVERSAL` - GRV-0001 |
+
+On a database that was migrated and then seeded, the seed deleted all three.
+The symptom is a document that cannot be saved at all:
+
+> No document sequence configured for CUTTING_CHALLAN
+
+**Re-running `db:deploy` does not fix it.** An applied migration is never
+applied again, so the inserts that would restore the rows never re-run. It
+takes a *new* migration - `20261002000200_restore_missing_document_sequences`
+is that migration, and it is idempotent, so it is safe on a healthy database.
+
+> **The rule:** any counter a migration inserts must also be listed in
+> `seed/data/transactions.js`. The two are not alternatives - a dev box that
+> is reset uses the list, and only the list.
+
 ### 2. The rate limiter is per-process
 
 [server/src/middleware/rateLimit.js](../server/src/middleware/rateLimit.js)
@@ -1121,6 +1150,7 @@ az webapp log tail \
 | First request each morning takes 20 s | Always On is off | Step 7.2. |
 | Deploy succeeded but old code still serving | Run-from-package mount did not swap | Restart the app; check the Deployment Center log. |
 | Logins fail for a whole department at once | The office is behind one NAT address and the per-IP bucket tripped | The limiter counts only *failed* attempts, so this means real failures — look for a stale saved password before raising the ceiling. |
+| Saving a document fails with `No document sequence configured for X` | The counter row is missing from `document_sequences` — almost always because the seed was run after the migrations and does not list that counter | Apply the pending migrations (`db:deploy`, or `tools/azure-migrate.ps1`). If none are pending, the row needs a new idempotent migration — see ["...and it deletes counters the migrations created"](#and-it-deletes-counters-the-migrations-created). No restart is needed: the counter is read per save. |
 
 ---
 

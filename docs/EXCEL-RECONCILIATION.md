@@ -100,6 +100,7 @@ with its date is provenance, which is what a remark is for.
 | Size Group | Dropdown → L_SizeGroup | `sizeGroup` | `size_group` | `sizeGroup` | Size Group |
 | Currency | Dropdown → L_Currency | `currency` | `currency` | `currency` | Currency |
 | Ship Mode | Dropdown → L_ShipMode | `shipMode` | `ship_mode` | `shipMode` | Ship Mode |
+| — *(added; see §17)* | Manual | `containerNo` | `container_no` | `containerNo` | Container No |
 | Delivery Date | Manual | `buyerDeliveryDate` | `buyer_delivery_date` | `buyerDeliveryDate` | Delivery |
 | Status | Dropdown → L_StatusGeneral | `status` | `status` | `status` | Status |
 | Remarks | Text | `remarks` | `remarks` | `remarks` | Remarks |
@@ -161,6 +162,7 @@ deserves its own reasoned field and a name that was stamped rather than typed.
 | Content | Text → L_FabricContent | `content` | `content` | `content` | Content |
 | Color code | Dropdown → L_ColorCode | `colorCode` | `color_code` | `colorCode` | Colour |
 | Count | Manual → L_Count | `count` | `count` | `count` | Count |
+| — *(added; see §17)* | Manual | `containerNo` | `container_no` | `containerNo` | Container No |
 | Status | Dropdown → L_StatusGeneral | `status` | `status` | `status` | Status |
 | Remarks — *"Order as per Style - B9641IS"* | Text | `orderType` + `orderId` | `order_type`, `order_id` | `orderType`, `order.orderNo` | Order type, Order No |
 | Remarks | Text | `remarks` | `remarks` | `remarks` | Remarks |
@@ -455,6 +457,38 @@ To check any ERP number against the workbook:
 §33 asks for deliberate omissions to be documented. The reverse is worth
 recording too: places where the ERP carries something the workbook never did,
 and why.
+
+### Container No on the order and the purchase order
+
+The workbook writes a Container No on **Planning**, **Plan Approval** and
+**Cutting Issue** (§4, §13, §14) and nowhere earlier. So the number was first
+*typed* at Planning — which is late. The container is agreed when the order is
+taken, and the cloth and trims are bought against it, so a planner was
+retyping it from an email.
+
+| ERP field | DB column | Why it is not in the workbook |
+|---|---|---|
+| `BuyerOrder.containerNo` | `buyer_orders.container_no` | The Order sheet has no such column. The container is agreed with the buyer at order time, and this is the first place it can be recorded. |
+| `PurchaseOrder.containerNo` | `purchase_orders.container_no` | The PO sheet has no such column. Materials are bought *for* a shipment; recording which one is what lets a buyer ask "what else is on this container". |
+| `PurchaseOrderHeader.containerNo` | `purchase_order_headers.container_no` | The document-level default for its lines, exactly as `order_id` works. A multi-item PO is usually for one container but need not be. |
+
+**It is free text, not a List Master value, and that is deliberate.** It was a
+dropdown reading `L_ContainerNo` on the planning documents and was changed —
+the reasoning is in `planning.service.js`:
+
+> A container number belongs to ONE shipment and is never used again, so a
+> master list of them could only grow into thousands of dead entries with the
+> one needed today missing — and somebody would have to register a container
+> in Masters before the order it carries could be planned.
+
+All three columns are `VARCHAR(40)`, nullable and indexed, matching every other
+`container_no` in the schema.
+
+**What it does not do.** Planning still carries and types its own container and
+does **not** inherit the order's; these columns do not feed the planning chain,
+and nothing downstream is made to match them. The vendor's printed PO copy does
+not show it either — that sheet already withholds *whose* buyer order the goods
+are for, and a container number is the same kind of information.
 
 ### GST on the purchase invoice
 
