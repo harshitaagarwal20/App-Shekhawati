@@ -527,6 +527,11 @@ export const getCuttingChallan = asyncHandler(async (req, res) =>
   ok(res, withApprovability('CUTTING_CHALLAN', await cuttingChallan.getById(req.params.id), req.auth)),
 );
 
+/** The printable cutting challan - the sheet the store draws materials against. */
+export const printCuttingChallan = asyncHandler(async (req, res) =>
+  ok(res, await cuttingChallan.printView(req.params.id)),
+);
+
 export const createCuttingChallan = asyncHandler(async (req, res) =>
   ok(res, await cuttingChallan.create(req.body, who(req)), 201),
 );

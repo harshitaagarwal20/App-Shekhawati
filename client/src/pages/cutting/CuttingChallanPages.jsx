@@ -625,6 +625,18 @@ export function CuttingChallanDetail() {
             <button type="button" className="btn" onClick={() => navigate('/cutting-challans')}>
               Back
             </button>
+            {/* A draft prints with a DRAFT banner across it rather than being
+                refused - walking one round for a signature is how approval
+                gets collected. The server decides; see printView(). */}
+            {can('CUTTING_CHALLAN.EXPORT') && (
+              <button
+                type="button"
+                className="btn"
+                onClick={() => navigate(`/print/cutting-challan/${row.id}`)}
+              >
+                Print
+              </button>
+            )}
             {state === 'DRAFT' && can('CUTTING_CHALLAN.EDIT') && (
               <button
                 type="button"

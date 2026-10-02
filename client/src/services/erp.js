@@ -523,6 +523,7 @@ export const scrutinies = {
 export const cuttingChallans = {
   list: (params) => requestList({ method: 'GET', url: '/cutting-challans', params }),
   get: (id) => request({ method: 'GET', url: `/cutting-challans/${id}` }),
+  print: (id) => request({ method: 'GET', url: `/cutting-challans/${id}/print` }),
   create: (body) => request({ method: 'POST', url: '/cutting-challans', data: body }),
   update: (id, body) => request({ method: 'PATCH', url: `/cutting-challans/${id}`, data: body }),
   remove: (id) => request({ method: 'DELETE', url: `/cutting-challans/${id}` }),

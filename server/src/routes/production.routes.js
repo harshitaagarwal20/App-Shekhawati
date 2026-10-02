@@ -690,6 +690,19 @@ cuttingChallanRoutes.get(
   c.getCuttingChallan,
 );
 
+/*
+ * EXPORT, not VIEW - the same guard every other print route in this file uses.
+ * The permission did not exist until migration 20261002000300: the C5
+ * permissions migration created VIEW/CREATE/EDIT/DELETE/APPROVE and missed it,
+ * which is also why downloading the challan register returned 403.
+ */
+cuttingChallanRoutes.get(
+  '/:id/print',
+  can('CUTTING_CHALLAN.EXPORT'),
+  validate({ params: idParam }),
+  c.printCuttingChallan,
+);
+
 cuttingChallanRoutes.patch(
   '/:id',
   can('CUTTING_CHALLAN.EDIT'),

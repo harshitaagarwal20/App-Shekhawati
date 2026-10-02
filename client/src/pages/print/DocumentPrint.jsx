@@ -1,7 +1,7 @@
 /**
- * The printed document, for all six things this system prints:
- * Purchase Order, Gate Pass, GRN, Purchase Invoice, Job Work Issue and Cutting
- * Challan.
+ * The printed document, for all eight things this system prints: Purchase
+ * Order, Gate Pass, GRN, Purchase Invoice, Job Work Issue, Fabric Issue,
+ * Cutting Issue and Cutting Challan.
  *
  * ---------------------------------------------------------------------------
  *  THE PAYLOAD IS ASSEMBLED ON THE SERVER
@@ -29,6 +29,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Alert, Spinner } from '../../components/ui.jsx';
 import { fmtDate, fmtDateTime, fmtEnum, fmtMoney, fmtNum } from '../../utils/format.js';
 import {
+  cuttingChallans,
   cuttingIssues,
   fabricIssues,
   gatePasses,
@@ -48,6 +49,7 @@ const FETCHERS = {
   'job-work': (id) => jobWorks.print(id),
   'cutting-issue': (id) => cuttingIssues.print(id),
   'fabric-issue': (id) => fabricIssues.print(id),
+  'cutting-challan': (id) => cuttingChallans.print(id),
 };
 
 /** Where "Back" goes. */
@@ -59,6 +61,7 @@ const BACK_TO = {
   'job-work': '/job-works',
   'cutting-issue': '/cutting-issues',
   'fabric-issue': '/fabric-issues',
+  'cutting-challan': '/cutting-challans',
 };
 
 /**
@@ -175,6 +178,7 @@ export default function DocumentPrint() {
         {kind === 'job-work' && <JobWorkBody doc={doc} />}
         {kind === 'cutting-issue' && <CuttingIssueBody doc={doc} />}
         {kind === 'fabric-issue' && <FabricIssueChallanBody doc={doc} />}
+        {kind === 'cutting-challan' && <CuttingChallanBody doc={doc} />}
 
         <Signatures names={doc.signatures ?? ['Prepared By', 'Checked By', 'Authorised By']} />
 
@@ -1104,6 +1108,139 @@ function CuttingIssueBody({ doc }) {
       />
 
       <ReceiverAcknowledgement />
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+//  Cutting Challan
+// ---------------------------------------------------------------------------
+
+/**
+ * The cutting department's requirement, as the store receives it.
+ *
+ * Deliberately NOT laid out like the issue challans above it. Those are
+ * despatch notes - goods leaving, one consignee, an acknowledgement to sign.
+ * This one never leaves the building and moves nothing: it asks the store for
+ * materials, and the store's question is "what is still owed", not "what was
+ * asked for months ago". So the quantity table leads with Outstanding, and
+ * there is no consignee block and no receiver acknowledgement.
+ */
+function CuttingChallanBody({ doc }) {
+  const { order, references, lines, totals } = doc;
+  const partlyIssued = lines.some((l) => Number(l.issuedQty) > 0);
+
+  return (
+    <>
+      <div className="po-meta">
+        <PoMeta label="Challan No" value={doc.challanNo} />
+        <PoMeta label="Date" value={fmtDate(doc.challanDate)} />
+        <PoMeta label="Required by" value={doc.requiredBy ? fmtDate(doc.requiredBy) : null} />
+        <PoMeta label="Buyer order" value={order.orderNo} />
+        <PoMeta label="Buyer" value={order.buyerName} />
+        <PoMeta label="Style" value={order.styleNo} />
+        <PoMeta label="Container No" value={order.containerNo} />
+        <PoMeta label="Plan" value={references.planNo} />
+        <PoMeta
+          label="Plan approval"
+          value={
+            references.approvalNo
+              ? `${references.approvalNo}${references.approvalRound ? ` (v${references.approvalRound})` : ''}`
+              : null
+          }
+        />
+        <PoMeta
+          label="Approved by"
+          value={doc.approvedByName ? `${doc.approvedByName}${doc.approvedAt ? ` · ${fmtDate(doc.approvedAt)}` : ''}` : null}
+        />
+      </div>
+
+      <table className="print-table po-items">
+        <thead>
+          <tr>
+            <th className="po-sr">Sr.</th>
+            <th>Material required</th>
+            <th>UOM</th>
+            <th className="num">Required</th>
+            {/* Only once something has actually been issued. On a fresh
+                challan these two columns would be a column of zeroes and a
+                column repeating Required, which reads as noise. */}
+            {partlyIssued && <th className="num">Issued</th>}
+            {partlyIssued && <th className="num">Outstanding</th>}
+          </tr>
+        </thead>
+        <tbody>
+          {lines.map((l) => (
+            <tr key={l.lineNo}>
+              <td className="po-sr">{l.lineNo}</td>
+              <td>
+                <strong>{l.description}</strong>
+                {l.note && <div className="po-item-note">{l.note}</div>}
+              </td>
+              <td>{l.uom}</td>
+              <td className="num">{fmtNum(l.requiredQty, { decimals: 4 })}</td>
+              {partlyIssued && <td className="num">{fmtNum(l.issuedQty, { decimals: 4 })}</td>}
+              {partlyIssued && (
+                <td className="num">
+                  <strong>{fmtNum(l.outstandingQty, { decimals: 4 })}</strong>
+                </td>
+              )}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {/*
+        Totals only when every line is in one unit. Metres and pieces do not
+        add up, and the server sends null rather than a mixed figure - so the
+        line count is printed instead, which is always true.
+      */}
+      <div className="po-totals">
+        {totals.uom ? (
+          <>
+            <div className="po-total-line">
+              <span>Total required</span>
+              <b>
+                {fmtNum(totals.requiredQty, { decimals: 4 })} {totals.uom}
+              </b>
+            </div>
+            {partlyIssued && (
+              <div className="po-total-line">
+                <span>Still outstanding</span>
+                <b>
+                  {fmtNum(totals.outstandingQty, { decimals: 4 })} {totals.uom}
+                </b>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="po-total-line">
+            <span>Lines</span>
+            <b>{totals.lineCount}</b>
+          </div>
+        )}
+      </div>
+
+      {/* A challan whose balance was written off says so on its face, or the
+          store spends a week looking for materials nobody is going to issue. */}
+      {doc.closedShort && (
+        <div className="challan-note">
+          <strong>Closed short.</strong> The outstanding quantity on this challan has been
+          abandoned deliberately and will not be issued.
+          {doc.closedShortReason ? ` Reason: ${doc.closedShortReason}` : ''}
+        </div>
+      )}
+
+      <ChallanTerms
+        items={[
+          `Issue only against this challan and quote ${doc.challanNo} on the issue note.`,
+          references.chain
+            ? `Authority: ${references.chain}. Check the plan approval before issuing.`
+            : 'Check the plan approval before issuing.',
+          'Report any shortage against a line rather than issuing a substitute material.',
+        ]}
+        remarks={doc.remarks}
+      />
     </>
   );
 }

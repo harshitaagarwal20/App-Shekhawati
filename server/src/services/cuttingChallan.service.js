@@ -1017,3 +1017,133 @@ export async function remove(id, actorId) {
   });
   return { id, deleted: true };
 }
+
+// ===========================================================================
+//  PRINTING
+// ===========================================================================
+
+/**
+ * The printable cutting challan - the sheet the cutting department hands to
+ * the store to draw materials against.
+ *
+ * Assembled HERE rather than in the browser, like every other print view in
+ * this application. The screen renders what it is given and computes nothing:
+ * a total that a print sheet worked out for itself would be a second answer to
+ * a question the service has already answered, and the two would drift.
+ *
+ * WHAT A PRINTED CHALLAN IS, AND IS NOT
+ *
+ * It is a REQUIREMENT - "cutting needs these materials for this order". It is
+ * not an issue note and it moves no stock; the Fabric Issue raised against a
+ * line is what does that. So the sheet prints the outstanding quantity beside
+ * the required one, because the store's question on receiving it is not "what
+ * was asked for" but "what is still owed".
+ *
+ * `printable` is false until the challan is APPROVED, and the shell renders a
+ * DRAFT banner carrying `printWarning` when it is. Printing is deliberately
+ * still ALLOWED: a supervisor walking a draft round for a signature is how an
+ * approval gets collected in the first place, and refusing the page outright
+ * would only move that onto a photocopied screenshot nobody can audit. What
+ * must not happen is a draft being mistaken for an authority to issue, and the
+ * banner is what prevents that.
+ */
+export async function printView(id) {
+  const challan = await prisma.cuttingChallan.findFirst({
+    where: { id, deletedAt: null },
+    include: INCLUDE,
+  });
+  if (!challan) throw ApiError.notFound('Cutting challan');
+
+  const lines = (challan.lines ?? []).map(projectLine);
+  const required = lines.reduce((a, l) => a.plus(D(l.requiredQty)), ZERO);
+  const issued = lines.reduce((a, l) => a.plus(D(l.issuedQty)), ZERO);
+  const outstanding = required.minus(issued);
+
+  const approved = challan.workflowState === 'APPROVED' || challan.workflowState === 'COMPLETED';
+
+  return {
+    documentTitle: 'CUTTING CHALLAN',
+    challanNo: challan.challanNo,
+    challanDate: challan.challanDate,
+    requiredBy: challan.requiredBy,
+    status: challan.status,
+    workflowState: challan.workflowState,
+    workflowLabel: engine.STATE_LABEL[challan.workflowState],
+
+    /** Drives the DRAFT banner in the print shell. See the note above. */
+    printable: approved,
+    printWarning: approved
+      ? null
+      : `This challan is ${(engine.STATE_LABEL[challan.workflowState] ?? challan.workflowState).toLowerCase()}. ` +
+        'It is a requirement awaiting authority, not an instruction to issue materials.',
+
+    approvedByName: challan.approvedByName,
+    approvedAt: challan.approvedAt,
+
+    order: {
+      orderNo: challan.order?.orderNo ?? null,
+      buyerName: challan.order?.buyer?.buyerName ?? null,
+      buyerCode: challan.order?.buyer?.buyerCode ?? null,
+      styleNo: challan.style?.styleNo ?? null,
+      styleDescription: challan.style?.styleDescription ?? null,
+      containerNo: challan.containerNo ?? challan.planning?.containerNo ?? null,
+    },
+
+    /**
+     * The authority this challan rests on. A store keeper asked to hand over
+     * cloth is entitled to see which signed plan it comes from, on the same
+     * sheet - not by opening the system.
+     */
+    references: {
+      planNo: challan.planning?.planNo ?? null,
+      planDepartment: challan.planning?.planDepartment ?? null,
+      approvalNo: challan.planApproval?.approvalNo ?? null,
+      approvalRound: challan.planApproval?.round ?? null,
+      chain: [challan.order?.orderNo, challan.planning?.planNo, challan.planApproval?.approvalNo, challan.challanNo]
+        .filter(Boolean)
+        .join(' \u2192 '),
+    },
+
+    lines: lines.map((l) => ({
+      lineNo: l.lineNo,
+      /** What it is, as one phrase - the store reads a description, not columns. */
+      description:
+        [l.itemCategory, l.subCategory, l.accessoriesItem, l.colorCode].filter(Boolean).join(' / ') ||
+        l.itemCategory,
+      note: l.description ?? null,
+      uom: l.uom,
+      requiredQty: D(l.requiredQty).toFixed(4),
+      issuedQty: D(l.issuedQty).toFixed(4),
+      outstandingQty: l.outstandingQty,
+      status: l.status,
+      /** The BOM figure this line was measured against, frozen at creation. */
+      computedRequirementQty:
+        l.computedRequirementQty != null ? D(l.computedRequirementQty).toFixed(4) : null,
+    })),
+
+    /**
+     * Quantities are summed ACROSS UNITS only when there is one unit, for the
+     * same reason the PO register does it: metres and pieces do not add up,
+     * and a total that silently mixed them would be a wrong number printed in
+     * bold on a document somebody signs.
+     */
+    totals: (() => {
+      const uoms = [...new Set(lines.map((l) => l.uom))];
+      const single = uoms.length === 1;
+      return {
+        lineCount: lines.length,
+        uom: single ? uoms[0] : null,
+        requiredQty: single ? required.toFixed(4) : null,
+        issuedQty: single ? issued.toFixed(4) : null,
+        outstandingQty: single ? (outstanding.isNegative() ? ZERO : outstanding).toFixed(4) : null,
+      };
+    })(),
+
+    closedShort: Boolean(challan.closedShortAt),
+    closedShortReason: challan.closedShortReason,
+    remarks: challan.remarks,
+
+    signatures: ['Raised By (Cutting)', 'Approved By', 'Issued By (Store)'],
+    printedAt: new Date().toISOString(),
+  };
+}
