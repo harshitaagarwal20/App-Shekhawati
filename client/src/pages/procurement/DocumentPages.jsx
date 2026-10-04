@@ -525,6 +525,21 @@ export function PoDocumentPrint() {
   const { doc: p, error } = useDoc(poApi.printDocument, id);
   if (error) return <Alert kind="error">{error}</Alert>;
   if (!p) return <Spinner label="Preparing..." />;
+
+  /*
+    ONE PO PER STYLE IS THE NORM, SO SAY IT ONCE WHEN IT IS TRUE.
+
+    A document whose every line is for the same order and style names them in
+    the header and leaves the rows alone; repeating the same pair under each
+    of eight descriptions is noise on a page the mill has to read. The moment
+    the lines disagree - which is what a multi-line PO is for - the header
+    cannot speak for them and each row carries its own instead.
+  */
+  const orderNos = [...new Set(p.lines.map((l) => l.orderNo).filter(Boolean))];
+  const styleNos = [...new Set(p.lines.map((l) => l.styleNo).filter(Boolean))];
+  const perLine = orderNos.length > 1 || styleNos.length > 1;
+  const headOrderNo = p.header.orderNo ?? (orderNos.length === 1 ? orderNos[0] : null);
+  const headStyleNo = styleNos.length === 1 ? styleNos[0] : null;
   return (
     <div className="doc-print">
       <div className="no-print row" style={{ marginBottom: 12, gap: 8 }}>
@@ -554,8 +569,10 @@ export function PoDocumentPrint() {
             {p.vendor?.gstNo && <div className="muted">GSTIN {p.vendor.gstNo}</div>}
           </div>
           <div>
-            {/* No buyer order: the vendor's copy does not say whose order the
-                goods are for. See PurchaseOrderBody in DocumentPrint. */}
+            {/* The order and style are printed by instruction - see the note in
+                PurchaseOrderBody. The buyer's name is still withheld. */}
+            {!perLine && headOrderNo && <div>Order No: {headOrderNo}</div>}
+            {!perLine && headStyleNo && <div>Style No: {headStyleNo}</div>}
             {p.header.paymentTerms && <div>Payment: {p.header.paymentTerms}</div>}
           </div>
         </div>
@@ -569,6 +586,13 @@ export function PoDocumentPrint() {
                 <td>{l.lineNo}</td>
                 <td>
                   {describe(l)}{l.gsm ? ` · ${l.gsm}` : ''}
+                  {perLine && (l.orderNo || l.styleNo) && (
+                    <div className="muted">
+                      {[l.orderNo && `Order ${l.orderNo}`, l.styleNo && `Style ${l.styleNo}`]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </div>
+                  )}
                   {l.remarks && <div className="muted" style={{ whiteSpace: 'pre-line' }}>{l.remarks}</div>}
                 </td>
                 <td>{l.hsnCode ?? ''}</td>

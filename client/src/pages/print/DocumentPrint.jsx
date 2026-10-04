@@ -352,10 +352,18 @@ function PurchaseOrderBody({ doc }) {
         <PoMeta label="PO No" value={doc.poId} />
         <PoMeta label="PO Date" value={fmtDate(doc.poDate)} />
         <PoMeta label="Order mode" value={fmtEnum(doc.orderMode)} />
-        {/* No buyer order, buyer or style. This copy goes to the VENDOR, who
-            needs none of them - and a supplier who learns whose order the
-            cloth is for can go round us to the buyer. The link to the buyer
-            order stays on the PO screen, where the ceiling is checked. */}
+        {/*
+          THE BUYER ORDER AND STYLE ARE ON THE VENDOR'S COPY, BY INSTRUCTION.
+
+          They were deliberately left off: a supplier who learns whose order
+          the cloth is for can go round us to the buyer. The office asked for
+          them anyway, because the mill quotes the style back when it
+          despatches and a PO that does not name it cannot be matched to a
+          delivery. The buyer's NAME is still withheld - the style and our own
+          order number identify the job without identifying the customer.
+        */}
+        <PoMeta label="Order No" value={doc.references?.orderNo} />
+        <PoMeta label="Style No" value={doc.references?.styleNo} />
       </div>
 
       <table className="print-table po-items">

@@ -200,7 +200,10 @@ const INCLUDE = {
 
 const LIST_INCLUDE = {
   vendor: { select: { id: true, vendorCode: true, vendorName: true, category: true } },
-  order: { select: { id: true, orderNo: true } },
+  order: {
+    select: { id: true, orderNo: true, style: { select: { id: true, styleNo: true } } },
+  },
+  style: { select: { id: true, styleNo: true } },
   quotation: { select: { id: true, quotationNo: true, authorisationStatus: true } },
   // Multi-line: the document this row is one line of.
   header: { select: { id: true, poNo: true, _count: { select: { lines: { where: { deletedAt: null } } } } } },
@@ -1610,6 +1613,8 @@ export async function printDocument(headerId) {
       amount: l.amount,
       approvalStatus: l.approvalStatus,
       orderNo: l.order?.orderNo ?? null,
+      /** A line may name its own style; otherwise it is the buyer order's. */
+      styleNo: l.style?.styleNo ?? l.order?.style?.styleNo ?? null,
       // Single-form POs keep their remarks on the line, not the header.
       remarks: l.remarks && l.remarks !== doc.remarks ? l.remarks : null,
     })),
