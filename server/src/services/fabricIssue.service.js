@@ -400,7 +400,10 @@ export async function assertJobWorkAuthorised(tx, { rollId, purpose, vendorId, q
 
   const candidates = await db.dyeIssue.findMany({
     where: {
-      rollId,
+      // C16: a job covers a SET of rolls. Matching on the header's lead roll
+      // found no authority for the second roll of a multi-roll lot, so a
+      // perfectly authorised challan was refused.
+      rolls: { some: { rollId, deletedAt: null } },
       process,
       deletedAt: null,
       // APPROVED, or POSTED by an earlier challan and not yet fully sent. A
@@ -410,11 +413,32 @@ export async function assertJobWorkAuthorised(tx, { rollId, purpose, vendorId, q
       status: { notIn: ['COMPLETED', 'CANCELLED'] },
       ...(vendorId ? { vendorId } : {}),
     },
-    include: { vendor: { select: { id: true, vendorName: true } } },
+    include: {
+      vendor: { select: { id: true, vendorName: true } },
+      // Only the line for THIS roll: it is the one that authorises the issue.
+      rolls: {
+        where: { rollId, deletedAt: null },
+        include: { roll: { select: { id: true, rollNo: true } } },
+      },
+    },
     orderBy: { issueDate: 'asc' },
   });
 
-  const open = candidates.filter((c) => D(c.qty).greaterThan(D(c.issuedQty)));
+  /*
+   * C16 - THE BALANCE IS THE ROLL'S, NOT THE JOB'S.
+   *
+   * A job for 100m of roll A and 200m of roll B is a 300m job. Measuring an
+   * issue of roll A against the header would have let 250m of A go out and
+   * called it authorised, because the lot as a whole still had room. Every
+   * figure below therefore comes off the line for the roll being issued.
+   */
+  const lineOf = (c) => c.rolls?.[0] ?? null;
+  const balance = (c) => {
+    const line = lineOf(c);
+    return line ? D(line.qty).minus(D(line.issuedQty)) : ZERO;
+  };
+
+  const open = candidates.filter((c) => balance(c).greaterThan(ZERO));
 
   if (!open.length) {
     const roll = await db.fabricRoll.findUnique({
@@ -446,26 +470,28 @@ export async function assertJobWorkAuthorised(tx, { rollId, purpose, vendorId, q
   // An order already part-sent is used up first, so a PO is finished off
   // before the next one is started.
   const wanted = D(qty);
-  const balance = (c) => D(c.qty).minus(D(c.issuedQty));
   const covering =
     open.find((c) => c.workflowState === 'POSTED' && balance(c).greaterThanOrEqualTo(wanted)) ??
     open.find((c) => balance(c).greaterThanOrEqualTo(wanted));
 
   if (!covering) {
     const biggest = open.reduce((a, c) => (balance(c).greaterThan(balance(a)) ? c : a));
+    const line = lineOf(biggest);
+    const rollNo = line?.roll?.rollNo ?? rollId;
     throw new ApiError(
       409,
-      `Job work order ${biggest.dyeIssueNo} is for ${D(biggest.qty).toFixed(4)}, of which ` +
-        `${D(biggest.issuedQty).toFixed(4)} has already gone on earlier challans - ` +
-        `${balance(biggest).toFixed(4)} is left and ${wanted.toFixed(4)} is being issued. ` +
-        'Amend the order or issue less.',
+      `Job work order ${biggest.dyeIssueNo} covers ${D(line?.qty ?? 0).toFixed(4)} of roll ` +
+        `${rollNo}, of which ${D(line?.issuedQty ?? 0).toFixed(4)} has already gone on earlier ` +
+        `challans - ${balance(biggest).toFixed(4)} is left and ${wanted.toFixed(4)} is being ` +
+        'issued. Amend the order or issue less.',
       {
         code: ERROR_CODES.VERIFICATION_FAILED,
         details: {
           field: 'fabricQtyIssued',
           jobWorkNo: biggest.dyeIssueNo,
-          authorisedQty: D(biggest.qty).toFixed(4),
-          alreadyIssuedQty: D(biggest.issuedQty).toFixed(4),
+          rollNo,
+          authorisedQty: D(line?.qty ?? 0).toFixed(4),
+          alreadyIssuedQty: D(line?.issuedQty ?? 0).toFixed(4),
           balanceQty: balance(biggest).toFixed(4),
           requestedQty: wanted.toFixed(4),
         },
@@ -1129,6 +1155,29 @@ export async function create(input, actor) {
       });
       const issuedQty = D(sent._sum.fabricQtyIssued ?? 0);
       const firstChallan = authorised.workflowState === 'APPROVED';
+
+      /*
+       * C16 - the ROLL's running total, re-derived the same way.
+       *
+       * Counted from the challans for this job AND this roll, never
+       * incremented, for the reason the header total is re-derived: a
+       * reversed or deleted challan has to take its quantity back with it,
+       * and an increment cannot. This is the figure
+       * assertJobWorkAuthorised() measures the next challan against, so
+       * getting it from the challans themselves is what keeps the
+       * authorisation honest.
+       */
+      const sentOnRoll = await tx.fabricIssue.aggregate({
+        where: { jobWorkId: authorised.id, rollId: locked.id, deletedAt: null },
+        _sum: { fabricQtyIssued: true },
+      });
+      await tx.dyeIssueRoll.updateMany({
+        where: { dyeIssueId: authorised.id, rollId: locked.id, deletedAt: null },
+        data: {
+          issuedQty: D(sentOnRoll._sum.fabricQtyIssued ?? 0),
+          updatedById: actor.userId ?? null,
+        },
+      });
 
       await tx.dyeIssue.update({
         where: { id: authorised.id },

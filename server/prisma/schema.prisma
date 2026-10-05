@@ -2935,6 +2935,8 @@ model FabricRoll {
 
   fabricIssues    FabricIssue[]
   dyeIssues       DyeIssue[]
+  /// C16 - the job work orders that cover this roll as one of several.
+  dyeIssueRolls   DyeIssueRoll[]
   dyeingReceipts  DyeingReceipt[]
   scrutinies      FabricScrutiny[]
   /// C4 - individual defect findings recorded against this roll.
@@ -3317,8 +3319,27 @@ model DyeIssue {
   /// Excel: "Process" (Manual -> L_Process): Dyeing / Printing / Washing / Finishing
   process      JobWorkProcess
   /// Excel: "Roll No" (Auto-Dropdown -> FabricRoll)
+  ///
+  /// C16: THE LEAD ROLL - line 1's roll, kept in step by the service.
+  ///
+  /// It is NOT the authority on what the job covers; `rolls` below is. A
+  /// dyeing lot is several rolls going to one vendor under one order, and this
+  /// column held the only roll a job could name - so five rolls meant five job
+  /// orders, five approvals and five numbers for one physical lot.
+  ///
+  /// The column stays, and stays NOT NULL, for exactly the reason
+  /// `BuyerOrder.styleId` did when C13 split orders into lines: every list
+  /// screen, report and printed challan reads it, and on a single-roll job -
+  /// which is every job raised before C16 - it is precisely right.
+  ///
+  /// ANYTHING DECIDING WHETHER A ROLL MAY BE SENT MUST READ `rolls`, NOT THIS.
+  /// fabricIssue.assertJobWorkAuthorised() matches on the set, because a
+  /// challan for the second roll of a job would otherwise find no authority.
   rollId       String         @map("roll_id") @db.Uuid
   roll         FabricRoll     @relation(fields: [rollId], references: [id], onDelete: Restrict)
+
+  /// C16 - every roll this job covers. THE AUTHORITY on what may be sent.
+  rolls        DyeIssueRoll[]
   /// Excel: "Colour Code" (Auto-Dropdown -> L_ColorCode)
   colourCode   String?        @map("colour_code") @db.VarChar(60)
   /// Excel: "Content" (Manual -> L_FabricContent)
@@ -3339,6 +3360,12 @@ model DyeIssue {
   /// Excel: "Pin Code" (Number)
   pinCode      String?        @map("pin_code") @db.VarChar(12)
   /// Excel: "Qty" (Manual)
+  ///
+  /// C16: SERVER-CALCULATED. The sum of `qty` across the job's rolls,
+  /// recomputed on every write and never accepted from a client - the rule
+  /// `BuyerOrder.orderQty` already follows. A header quantity typed
+  /// independently of the rolls would be a second answer to "how much cloth
+  /// went to this dyer", and the two would drift.
   qty          Decimal        @db.Decimal(18, 4)
   /// Excel: "UOM" (Auto -> L_UOM)
   uom          String         @db.VarChar(20)
@@ -3449,6 +3476,82 @@ model DyeIssue {
   @@index([inventoryItemId])
   @@index([deletedAt])
   @@map("dye_issues")
+}
+
+/// C16 - ONE ROLL OF A JOB WORK ORDER.
+///
+/// ===========================================================================
+///  WHY THIS TABLE EXISTS
+/// ===========================================================================
+///
+///  A dyeing lot is physically several rolls: one vendor, one shade, one
+///  despatch. The job work order could name exactly one, so sending five rolls
+///  meant raising five orders, getting five approvals and quoting five numbers
+///  for a single lot - and the vendor received one pile of cloth with five
+///  pieces of paper that did not add up to it.
+///
+///  The split follows C13's precedent on BuyerOrder exactly: the header keeps
+///  its lead roll and a SERVER-CALCULATED total quantity, and this table is
+///  the authority on what the order actually covers.
+///
+/// ===========================================================================
+///  WHY THE QUANTITY IS PER ROLL AND NOT SHARED
+/// ===========================================================================
+///
+///  Shrinkage is measured against what went out, roll by roll: a lot where one
+///  roll came back four per cent short and the rest were clean is a different
+///  fact from one where every roll lost a little, and only the first is a
+///  vendor problem. DyeingReceipt already records its return per roll, so the
+///  issued side has to be per roll too or the two cannot be reconciled.
+///
+///  `issuedQty` and `receivedQty` are running totals maintained by the fabric
+///  issue and the dyeing receipt. They are the per-roll counterparts of the
+///  header's, and they are what decides whether another challan may draw on
+///  this roll - see fabricIssue.assertJobWorkAuthorised().
+model DyeIssueRoll {
+  id         String   @id @default(uuid()) @db.Uuid
+  dyeIssueId String   @map("dye_issue_id") @db.Uuid
+  dyeIssue   DyeIssue @relation(fields: [dyeIssueId], references: [id], onDelete: Cascade)
+
+  lineNo Int @map("line_no")
+
+  rollId String     @map("roll_id") @db.Uuid
+  roll   FabricRoll @relation(fields: [rollId], references: [id], onDelete: Restrict)
+
+  /// How much of THIS roll the job covers. The header's `qty` is their sum.
+  qty Decimal @db.Decimal(18, 4)
+
+  /// Sent out against this roll by fabric issue challans, and returned against
+  /// it by dyeing receipts. Both maintained by the services that move stock.
+  issuedQty   Decimal @default(0) @map("issued_qty") @db.Decimal(18, 4)
+  receivedQty Decimal @default(0) @map("received_qty") @db.Decimal(18, 4)
+
+  /// What this roll is expected back as - its qty less the tolerance frozen on
+  /// the header. Stored per roll so a short return names the roll that was
+  /// short, rather than a lot total that hides it.
+  expectedReturnQty Decimal @map("expected_return_qty") @db.Decimal(18, 4)
+
+  remarks String? @db.Text
+
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdById String?   @map("created_by_id") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  updatedById String?   @map("updated_by_id") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
+  deletedById String?   @map("deleted_by_id") @db.Uuid
+
+  @@unique([dyeIssueId, lineNo])
+  /// One roll cannot appear twice on one order - that is one line with a
+  /// bigger quantity, and two would each carry their own running totals.
+  ///
+  /// `map:` and not `name:`. `name:` renames the key on the generated client
+  /// and leaves the database index at Prisma's default, which is how the
+  /// migration and the schema come to disagree about what the index is called.
+  @@unique([dyeIssueId, rollId], map: "dye_issue_roll_identity")
+  @@index([dyeIssueId])
+  @@index([rollId])
+  @@index([deletedAt])
+  @@map("dye_issue_rolls")
 }
 
 /// EXCEL SHEET: "Dyeing Receipt" - Fabric Received from Dyeing (Shekwati4.xlsx)

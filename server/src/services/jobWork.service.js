@@ -184,6 +184,21 @@ const INCLUDE = {
     },
   },
   style: { select: { id: true, styleNo: true, styleDescription: true } },
+  /// C16 - every roll this job covers. THE AUTHORITY on what may be sent.
+  rolls: {
+    where: { deletedAt: null },
+    orderBy: { lineNo: 'asc' },
+    include: {
+      roll: {
+        select: {
+          id: true, rollNo: true, fabricName: true, colorCode: true, content: true,
+          count: true, construction: true, width: true, gsm: true, uom: true,
+          balanceQty: true, stage: true, location: true, isHeld: true,
+          inventoryItemId: true,
+        },
+      },
+    },
+  },
   fabricIssue: {
     select: { id: true, issueNo: true, issueDate: true, purpose: true, fabricQtyIssued: true },
   },
@@ -216,6 +231,15 @@ const LIST_INCLUDE = {
   vendor: { select: { id: true, vendorName: true } },
   order: { select: { id: true, orderNo: true } },
   style: { select: { id: true, styleNo: true } },
+  /// Enough for the list to say "3 rolls" instead of naming only the lead one.
+  rolls: {
+    where: { deletedAt: null },
+    orderBy: { lineNo: 'asc' },
+    select: {
+      id: true, lineNo: true, qty: true, issuedQty: true, receivedQty: true,
+      roll: { select: { id: true, rollNo: true } },
+    },
+  },
 };
 
 // ===========================================================================
@@ -259,6 +283,67 @@ async function validateDropdowns(data) {
     if (data[field] === undefined) continue;
     await assertValueInList(listCode, data[field], { field });
   }
+}
+
+/**
+ * C16 - THE ROLLS THIS JOB COVERS, resolved and checked as a set.
+ *
+ * Accepts the C16 form `{ rolls: [{ rollId, qty }, ...] }` and the pre-C16
+ * form `{ rollId, qty }`, which is still what a single-roll job posts and what
+ * every job raised before C16 was created from. One path produces the set, so
+ * there is one place that decides what a job covers.
+ *
+ * Refusals are per roll and name the roll, because "quantity must be greater
+ * than zero" on a five-roll lot is not an answer a planner can act on.
+ */
+async function resolveRolls(input, tx = prisma) {
+  const raw = Array.isArray(input.rolls) && input.rolls.length
+    ? input.rolls
+    : [{ rollId: input.rollId, qty: input.qty }];
+
+  const seen = new Set();
+  const resolved = [];
+
+  for (const [i, line] of raw.entries()) {
+    const at = Array.isArray(input.rolls) ? `rolls.${i}` : null;
+
+    if (!line?.rollId) {
+      throw ApiError.badRequest('Choose a roll', { field: at ? `${at}.rollId` : 'rollId' });
+    }
+
+    // The same roll twice is one line with a bigger quantity. Two would each
+    // keep their own running totals and neither would be the truth.
+    if (seen.has(line.rollId)) {
+      const dup = await tx.fabricRoll.findUnique({
+        where: { id: line.rollId },
+        select: { rollNo: true },
+      });
+      throw ApiError.badRequest(
+        `Roll ${dup?.rollNo ?? line.rollId} is on this job twice. Put it on one line with the ` +
+          'total quantity.',
+        { field: at ? `${at}.rollId` : 'rollId' },
+      );
+    }
+    seen.add(line.rollId);
+
+    const roll = await resolveRoll(line.rollId, tx);
+    const qty = D(line.qty);
+    if (!qty.greaterThan(0)) {
+      throw ApiError.badRequest(
+        `Quantity for roll ${roll.rollNo} must be greater than zero`,
+        { field: at ? `${at}.qty` : 'qty' },
+      );
+    }
+
+    resolved.push({ lineNo: resolved.length + 1, roll, qty });
+  }
+
+  return resolved;
+}
+
+/** The job's quantity is the sum of its rolls', and is never typed. */
+function sumRollQty(rolls) {
+  return rolls.reduce((a, r) => a.plus(r.qty), ZERO);
 }
 
 /** The roll going out to the job worker. */
@@ -397,6 +482,42 @@ function project(job) {
     /** Over the allowance the job was raised with - the sheet's Variation Flag. */
     shrinkageBreached: !received.isZero() && shrinkage.greaterThan(standard),
     fullyReturned: !issued.isZero() && received.greaterThanOrEqualTo(issued),
+
+    /*
+     * C16 - THE ROLLS, each carrying its own version of the header's figures.
+     *
+     * Restated here so no screen divides a quantity by a roll count or works
+     * out a balance for itself. `toSendQty` is what decides whether another
+     * challan may draw on this roll, and it is the figure
+     * fabricIssue.assertJobWorkAuthorised() enforces - so the number shown and
+     * the number enforced come from the same arithmetic.
+     */
+    rolls: (job.rolls ?? []).map((r) => {
+      const lineQty = D(r.qty);
+      const lineIssued = D(r.issuedQty ?? 0);
+      const lineReceived = D(r.receivedQty ?? 0);
+      const toSendLine = lineQty.minus(lineIssued);
+      const atVendor = lineIssued.minus(lineReceived);
+      return {
+        id: r.id,
+        lineNo: r.lineNo,
+        rollId: r.rollId ?? r.roll?.id ?? null,
+        roll: r.roll ?? null,
+        rollNo: r.roll?.rollNo ?? null,
+        qty: lineQty.toFixed(4),
+        issuedQty: lineIssued.toFixed(4),
+        receivedQty: lineReceived.toFixed(4),
+        toSendQty: (toSendLine.isNegative() ? ZERO : toSendLine).toFixed(4),
+        pendingQty: (atVendor.isNegative() ? ZERO : atVendor).toFixed(4),
+        expectedReturnQty: r.expectedReturnQty != null ? D(r.expectedReturnQty).toFixed(4) : null,
+        shrinkagePct: calculateShrinkage(lineIssued, lineReceived).toFixed(6),
+        fullyReturned: !lineIssued.isZero() && lineReceived.greaterThanOrEqualTo(lineIssued),
+        remarks: r.remarks ?? null,
+      };
+    }),
+    /** One roll is the old shape; the screens still say "roll", not "rolls". */
+    rollCount: (job.rolls ?? []).length,
+    multiRoll: (job.rolls ?? []).length > 1,
   };
 }
 
@@ -418,7 +539,10 @@ export async function list(query) {
     ...(vendorId ? { vendorId } : {}),
     ...(orderId ? { orderId } : {}),
     ...(styleId ? { styleId } : {}),
-    ...(rollId ? { rollId } : {}),
+    // C16: match the SET, not the lead roll - a job is a job for every roll
+    // on it, and filtering on the header would hide it from a search for its
+    // own second roll.
+    ...(rollId ? { rolls: { some: { rollId, deletedAt: null } } } : {}),
     ...(fabricStage ? { fabricStage } : {}),
     ...(dateFrom || dateTo
       ? {
@@ -521,14 +645,21 @@ export async function create(input, actorId) {
   await validateDropdowns(input);
 
   const meta = processMeta(input.process);
-  const roll = await resolveRoll(input.rollId);
+
+  /*
+   * C16 - THE ROLLS, AND THE LEAD ONE.
+   *
+   * `rolls` is the authority on what the job covers; `roll` is line 1, kept on
+   * the header for every screen and printed challan that names a single roll.
+   * The header quantity is their SUM and is never read from the input - the
+   * same rule BuyerOrder.orderQty follows.
+   */
+  const rolls = await resolveRolls(input);
+  const roll = rolls[0].roll;
+  const qty = sumRollQty(rolls);
+
   const vendor = await resolveVendor(input.vendorId, input.process);
   const order = await resolveOrder(input.orderId);
-
-  const qty = D(input.qty);
-  if (!qty.greaterThan(0)) {
-    throw ApiError.badRequest('Quantity must be greater than zero', { field: 'qty' });
-  }
 
   // A job cannot send out more of a roll than was issued off it. The Fabric
   // Issue is what put the fabric in the vendor's hands; this records the work.
@@ -541,16 +672,23 @@ export async function create(input, actorId) {
   if (input.fabricIssueId && !fabricIssue) {
     throw ApiError.badRequest('Fabric issue does not exist', { field: 'fabricIssueId' });
   }
-  if (fabricIssue && fabricIssue.rollId !== roll.id) {
+  // C16: the named fabric issue has to be for ONE OF the job's rolls, and it
+  // bounds that roll's line rather than the whole lot - a challan that
+  // released 300m of roll A says nothing about how much of roll B may go out.
+  const issueLine = fabricIssue
+    ? rolls.find((r) => r.roll.id === fabricIssue.rollId)
+    : null;
+  if (fabricIssue && !issueLine) {
     throw ApiError.badRequest(
-      `Fabric issue ${fabricIssue.issueNo} released a different roll.`,
+      `Fabric issue ${fabricIssue.issueNo} released a roll that is not on this job.`,
       { field: 'fabricIssueId' },
     );
   }
-  if (fabricIssue && qty.greaterThan(D(fabricIssue.fabricQtyIssued))) {
+  if (issueLine && issueLine.qty.greaterThan(D(fabricIssue.fabricQtyIssued))) {
     throw ApiError.badRequest(
       `Fabric issue ${fabricIssue.issueNo} released ${D(fabricIssue.fabricQtyIssued).toFixed(4)} ` +
-        `${roll.uom}. A ${meta.label.toLowerCase()} job cannot be raised for ${qty.toFixed(4)}.`,
+        `${issueLine.roll.uom} of roll ${issueLine.roll.rollNo}. A ${meta.label.toLowerCase()} ` +
+        `job cannot be raised for ${issueLine.qty.toFixed(4)} of it.`,
       { field: 'qty' },
     );
   }
@@ -663,6 +801,25 @@ export async function create(input, actorId) {
         status: 'PENDING',
         createdById: actorId,
         updatedById: actorId,
+
+        /*
+         * C16 - the rolls, written with the header in one transaction.
+         *
+         * `expectedReturnQty` is stored PER ROLL as well as in total, so a
+         * short return names the roll that was short. A lot total hides it:
+         * one roll four per cent down among four clean ones nets out inside
+         * the tolerance and looks like nothing happened.
+         */
+        rolls: {
+          create: rolls.map((r) => ({
+            lineNo: r.lineNo,
+            rollId: r.roll.id,
+            qty: r.qty,
+            expectedReturnQty: expectedReturnQty(r.qty, shrinkageTolerancePct),
+            createdById: actorId,
+            updatedById: actorId,
+          })),
+        },
       },
       include: LIST_INCLUDE,
     });
@@ -687,7 +844,8 @@ export async function create(input, actorId) {
       actor: { userId: actorId },
       remarks:
         `${meta.documentName} raised on ${vendor.vendorName}: ${qty.toFixed(4)} ` +
-        `${input.uom ?? roll.uom} of roll ${roll.rollNo}, shrinkage tolerance ` +
+        `${input.uom ?? roll.uom} across ${rolls.length} roll(s) ` +
+        `(${rolls.map((r) => r.roll.rollNo).join(', ')}), shrinkage tolerance ` +
         `${shrinkageTolerancePct.mul(100).toFixed(2)}%.`,
     });
 
@@ -726,7 +884,37 @@ export async function update(id, input, actorId) {
     input.orderId !== undefined ? input.orderId : existing.orderId,
   );
 
-  const qty = input.qty !== undefined ? D(input.qty) : D(existing.qty);
+  /*
+   * C16 - THE ROLL SET IS REPLACED AS A SET, or left entirely alone.
+   *
+   * Supplying `rolls` replaces every line; the header quantity and lead roll
+   * are then re-derived from the new set exactly as create() derives them, so
+   * there is still one place that decides what a job covers.
+   *
+   * It is refused once ANY fabric has gone out. A challan has already drawn on
+   * a specific roll for a specific quantity, and re-cutting the lines
+   * underneath it would leave the authorisation measuring an issue against a
+   * line that no longer describes it. Changing the rolls then is not an edit,
+   * it is a different job.
+   */
+  let replacementRolls = null;
+  if (Array.isArray(input.rolls) && input.rolls.length) {
+    if (D(existing.issuedQty).greaterThan(0)) {
+      throw ApiError.conflict(
+        `${D(existing.issuedQty).toFixed(4)} ${existing.uom} has already gone out on challans ` +
+          `against ${existing.dyeIssueNo}, so its rolls can no longer be changed. Raise a ` +
+          'further job work order for the extra rolls.',
+        { field: 'rolls', issuedQty: D(existing.issuedQty).toFixed(4) },
+      );
+    }
+    replacementRolls = await resolveRolls(input);
+  }
+
+  const qty = replacementRolls
+    ? sumRollQty(replacementRolls)
+    : input.qty !== undefined
+      ? D(input.qty)
+      : D(existing.qty);
   const rate = input.rate !== undefined ? D(input.rate) : D(existing.rate);
   if (qty.lessThan(D(existing.issuedQty))) {
     throw ApiError.badRequest(
@@ -758,10 +946,37 @@ export async function update(id, input, actorId) {
         : {}),
       ...(input.orderId !== undefined ? { orderId: input.orderId } : {}),
       ...(input.styleId !== undefined ? { styleId: input.styleId } : {}),
+      // C16 - the lead roll follows line 1 of the new set, as create() sets it.
+      ...(replacementRolls ? { rollId: replacementRolls[0].roll.id } : {}),
+      ...(replacementRolls
+        ? {
+            // Deleted and rewritten rather than diffed: nothing has gone out
+            // against these lines, so none of them carries a running total
+            // worth preserving, and a diff would be machinery for no gain.
+            rolls: {
+              deleteMany: {},
+              create: replacementRolls.map((r) => ({
+                lineNo: r.lineNo,
+                rollId: r.roll.id,
+                qty: r.qty,
+                expectedReturnQty: expectedReturnQty(
+                  r.qty,
+                  D(existing.shrinkageTolerancePct),
+                ),
+                createdById: actorId,
+                updatedById: actorId,
+              })),
+            },
+          }
+        : {}),
       qty,
       rate,
       // Recomputed on every write, whether or not qty or rate were what moved.
       amount: calculateAmount(qty, rate),
+      // C16: the lot's expected return follows the rolls when they change.
+      ...(replacementRolls
+        ? { expectedReturnQty: expectedReturnQty(qty, D(existing.shrinkageTolerancePct)) }
+        : {}),
       updatedById: actorId,
     },
     include: LIST_INCLUDE,
@@ -884,12 +1099,60 @@ export async function setStatus(id, { status, remarks }, actorId) {
 export async function receive(id, input, actor) {
   const job = await prisma.dyeIssue.findFirst({
     where: { id, deletedAt: null },
-    include: { roll: { include: { inventoryItem: true } }, vendor: true },
+    include: {
+      roll: { include: { inventoryItem: true } },
+      vendor: true,
+      rolls: {
+        where: { deletedAt: null },
+        orderBy: { lineNo: 'asc' },
+        include: { roll: { include: { inventoryItem: true } } },
+      },
+    },
   });
   if (!job) throw ApiError.notFound('Job work issue');
   if (job.status === 'CANCELLED') {
     throw ApiError.conflict('This job is cancelled; nothing can be returned against it.');
   }
+
+  /*
+   * C16 - WHICH ROLL IS COMING BACK.
+   *
+   * A return is per roll, because shrinkage is: one roll four per cent down
+   * among four clean ones nets out inside the tolerance across the lot and
+   * looks like nothing happened. DyeingReceipt has always recorded a rollId;
+   * before C16 there was only ever one it could be.
+   *
+   * A single-roll job needs no `rollId` in the request, so every existing
+   * caller keeps working. A multi-roll job must say, because guessing would
+   * post the return against the wrong roll's balance.
+   */
+  const line = (() => {
+    const lines = job.rolls ?? [];
+    if (!lines.length) return null;
+    if (input.rollId) {
+      const named = lines.find((r) => r.rollId === input.rollId);
+      if (!named) {
+        throw ApiError.badRequest(
+          `Roll is not on job ${job.dyeIssueNo}. It covers ` +
+            `${lines.map((r) => r.roll?.rollNo).filter(Boolean).join(', ')}.`,
+          { field: 'rollId' },
+        );
+      }
+      return named;
+    }
+    if (lines.length > 1) {
+      throw ApiError.badRequest(
+        `${job.dyeIssueNo} covers ${lines.length} rolls ` +
+          `(${lines.map((r) => r.roll?.rollNo).filter(Boolean).join(', ')}). ` +
+          'Say which roll is being returned.',
+        { field: 'rollId' },
+      );
+    }
+    return lines[0];
+  })();
+
+  /** The roll the fabric is physically coming back on. */
+  const returningRoll = line?.roll ?? job.roll;
 
   const meta = processMeta(job.process);
   const received = D(input.qtyReceived);
@@ -906,7 +1169,9 @@ export async function receive(id, input, actor) {
    * shrinkage and closing are all measured against the 5,000 at the vendor -
    * 4,900 back is 2% shrinkage, not 51%.
    */
-  const sent = D(job.issuedQty);
+  // C16: what went out ON THIS ROLL. On a single-roll job this is the job's
+  // own total, which is what it always was.
+  const sent = line ? D(line.issuedQty) : D(job.issuedQty);
   if (!sent.greaterThan(0)) {
     throw ApiError.conflict(
       `Nothing has been sent to the vendor on ${job.dyeIssueNo} yet - issue the fabric on a ` +
@@ -915,7 +1180,7 @@ export async function receive(id, input, actor) {
     );
   }
 
-  const alreadyBack = D(job.receivedQty);
+  const alreadyBack = line ? D(line.receivedQty) : D(job.receivedQty);
   const cumulative = alreadyBack.plus(received);
   if (cumulative.greaterThan(sent)) {
     throw ApiError.conflict(
@@ -932,10 +1197,10 @@ export async function receive(id, input, actor) {
     );
   }
 
-  if (!job.roll?.inventoryItemId) {
+  if (!returningRoll?.inventoryItemId) {
     throw ApiError.conflict(
-      `Roll ${job.roll?.rollNo ?? ''} is not linked to a stock item, so the return could not be ` +
-        'recorded in the stock ledger.',
+      `Roll ${returningRoll?.rollNo ?? ''} is not linked to a stock item, so the return could ` +
+        'not be recorded in the stock ledger.',
     );
   }
 
@@ -1027,7 +1292,7 @@ export async function receive(id, input, actor) {
         receiptNo,
         receiptDate,
         dyeIssueId: job.id,
-        rollId: job.rollId,
+        rollId: returningRoll.id,
         qtyIssued: sent,
         qtyReceived: received,
         // Excel: "Shrinkage %" on the receipt is for the lot as a whole.
@@ -1099,11 +1364,11 @@ export async function receive(id, input, actor) {
       );
 
       if (leavingJobWorker.greaterThan(0)) ({ consumed: carried } = await postMovement(tx, {
-        itemId: job.roll.inventoryItemId,
-        rollId: job.rollId,
+        itemId: returningRoll.inventoryItemId,
+        rollId: returningRoll.id,
         direction: 'OUT',
         qty: leavingJobWorker,
-        rate: job.roll.rate ?? 0,
+        rate: returningRoll.rate ?? 0,
         entryDate: receiptDate,
         location: returningFrom,
         documentType: 'DYEING_RECEIPT',
@@ -1111,11 +1376,11 @@ export async function receive(id, input, actor) {
         documentNo: receipt.receiptNo,
         orderId: job.orderId,
         snapshot: {
-          itemCategory: job.roll.inventoryItem?.itemCategory ?? 'Fabric',
-          colorCode: job.roll.colorCode,
-          gsm: job.roll.gsm,
-          content: job.roll.content,
-          uom: job.roll.uom,
+          itemCategory: returningRoll.inventoryItem?.itemCategory ?? 'Fabric',
+          colorCode: returningRoll.colorCode,
+          gsm: returningRoll.gsm,
+          content: returningRoll.content,
+          uom: returningRoll.uom,
         },
         remarks:
           `Released from ${returningFrom} on ${receipt.receiptNo}` +
@@ -1130,11 +1395,11 @@ export async function receive(id, input, actor) {
     // LEG TWO. Stock comes back in - only what actually arrived. The shrinkage
     // is gone and the ledger says so by never recording it as returning.
     await postMovement(tx, {
-      itemId: job.roll.inventoryItemId,
-      rollId: job.rollId,
+      itemId: returningRoll.inventoryItemId,
+      rollId: returningRoll.id,
       direction: 'IN',
       qty: received,
-      rate: job.roll.rate ?? 0,
+      rate: returningRoll.rate ?? 0,
       // FIFO - what came back carries the whole cost of what left the job
       // worker, shrinkage included: a normal process loss is absorbed by the
       // good metres, not written off at cost. Null for a lot issued before
@@ -1147,11 +1412,11 @@ export async function receive(id, input, actor) {
       documentNo: receipt.receiptNo,
       orderId: job.orderId,
       snapshot: {
-        itemCategory: job.roll.inventoryItem?.itemCategory ?? 'Fabric',
-        colorCode: job.roll.colorCode,
-        gsm: job.roll.gsm,
-        content: job.roll.content,
-        uom: job.roll.uom,
+        itemCategory: returningRoll.inventoryItem?.itemCategory ?? 'Fabric',
+        colorCode: returningRoll.colorCode,
+        gsm: returningRoll.gsm,
+        content: returningRoll.content,
+        uom: returningRoll.uom,
       },
       remarks:
         `Returned from ${meta.label.toLowerCase()} at ${job.vendor?.vendorName ?? 'vendor'} ` +
@@ -1171,10 +1436,10 @@ export async function receive(id, input, actor) {
     const reshaded = job.process === 'DYEING';
     const shadePatch = {
       ...(input.dyeLot !== undefined || reshaded
-        ? { dyeLot: normaliseShade(input.dyeLot) ?? (reshaded ? null : job.roll.dyeLot) }
+        ? { dyeLot: normaliseShade(input.dyeLot) ?? (reshaded ? null : returningRoll.dyeLot) }
         : {}),
       ...(input.shade !== undefined || reshaded
-        ? { shade: normaliseShade(input.shade) ?? (reshaded ? null : job.roll.shade) }
+        ? { shade: normaliseShade(input.shade) ?? (reshaded ? null : returningRoll.shade) }
         : {}),
       ...(input.shade || input.dyeLot
         ? { shadeMarkedAt: new Date(), shadeMarkedByName: actor.fullName ?? null }
@@ -1183,17 +1448,17 @@ export async function receive(id, input, actor) {
 
     // The roll: what is on it, where it is, and whether it is held for scrutiny.
     await tx.fabricRoll.update({
-      where: { id: job.rollId },
+      where: { id: returningRoll.id },
       data: {
         ...shadePatch,
-        balanceQty: D(job.roll.balanceQty).plus(received),
+        balanceQty: D(returningRoll.balanceQty).plus(received),
         stage: breached ? 'SCRUTINY_HOLD' : meta.returnedStage,
         location,
         isHeld: breached,
         remarks: breached
           ? `Held: ${meta.lossLabel.toLowerCase()} ${shrinkage.mul(100).toDecimalPlaces(2)}% on ` +
             `${job.dyeIssueNo}, allowance ${standard.mul(100).toDecimalPlaces(2)}%`
-          : job.roll.remarks,
+          : returningRoll.remarks,
         updatedById: actor.userId,
       },
     });
@@ -1201,15 +1466,41 @@ export async function receive(id, input, actor) {
     // The job's running totals - DERIVED from the returns, not typed. A job is
     // finished when the whole PO has gone out AND come back within tolerance;
     // a PO with a challan still to go is not finished however much returned.
+    /*
+     * C16 - the ROLL's total first, then the job's as the sum of them.
+     *
+     * `cumulative` is this roll's running total, so the header cannot simply
+     * take it: on a three-roll lot that would report the third roll's returns
+     * as the whole job's. The line is written, then the header is re-derived
+     * from every line - which is also what makes a correction to one roll show
+     * up correctly in the lot total.
+     */
+    let jobReceived = cumulative;
+    let jobShrinkage = shrinkage;
+    if (line) {
+      await tx.dyeIssueRoll.update({
+        where: { id: line.id },
+        data: { receivedQty: cumulative, updatedById: actor.userId ?? null },
+      });
+      const totals = await tx.dyeIssueRoll.aggregate({
+        where: { dyeIssueId: job.id, deletedAt: null },
+        _sum: { issuedQty: true, receivedQty: true },
+      });
+      jobReceived = D(totals._sum.receivedQty ?? 0);
+      jobShrinkage = calculateShrinkage(D(totals._sum.issuedQty ?? 0), jobReceived);
+    }
+
+    // The job is finished when the whole PO has gone out AND come back within
+    // tolerance - measured across every roll, not just the one returning now.
     const finished =
-      sent.greaterThanOrEqualTo(D(job.qty)) &&
-      cumulative.greaterThanOrEqualTo(D(job.expectedReturnQty));
+      D(job.issuedQty).greaterThanOrEqualTo(D(job.qty)) &&
+      jobReceived.greaterThanOrEqualTo(D(job.expectedReturnQty));
 
     await tx.dyeIssue.update({
       where: { id: job.id },
       data: {
-        receivedQty: cumulative,
-        shrinkagePct: shrinkage,
+        receivedQty: jobReceived,
+        shrinkagePct: jobShrinkage,
         updatedById: actor.userId,
         // Only moved directly for the lots that predate C3 and so never
         // entered the workflow. Everything else closes through the engine

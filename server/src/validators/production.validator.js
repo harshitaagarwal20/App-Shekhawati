@@ -212,7 +212,30 @@ const jobWorkBody = z.object({
   /// and never defaulted.
   process: jobProcess,
 
-  rollId: uuid,
+  /// C16 - THE ROLLS THIS JOB COVERS.
+  ///
+  /// A dyeing lot is several rolls going to one vendor on one despatch. Supply
+  /// `rolls`, or the single `rollId` + `qty` pair below - jobWork.service.js
+  /// resolves both through one path, so there is one place that decides what a
+  /// job covers. The pair is what a single-roll job still posts and what every
+  /// job raised before C16 was created from.
+  ///
+  /// There is no per-roll shrinkage tolerance: the tolerance is the vendor's
+  /// and the process's, frozen once on the header, and a roll cannot contract
+  /// for its own.
+  rolls: z
+    .array(
+      z.object({
+        rollId: uuid,
+        qty: decimal('Quantity', { min: 0, allowZero: false }),
+        remarks: optionalText(2000),
+      }),
+    )
+    .min(1, 'A job work order needs at least one roll')
+    .max(100, 'A job work order cannot hold more than 100 rolls')
+    .optional(),
+
+  rollId: uuid.optional(),
   vendorId: uuid,
 
   /// Fabric characteristics. Left blank they are copied from the roll.
@@ -227,7 +250,9 @@ const jobWorkBody = z.object({
   address: optionalText(2000),
   pinCode: optionalText(12),
 
-  qty: decimal('Quantity', { min: 0, allowZero: false }),
+  /// C16: the single-roll form. With `rolls` the header quantity is their sum
+  /// and this is ignored - the service never reads a typed total.
+  qty: decimal('Quantity', { min: 0, allowZero: false }).optional(),
   uom: optionalText(20),
   rate: decimal('Rate', { min: 0 }),
 
@@ -244,7 +269,10 @@ const jobWorkBody = z.object({
   remark: optionalText(2000),
 });
 
-export const createJobWorkSchema = jobWorkBody;
+export const createJobWorkSchema = jobWorkBody.refine(
+  (d) => (d.rolls?.length ?? 0) > 0 || (Boolean(d.rollId) && d.qty != null),
+  { message: 'A job work order needs at least one roll and a quantity', path: ['rolls'] },
+);
 /**
  * Editing a job. `status` is absent: a job moves to COMPLETED when the last
  * of its fabric comes back, which the return endpoint works out - not when
@@ -268,6 +296,11 @@ export const setJobWorkStatusSchema = z.object({
 export const receiveJobWorkSchema = z.object({
   receiptNo: optionalText(40),
   receiptDate: isoDate.optional(),
+  /// C16 - WHICH ROLL IS COMING BACK. Optional, because a single-roll job has
+  /// only one answer and every caller that predates C16 omits it. A multi-roll
+  /// job is refused without it rather than guessing: shrinkage is measured per
+  /// roll, and guessing would post the return against the wrong balance.
+  rollId: uuid.optional(),
   qtyReceived: decimal('Received quantity', { min: 0, allowZero: false }),
   /// Where the returned fabric is being put back (-> L_StockLocation).
   location: optionalText(80),
