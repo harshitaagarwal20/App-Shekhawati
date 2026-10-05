@@ -28,7 +28,8 @@ import {
   useSubmit,
   useZodForm,
 } from '../../components/form.jsx';
-import { Alert, Spinner } from '../../components/ui.jsx';
+import { Alert, RecordSelect, Spinner, TextInput } from '../../components/ui.jsx';
+import TableWrap from '../../components/TableWrap.jsx';
 import { fmtNum, todayInput } from '../../utils/format.js';
 import { loadFailed } from '../../services/loadFailures.js';
 
@@ -39,11 +40,18 @@ const schema = z.object({
   // decides what is offered (jobWork.service.js `OFFERED`); this refuses
   // anything else being submitted from a stale form.
   process: z.enum(['DYEING', 'PRINTING']),
-  rollId: z.string().uuid('Choose a roll'),
+  /*
+   * C16 - THE ROLLS ARE NOT IN THIS SCHEMA.
+   *
+   * A job covers a set of rolls with a quantity each, and the header quantity
+   * is their sum - worked out by the server, never typed. A repeating grid is
+   * awkward to express through react-hook-form and would duplicate a rule the
+   * server already owns, so the grid is component state and is checked on
+   * submit. What stays here is everything that is genuinely one value.
+   */
   vendorId: z.string().uuid('Choose a vendor'),
   fabricIssueId: z.string().optional(),
   orderId: z.string().optional(),
-  qty: z.coerce.number().positive('Quantity must be greater than zero'),
   uom: z.string().optional(),
   rate: z.coerce.number().min(0, 'Rate cannot be negative'),
   fabricStage: z.enum(['BEFORE_STITCHING', 'AFTER_STITCHING']),
@@ -59,6 +67,10 @@ const STAGES = [
   { value: 'AFTER_STITCHING', label: 'After stitching' },
 ];
 
+/** A stable row key - the roll can change under it, so the id cannot be one. */
+let rowSeq = 0;
+const rowKey = () => `r${++rowSeq}`;
+
 const pctToFraction = (pct) => (pct === '' || pct === undefined ? undefined : String(Number(pct) / 100));
 
 export default function JobWorkForm({ processes = [], onSaved, onCancel }) {
@@ -66,11 +78,9 @@ export default function JobWorkForm({ processes = [], onSaved, onCancel }) {
     dyeIssueNo: '',
     issueDate: todayInput(),
     process: 'DYEING',
-    rollId: '',
     vendorId: '',
     fabricIssueId: '',
     orderId: '',
-    qty: '',
     uom: '',
     rate: '',
     fabricStage: 'BEFORE_STITCHING',
@@ -88,11 +98,27 @@ export default function JobWorkForm({ processes = [], onSaved, onCancel }) {
   const [preview, setPreview] = useState(null);
   const [previewing, setPreviewing] = useState(false);
 
+  /*
+   * C16 - THE ROLLS GOING OUT ON THIS JOB.
+   *
+   * One line per roll, each with its own quantity. A lot is usually several
+   * rolls of the same cloth to the same vendor on one despatch, which is why
+   * the row is roll + quantity and nothing else: the process, the vendor, the
+   * rate and the shrinkage tolerance belong to the job, not to a roll.
+   */
+  const [rollLines, setRollLines] = useState([{ key: rowKey(), rollId: '', qty: '' }]);
+  const setRollLine = (key, patch) =>
+    setRollLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
+
   const process = form.watch('process');
-  const rollId = form.watch('rollId');
-  const qty = form.watch('qty');
   const rate = form.watch('rate');
   const standardShrinkagePct = form.watch('standardShrinkagePct');
+
+  /** The lead roll - line 1, as the server treats it. Drives the preview. */
+  const rollId = rollLines[0]?.rollId ?? '';
+  /** The job's quantity is the sum of its rolls', here as on the server. */
+  const qty = rollLines.reduce((a, l) => a + (Number(l.qty) || 0), 0);
+  const chosenRollIds = rollLines.map((l) => l.rollId).filter(Boolean);
 
   const meta = processes.find((p) => p.process === process);
 
@@ -110,17 +136,28 @@ export default function JobWorkForm({ processes = [], onSaved, onCancel }) {
       .catch(loadFailed(setVendors, 'vendors'));
   }, [meta]);
 
-  // The fabric issue that released this roll, so the job can point back at it.
+  /*
+   * The fabric issues that released ANY of the job's rolls, so it can point
+   * back at one. The server accepts an issue for any roll on the job and
+   * measures it against that roll's line, so offering only the lead roll's
+   * issues would hide a legitimate choice on a multi-roll lot.
+   */
+  const rollKey = chosenRollIds.join(',');
   useEffect(() => {
-    if (!rollId) {
+    const ids = rollKey ? rollKey.split(',') : [];
+    if (!ids.length) {
       setIssues([]);
       return;
     }
-    fiApi
-      .list({ rollId, pageSize: 25 })
-      .then((r) => setIssues(r.rows ?? []))
+    let cancelled = false;
+    Promise.all(ids.map((id) => fiApi.list({ rollId: id, pageSize: 25 })))
+      .then((results) => {
+        if (cancelled) return;
+        setIssues(results.flatMap((r) => r.rows ?? []));
+      })
       .catch(loadFailed(setIssues, 'issues'));
-  }, [rollId]);
+    return () => { cancelled = true; };
+  }, [rollKey]);
 
   const runPreview = useCallback(async () => {
     if (!process) return;
@@ -129,7 +166,9 @@ export default function JobWorkForm({ processes = [], onSaved, onCancel }) {
       const p = await jwApi.preview({
         process,
         rollId: rollId || undefined,
-        qty: qty === '' ? undefined : String(qty),
+        // The grid's running total. Zero means nothing is typed yet, not a
+        // job for nothing, so the preview is asked without a quantity.
+        qty: qty > 0 ? String(qty) : undefined,
         rate: rate === '' ? undefined : String(rate),
         standardShrinkageAllowed: pctToFraction(standardShrinkagePct),
       });
@@ -160,16 +199,39 @@ export default function JobWorkForm({ processes = [], onSaved, onCancel }) {
 
   const { submit, busy, banner, setBanner } = useSubmit(
     form,
-    (values) =>
-      jwApi.create({
+    (values) => {
+      /*
+       * The grid is not part of the RHF schema, so it is checked here. These
+       * refusals are the same ones the server makes - they are repeated for
+       * the round trip, not instead of it.
+       */
+      const lines = rollLines.filter((l) => l.rollId);
+      if (!lines.length) throw new Error('Add at least one roll to this job.');
+      const blank = lines.find((l) => !(Number(l.qty) > 0));
+      if (blank) {
+        const roll = rolls.find((r) => r.id === blank.rollId);
+        throw new Error(`Enter a quantity for roll ${roll?.rollNo ?? roll?.label ?? ''}.`.trim());
+      }
+      const ids = lines.map((l) => l.rollId);
+      const dup = ids.find((id, i) => ids.indexOf(id) !== i);
+      if (dup) {
+        const roll = rolls.find((r) => r.id === dup);
+        throw new Error(
+          `Roll ${roll?.rollNo ?? roll?.label ?? ''} is on this job twice. `.trim() +
+            'Put it on one line with the total quantity.',
+        );
+      }
+
+      return jwApi.create({
         dyeIssueNo: values.dyeIssueNo || undefined,
         issueDate: values.issueDate,
         process: values.process,
-        rollId: values.rollId,
+        // C16 - the set. The server derives the header quantity and the lead
+        // roll from it, so neither is sent.
+        rolls: lines.map((l) => ({ rollId: l.rollId, qty: String(l.qty) })),
         vendorId: values.vendorId,
         fabricIssueId: values.fabricIssueId || null,
         orderId: values.orderId || null,
-        qty: String(values.qty),
         uom: values.uom || null,
         rate: String(values.rate),
         fabricStage: values.fabricStage,
@@ -199,7 +261,8 @@ export default function JobWorkForm({ processes = [], onSaved, onCancel }) {
          */
         gsm: values.gsm || null,
         remark: values.remark || null,
-      }),
+      });
+    },
     { onDone: (saved) => onSaved(saved) },
   );
 
@@ -222,6 +285,94 @@ export default function JobWorkForm({ processes = [], onSaved, onCancel }) {
           loss is measured as <strong>{meta.lossLabel.toLowerCase()}</strong>.
         </Alert>
       )}
+
+      {/*
+        C16 - THE ROLLS, AS A GRID.
+
+        A dyeing lot is several rolls going to one vendor on one despatch. It
+        used to be one roll per job, so five rolls meant five job orders and
+        five numbers for one physical lot - and the vendor got one pile of
+        cloth with five papers that did not add up to it.
+
+        The quantity is per roll because shrinkage is judged per roll: one roll
+        four per cent short among four clean ones nets out across a lot total
+        and looks like nothing happened.
+      */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="card-header">
+          <span>Rolls going out</span>
+          <span className="faint" style={{ fontWeight: 400, fontSize: 12 }}>
+            {rollLines.filter((l) => l.rollId).length} roll(s) · {fmtNum(qty)}{' '}
+            {form.watch('uom') || preview?.roll?.uom || ''} in total
+          </span>
+        </div>
+        <TableWrap>
+          <table className="data">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Roll</th>
+                <th className="num">Qty</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {rollLines.map((l, i) => (
+                <tr key={l.key}>
+                  <td>{i + 1}</td>
+                  <td style={{ minWidth: 280 }}>
+                    <RecordSelect
+                      options={rolls}
+                      getValue={(r) => r.id}
+                      getLabel={(r) => r.label}
+                      aria-label="Roll"
+                      placeholder="Choose a roll..."
+                      value={l.rollId}
+                      onChange={(e) => setRollLine(l.key, { rollId: e.target.value })}
+                    />
+                  </td>
+                  <td className="num" style={{ minWidth: 120 }}>
+                    <TextInput
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      step="any"
+                      aria-label="Quantity"
+                      style={{ width: 120, textAlign: 'right' }}
+                      value={l.qty}
+                      onChange={(e) => setRollLine(l.key, { qty: e.target.value })}
+                    />
+                  </td>
+                  <td className="actions">
+                    {rollLines.length > 1 && (
+                      <button
+                        type="button"
+                        className="btn btn-sm"
+                        onClick={() => setRollLines((ls) => ls.filter((x) => x.key !== l.key))}
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </TableWrap>
+        <div className="card-body">
+          <button
+            type="button"
+            className="btn"
+            onClick={() => setRollLines((ls) => [...ls, { key: rowKey(), rollId: '', qty: '' }])}
+          >
+            Add a roll
+          </button>
+          <span className="hint" style={{ marginLeft: 10 }}>
+            The job&apos;s quantity is the total of these - the server works it out, so there is
+            no total to type.
+          </span>
+        </div>
+      </div>
 
       <div className="form-grid">
         <FieldGroup title="Job" hint="the process decides everything below it">
@@ -251,15 +402,6 @@ export default function JobWorkForm({ processes = [], onSaved, onCancel }) {
         </FieldGroup>
 
         <FieldGroup title="What is going out">
-          <RHFRecordSelect
-            form={form}
-            name="rollId"
-            label="Roll"
-            required
-            options={rolls}
-            getLabel={(r) => r.label}
-            placeholder="Choose a roll..."
-          />
           <RHFRecordSelect
             form={form}
             name="vendorId"
@@ -293,7 +435,6 @@ export default function JobWorkForm({ processes = [], onSaved, onCancel }) {
             getLabel={(o) => `${o.orderNo} — ${o.style?.styleNo ?? ''}`}
             placeholder="No order reference"
           />
-          <RHFQty form={form} name="qty" label="Qty" required uom={preview?.roll?.uom} />
           <RHFQty form={form} name="rate" label="Rate" required hint="Job work rate per unit." />
           <RHFInput
             form={form}

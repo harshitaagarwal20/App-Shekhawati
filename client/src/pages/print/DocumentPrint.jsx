@@ -854,20 +854,34 @@ function JobWorkBody({ doc }) {
           </tr>
         </thead>
         <tbody>
-          <tr>
-            <td className="po-sr">1</td>
-            <td>
-              <strong>
-                {doc.processLabel} of {fabric.fabricName ?? 'fabric'}
-              </strong>
-              {spec && <div className="po-item-note">{spec}</div>}
-            </td>
-            <td className="code">{fabric.rollNo}</td>
-            <td>{line.uom}</td>
-            <td className="num">{fmtNum(line.qty, { decimals: 4 })}</td>
-            <td className="num">{fmtNum(line.rate, { decimals: 4 })}</td>
-            <td className="num">{fmtMoney(line.amount)}</td>
-          </tr>
+          {/*
+            C16 - A ROW PER ROLL.
+
+            The slip is what the vendor counts the cloth against, so it lists
+            every roll on the despatch. A lot of three rolls arriving under a
+            slip naming one is exactly the mismatch C16 exists to end.
+
+            The rate and amount are the JOB's, not a roll's: job work is priced
+            per unit across the lot, and splitting the amount down the rolls
+            would invent a per-roll figure nobody agreed. They are printed once
+            against the first row and the total carries the rest.
+          */}
+          {(doc.rolls?.length ? doc.rolls : [{ lineNo: 1, rollNo: fabric.rollNo, fabricName: fabric.fabricName, qty: line.qty, uom: line.uom }]).map((r, i) => (
+            <tr key={r.lineNo ?? i}>
+              <td className="po-sr">{r.lineNo ?? i + 1}</td>
+              <td>
+                <strong>
+                  {doc.processLabel} of {r.fabricName ?? fabric.fabricName ?? 'fabric'}
+                </strong>
+                {i === 0 && spec && <div className="po-item-note">{spec}</div>}
+              </td>
+              <td className="code">{r.rollNo}</td>
+              <td>{r.uom ?? line.uom}</td>
+              <td className="num">{fmtNum(r.qty, { decimals: 4 })}</td>
+              <td className="num">{i === 0 ? fmtNum(line.rate, { decimals: 4 }) : ''}</td>
+              <td className="num">{i === 0 ? fmtMoney(line.amount) : ''}</td>
+            </tr>
+          ))}
         </tbody>
       </table>
 

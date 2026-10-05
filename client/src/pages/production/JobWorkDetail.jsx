@@ -13,6 +13,7 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import { jobWorks as jwApi } from '../../services/erp.js';
 import {
   Alert,
+  EnumSelect,
   Field,
   MasterSelect,
   Modal,
@@ -253,7 +254,14 @@ export default function JobWorkDetail() {
             <Detail label={meta.vendorLabel} value={job.vendor?.vendorName} />
             <Detail label="Address" value={job.address} className="span-2" />
             <Detail label="Pin code" value={job.pinCode} />
-            <Detail label="Roll No" value={job.roll?.rollNo} mono />
+            {/* C16: one roll is named here as it always was. Several are a
+                table of their own below - a header field cannot carry three
+                rolls with three balances. */}
+            {job.multiRoll ? (
+              <Detail label="Rolls" value={`${job.rollCount} rolls — see below`} />
+            ) : (
+              <Detail label="Roll No" value={job.roll?.rollNo} mono />
+            )}
             <Detail label="Colour" value={job.colourCode} />
             <Detail label="Content" value={job.content} />
             <Detail label="Count" value={job.count} />
@@ -268,6 +276,61 @@ export default function JobWorkDetail() {
           </DetailGrid>
         </div>
       </div>
+
+      {/*
+        C16 - THE ROLLS, each with its own balance.
+
+        Shown whenever the job carries lines, including a single-roll job:
+        "how much of this roll is still to go out, and how much is still at the
+        vendor" is the question the store asks, and on a one-roll job it was
+        only answerable by reading the header's three totals together.
+
+        Every figure comes from the server. `toSendQty` in particular is the
+        number fabricIssue.assertJobWorkAuthorised() enforces, so what is shown
+        here and what the next challan is allowed to draw are the same
+        arithmetic rather than two that can drift.
+      */}
+      {(job.rolls?.length ?? 0) > 0 && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div className="card-header">
+            <span>Rolls on this job</span>
+            <span className="faint" style={{ fontWeight: 400, fontSize: 12 }}>
+              {job.rollCount} roll(s) · {fmtNum(job.qty)} {job.uom} authorised
+            </span>
+          </div>
+          <TableWrap>
+            <table className="data">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Roll</th>
+                  <th className="num">Authorised</th>
+                  <th className="num">Sent out</th>
+                  <th className="num">Still to send</th>
+                  <th className="num">At vendor</th>
+                  <th className="num">Returned</th>
+                </tr>
+              </thead>
+              <tbody>
+                {job.rolls.map((r) => (
+                  <tr key={r.id}>
+                    <td>{r.lineNo}</td>
+                    <td className="code">{r.rollNo ?? '-'}</td>
+                    <td className="num">{fmtNum(r.qty)}</td>
+                    <td className="num">{fmtNum(r.issuedQty)}</td>
+                    <td className="num">{fmtNum(r.toSendQty)}</td>
+                    <td className="num">{fmtNum(r.pendingQty)}</td>
+                    <td className="num">
+                      {fmtNum(r.receivedQty)}
+                      {r.fullyReturned && <span className="faint"> · back</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableWrap>
+        </div>
+      )}
 
       {/* --- Returns ------------------------------------------------------ */}
       <div className="card" style={{ marginBottom: 16 }}>
@@ -453,6 +516,22 @@ export default function JobWorkDetail() {
  * screen before the button is pressed rather than after.
  */
 function ReceiveDialog({ job, onCancel, onDone }) {
+  /*
+   * C16 - WHICH ROLL IS COMING BACK.
+   *
+   * Only the lines that still have cloth at the vendor can be returned
+   * against. A single-roll job preselects the one answer and never shows the
+   * picker; a multi-roll job must be told, because shrinkage is measured
+   * against what went out ON THAT ROLL and guessing would post the return
+   * against the wrong balance. The server refuses an unstated roll for the
+   * same reason - this is the screen agreeing with it, not substituting for it.
+   */
+  const returnable = (job.rolls ?? []).filter((r) => Number(r.pendingQty) > 0);
+  const [rollLineId, setRollLineId] = useState(
+    returnable.length === 1 ? returnable[0].rollId : '',
+  );
+  const line = (job.rolls ?? []).find((r) => r.rollId === rollLineId) ?? null;
+
   const [qtyReceived, setQtyReceived] = useState('');
   const [location, setLocation] = useState('MAIN STORE');
   const [dyeLot, setDyeLot] = useState('');
@@ -484,6 +563,7 @@ function ReceiveDialog({ job, onCancel, onDone }) {
     setError('');
     try {
       const result = await jwApi.receive(job.id, {
+        ...(rollLineId ? { rollId: rollLineId } : {}),
         qtyReceived: String(qtyReceived),
         location: location || undefined,
         dyeLot: dyeLot || undefined,
@@ -515,7 +595,12 @@ function ReceiveDialog({ job, onCancel, onDone }) {
             type="button"
             className="btn btn-primary"
             onClick={go}
-            disabled={busy || !(Number(qtyReceived) > 0) || preview?.exceedsIssued}
+            disabled={
+              busy ||
+              !(Number(qtyReceived) > 0) ||
+              preview?.exceedsIssued ||
+              (returnable.length > 1 && !rollLineId)
+            }
           >
             {busy ? 'Booking...' : 'Book the return'}
           </button>
@@ -525,9 +610,37 @@ function ReceiveDialog({ job, onCancel, onDone }) {
       <div className="modal-body">
         <Alert kind="error">{error}</Alert>
 
+        {returnable.length > 1 && (
+          <Field label="Roll coming back" required>
+            <EnumSelect
+              placeholder="Which roll has arrived?"
+              value={rollLineId}
+              onChange={(e) => {
+                setRollLineId(e.target.value);
+                // The quantity belonged to the previous roll's balance.
+                setQtyReceived('');
+              }}
+              options={returnable.map((r) => ({
+                value: r.rollId,
+                label: `${r.rollNo} — ${fmtNum(r.pendingQty)} ${job.uom} at the vendor`,
+              }))}
+            />
+          </Field>
+        )}
+
         <p style={{ marginTop: 0 }}>
-          {fmtNum(job.issuedQty)} {job.uom} went out on {job.dyeIssueNo};{' '}
-          {fmtNum(job.receivedQty)} has already come back. Enter what arrived now.
+          {line ? (
+            <>
+              {fmtNum(line.issuedQty)} {job.uom} of roll {line.rollNo} went out on{' '}
+              {job.dyeIssueNo}; {fmtNum(line.receivedQty)} has already come back. Enter what
+              arrived now.
+            </>
+          ) : (
+            <>
+              {fmtNum(job.issuedQty)} {job.uom} went out on {job.dyeIssueNo};{' '}
+              {fmtNum(job.receivedQty)} has already come back. Choose the roll that has arrived.
+            </>
+          )}
         </p>
 
         <QtyStepper
@@ -535,7 +648,7 @@ function ReceiveDialog({ job, onCancel, onDone }) {
           onChange={setQtyReceived}
           uom={job.uom}
           label="Qty received"
-          available={job.pendingQty}
+          available={line ? line.pendingQty : job.pendingQty}
           max={job.pendingQty}
         />
 

@@ -1693,6 +1693,21 @@ export async function printView(id) {
       gstNo: job.vendor.gstNo,
       phone: job.vendor.phone,
     },
+    /*
+     * C16 - every roll on the despatch, with its own quantity.
+     *
+     * This is what the vendor counts against. A lot of three rolls arriving
+     * under a slip that names one is exactly the mismatch C16 exists to end,
+     * so the rolls are listed whatever their number - a single-roll job prints
+     * a one-row table, which is still the truth.
+     */
+    rolls: (job.rolls ?? []).map((r) => ({
+      lineNo: r.lineNo,
+      rollNo: r.roll?.rollNo ?? null,
+      fabricName: r.roll?.fabricName ?? null,
+      qty: D(r.qty).toFixed(4),
+      uom: job.uom,
+    })),
     fabric: {
       rollNo: job.roll.rollNo,
       fabricName: job.roll.fabricName,
