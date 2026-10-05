@@ -1,13 +1,23 @@
 /**
  * Inventory, stock ledger and fabric rolls.
  *
- * Note what is NOT here: there is no POST that writes a stock movement, and no
- * PATCH that sets a balance. Stock moves only as a consequence of a document -
- * a GRN in, an issue out - through `postMovement()`. A ledger with a public
- * write endpoint is not a ledger, it is a spreadsheet with extra steps.
+ * Note what is NOT here: there is no PATCH that sets a balance, and no POST
+ * that writes an arbitrary stock movement. Stock moves only as a consequence
+ * of a document - a GRN in, an issue out - through `postMovement()`. A ledger
+ * with a public write endpoint is not a ledger, it is a spreadsheet with extra
+ * steps.
  *
- * The one write that touches balances is `/reconcile`, and it does not set them
- * either: it re-derives every one of them from the movements.
+ * Two endpoints are close enough to that line to be named:
+ *
+ *   /reconcile          touches balances but does not SET them: it re-derives
+ *                       every one of them from the movements.
+ *
+ *   /opening-stock      writes movements, once, for stock that was already on
+ *                       the rack when this system started. It is still a
+ *                       document - OPENING_BALANCE, numbered OB-0001 - and it
+ *                       refuses any item that already has one, so it cannot be
+ *                       used as a back door for adjusting a balance. The
+ *                       reasoning is in openingStock.service.js.
  */
 
 import { Router } from 'express';
@@ -25,6 +35,7 @@ import {
   rollListQuery,
   stockSummaryQuery,
   updateItemSchema,
+  openingStockSchema,
 } from '../validators/grn.validator.js';
 
 const router = Router();
@@ -58,6 +69,31 @@ router.post(
 );
 
 // --- Fabric rolls -----------------------------------------------------------
+
+/*
+ * OPENING STOCK - the one-time load of what was already here.
+ *
+ * Guarded by FABRIC_ROLL.CREATE, which is what it actually does: it creates
+ * rolls and the ledger entries that put them on hand. INVENTORY is a
+ * read-only module by design (see READ_ONLY in prisma/seed/data/rbac.js), so
+ * there is no INVENTORY.CREATE to ask for and inventing one would make the
+ * inventory module writable to say that stock may be loaded once.
+ *
+ * Before /rolls/:id, or Express reads "opening-stock" as a roll id.
+ */
+router.post(
+  '/opening-stock/preview',
+  can('FABRIC_ROLL.CREATE'),
+  validate({ body: openingStockSchema }),
+  c.previewOpeningStock,
+);
+
+router.post(
+  '/opening-stock',
+  can('FABRIC_ROLL.CREATE'),
+  validate({ body: openingStockSchema }),
+  c.applyOpeningStock,
+);
 
 router.get('/rolls', can('FABRIC_ROLL.VIEW'), validate({ query: rollListQuery }), c.listRolls);
 

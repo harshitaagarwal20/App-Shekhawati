@@ -1,0 +1,25 @@
+-- ===========================================================================
+--  OPENING BALANCE - the document type stock on hand at go-live arrives under
+-- ===========================================================================
+--
+--  Fabric can only enter this system through a GRN posted against a purchase
+--  order. That is right for everything the company buys from now on, and
+--  useless for the cloth already on the rack the day the system starts: there
+--  is no purchase order for it, and inventing one would put a receipt in the
+--  books against a vendor who never sent it, at a rate nobody paid.
+--
+--  So opening stock gets its own document type. A stock ledger row that says
+--  OPENING_BALANCE is honest about what it is - cloth that was already here -
+--  and is trivially separable from everything bought since, which matters the
+--  first time somebody reconciles purchases against consumption.
+--
+--  THIS MIGRATION ADDS THE ENUM VALUE AND NOTHING ELSE.
+--
+--  PostgreSQL will not let a transaction USE an enum value it added itself,
+--  and `document_sequences.document_type` IS this enum - so the counter row
+--  cannot be inserted here. It goes in the next migration, once this one has
+--  committed. Migrations 20260827000700 / 20260827001100 split CUTTING_CHALLAN
+--  the same way and for the same reason.
+-- ===========================================================================
+
+ALTER TYPE "DocumentType" ADD VALUE IF NOT EXISTS 'OPENING_BALANCE' AFTER 'INVENTORY_ITEM';

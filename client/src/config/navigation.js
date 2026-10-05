@@ -171,6 +171,18 @@ export const NAV_GROUPS = [
        * rather than to the store that would benefit from a looser limit.
        */
       { to: '/masters/excess-rules', label: 'Excess Rules', permission: 'MASTER_LIST.VIEW', hint: 'Allowed extra % limits' },
+      /*
+       * A SETUP ACTION, AND IT SITS WITH THE OTHER SETUP.
+       *
+       * Opening stock is loaded once, at go-live, and never again - the server
+       * refuses a second opening balance for the same fabric and colour. It
+       * does not belong in Stores beside the daily work, and it does not
+       * belong in the Inventory hub, which asks "what do you want to look at".
+       * This is the one place in the application that writes a stock movement
+       * without a document behind it, so it is kept where the other one-time
+       * setup lives and gated on the permission that actually creates rolls.
+       */
+      { to: '/masters/opening-stock', label: 'Opening Stock', permission: 'FABRIC_ROLL.CREATE', hint: 'What was already in the store at go-live' },
     ],
   },
   {

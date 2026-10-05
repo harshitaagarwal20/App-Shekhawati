@@ -307,6 +307,7 @@ export const documentSequences = [
   { documentType: 'CUTTING_CHALLAN', scopeKey: '', prefix: 'CC',  separator: '-', padLength: 4, nextNumber: 1, description: 'Cutting Challan - CC-0001 (migration 20260827001100)' },
   { documentType: 'MATERIAL_PLAN',   scopeKey: '', prefix: 'MP',  separator: '-', padLength: 4, nextNumber: 1, description: 'Material Plan - MP-0001 (migration 20260831000200)' },
   { documentType: 'GRN_REVERSAL',    scopeKey: '', prefix: 'GRV', separator: '-', padLength: 4, nextNumber: 1, description: 'GRN Reversal - GRV-0001 (migration 20260901000200)' },
+  { documentType: 'OPENING_BALANCE', scopeKey: '', prefix: 'OB',  separator: '-', padLength: 4, nextNumber: 1, description: 'Opening stock posting - OB-0001 (migration 20261005000200)' },
   // PO IDs run one counter per vendor: "Vendor initial + no" (PO sheet, row 3).
   { documentType: 'PURCHASE_ORDER',   scopeKey: 'RF', prefix: 'RF', separator: '-', padLength: 3, nextNumber: 5, description: 'PO - Rajasthan Fabrics' },
   { documentType: 'PURCHASE_ORDER',   scopeKey: 'MA', prefix: 'MA', separator: '-', padLength: 3, nextNumber: 4, description: 'PO - Metro Accessories' },

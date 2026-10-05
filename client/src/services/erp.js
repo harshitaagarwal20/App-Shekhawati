@@ -419,6 +419,20 @@ export const inventory = {
    */
   ledger: (params) => requestList({ method: 'GET', url: '/inventory/stock/ledger', params }),
 
+  /**
+   * Opening stock - the one-time load of what was already on the rack.
+   *
+   * The exception to the rule above, and the only one: stock that predates
+   * the system has no document to be a consequence of. `preview` writes
+   * nothing and reports what the file would do; `apply` posts the whole file
+   * in one transaction and refuses any item that already has an opening
+   * balance, so a double submit cannot double the inventory.
+   */
+  openingStockPreview: (rows) =>
+    request({ method: 'POST', url: '/inventory/opening-stock/preview', data: { rows } }),
+  openingStockApply: (rows) =>
+    request({ method: 'POST', url: '/inventory/opening-stock', data: { rows } }),
+
   /** Rebuilds the balance cache from the ledger; dryRun reports differences. */
   reconcile: (dryRun) =>
     request({ method: 'POST', url: '/inventory/stock/reconcile', params: { dryRun } }),

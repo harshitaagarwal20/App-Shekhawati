@@ -323,3 +323,44 @@ export const itemOptionsQuery = z.object({
     .optional()
     .transform((v) => v === 'true'),
 });
+
+/**
+ * OPENING STOCK - what was already on the rack when this system started.
+ *
+ * The office sheet carries three columns, so only three are required here:
+ * the fabric type (which is the sub-category a purchase order uses, 10OZ or
+ * 12OZ), the colour, and the quantity. Everything else has a default, because
+ * a required field somebody has to invent a value for is a field that gets a
+ * made-up value.
+ *
+ * `rate` is optional and defaults to zero. That is deliberate - see the note
+ * in openingStock.service.js: stock carried at no value is honest, and a rate
+ * invented to fill the box becomes the FIFO cost of the first issue.
+ */
+const openingStockRow = z.object({
+  /// The fabric weight - 10OZ, 12OZ. Named either way, as the sheet does.
+  subCategory: z.string().trim().min(1, 'Fabric type is required').max(60).optional(),
+  fabricType: z.string().trim().max(60).optional(),
+  colorCode: z.string().trim().max(60).optional(),
+  color: z.string().trim().max(60).optional(),
+  qty: decimal('Quantity', { min: 0, allowZero: false }),
+
+  itemCategory: z.string().trim().max(60).optional(),
+  gsm: z.string().trim().max(20).optional(),
+  content: z.string().trim().max(80).optional(),
+  count: z.string().trim().max(20).optional(),
+  width: decimal('Width', { min: 0 }).nullish(),
+  uom: z.string().trim().max(20).optional(),
+  rate: decimal('Rate', { min: 0 }).nullish(),
+  /// Left blank the roll is numbered from the FAB- series, as a receipt is.
+  rollNo: z.string().trim().max(40).optional(),
+  location: z.string().trim().max(80).optional(),
+  remarks: z.string().trim().max(2000).optional(),
+});
+
+export const openingStockSchema = z.object({
+  rows: z
+    .array(openingStockRow)
+    .min(1, 'Add at least one row')
+    .max(500, 'More than 500 rows at once - split the file'),
+});

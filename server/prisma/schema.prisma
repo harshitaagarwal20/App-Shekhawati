@@ -343,6 +343,13 @@ enum DocumentType {
   /// the same counter table as every other number, inside the GRN
   /// transaction, so a rolled-back receipt never burns an item code.
   INVENTORY_ITEM
+  /// Stock that was already on the rack when this system started. Fabric can
+  /// otherwise only enter through a GRN against a purchase order, which is
+  /// right for everything bought from now on and useless for what was already
+  /// here: there is no order for it, and inventing one would record a receipt
+  /// against a vendor who never sent it. A ledger row saying OPENING_BALANCE
+  /// is honest about what it is, and separable from everything bought since.
+  OPENING_BALANCE
   FABRIC_ISSUE
   DYE_ISSUE
   DYEING_RECEIPT

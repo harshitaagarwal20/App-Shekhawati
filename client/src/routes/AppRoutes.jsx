@@ -47,6 +47,7 @@ const GrnDetail = lazy(() => import('../pages/procurement/GrnDetail.jsx'));
 const GrnReversalDetail = lazy(() => import('../pages/procurement/GrnReversalDetail.jsx'));
 
 const InventoryHub = lazy(() => import('../pages/inventory/InventoryHub.jsx'));
+const OpeningStockPage = lazy(() => import('../pages/inventory/OpeningStockPage.jsx'));
 const StockSummary = lazy(() => import('../pages/inventory/StockSummary.jsx'));
 const StockLedgerPage = lazy(() => import('../pages/inventory/StockLedgerPage.jsx'));
 const RollList = lazy(() => import('../pages/inventory/RollList.jsx'));
@@ -257,6 +258,12 @@ export default function AppRoutes() {
           <Route
             path="/inventory/stock/ledger"
             element={guarded('STOCK_LEDGER.VIEW', <StockLedgerPage />)}
+          />
+          {/* One-time go-live load. Filed under Masters because it is setup,
+              not stores work - see the note in config/navigation.js. */}
+          <Route
+            path="/masters/opening-stock"
+            element={guarded('FABRIC_ROLL.CREATE', <OpeningStockPage />)}
           />
           <Route path="/inventory/rolls" element={guarded('FABRIC_ROLL.VIEW', <RollList />)} />
           <Route path="/inventory/rolls/:id" element={guarded('FABRIC_ROLL.VIEW', <RollDetail />)} />

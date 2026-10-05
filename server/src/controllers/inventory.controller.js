@@ -1,4 +1,5 @@
 import * as service from '../services/inventory.service.js';
+import * as openingStock from '../services/openingStock.service.js';
 import { asyncHandler, ok, okList, okListWithTotals, parseListQuery } from '../utils/http.js';
 
 const actor = (req) => req.auth.userId;
@@ -157,4 +158,25 @@ export const markRollShade = asyncHandler(async (req, res) =>
 
 export const relocateRoll = asyncHandler(async (req, res) =>
   ok(res, await service.relocateRoll(req.params.id, req.body, actor(req))),
+);
+
+// ---------------------------------------------------------------------------
+//  Opening stock
+// ---------------------------------------------------------------------------
+
+/** What the file would do, written nowhere. */
+export const previewOpeningStock = asyncHandler(async (req, res) =>
+  ok(res, await openingStock.preview(req.body.rows)),
+);
+
+/** Posts it. One transaction for the whole file - see the service. */
+export const applyOpeningStock = asyncHandler(async (req, res) =>
+  ok(
+    res,
+    await openingStock.apply(req.body.rows, {
+      userId: req.auth.userId,
+      fullName: req.auth.fullName ?? req.auth.username ?? null,
+    }),
+    201,
+  ),
 );
