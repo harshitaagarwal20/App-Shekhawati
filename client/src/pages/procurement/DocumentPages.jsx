@@ -21,6 +21,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { PurchaseOrderSheet } from '../print/DocumentPrint.jsx';
 import {
   grns as grnApi,
   orders as ordersApi,
@@ -527,91 +528,22 @@ export function PoDocumentPrint() {
   if (!p) return <Spinner label="Preparing..." />;
 
   /*
-    ONE PO PER STYLE IS THE NORM, SO SAY IT ONCE WHEN IT IS TRUE.
+    THE SAME SHEET THE SINGLE-ITEM PO PRINTS.
 
-    A document whose every line is for the same order and style names them in
-    the header and leaves the rows alone; repeating the same pair under each
-    of eight descriptions is noise on a page the mill has to read. The moment
-    the lines disagree - which is what a multi-line PO is for - the header
-    cannot speak for them and each row carries its own instead.
+    This page used to lay the document out itself, and so sent the mill a
+    different-looking purchase order depending on which form the office had
+    raised it on - accessories here, fabric on the other. The layout is now
+    imported from the print sheet both go through, and this page is only the
+    route and the two buttons.
   */
-  const orderNos = [...new Set(p.lines.map((l) => l.orderNo).filter(Boolean))];
-  const styleNos = [...new Set(p.lines.map((l) => l.styleNo).filter(Boolean))];
-  const perLine = orderNos.length > 1 || styleNos.length > 1;
-  const headOrderNo = p.header.orderNo ?? (orderNos.length === 1 ? orderNos[0] : null);
-  const headStyleNo = styleNos.length === 1 ? styleNos[0] : null;
   return (
-    <div className="doc-print">
-      <div className="no-print row" style={{ marginBottom: 12, gap: 8 }}>
+    <>
+      <div className="page-actions no-print" style={{ marginBottom: 16, display: 'flex', gap: 8 }}>
         <button type="button" className="btn" onClick={() => navigate(-1)}>Back</button>
         <button type="button" className="btn btn-primary" onClick={() => window.print()}>Print</button>
-        {!p.fullyApproved && <Alert kind="warning">Not every line is approved yet - this is a draft, not the vendor&apos;s copy.</Alert>}
       </div>
-      <div className="doc-sheet">
-        <div className="doc-head">
-          <div>
-            <h2 style={{ margin: 0 }}>{p.company.name}</h2>
-            <div className="muted">{p.company.address}</div>
-            {p.company.gstin && <div className="muted">GSTIN {p.company.gstin}</div>}
-          </div>
-          <div style={{ textAlign: 'right' }}>
-            <h2 style={{ margin: 0 }}>PURCHASE ORDER{p.fullyApproved ? '' : ' (DRAFT)'}</h2>
-            <div className="code">{p.header.poNo}</div>
-            <div>Date {fmtDate(p.header.poDate)}</div>
-            {p.header.deliveryDate && <div>Deliver by {fmtDate(p.header.deliveryDate)}</div>}
-          </div>
-        </div>
-        <div className="doc-parties">
-          <div>
-            <strong>To</strong>
-            <div>{p.vendor?.vendorName}</div>
-            <div className="muted" style={{ whiteSpace: 'pre-line' }}>{p.header.address ?? p.vendor?.address}</div>
-            {p.vendor?.gstNo && <div className="muted">GSTIN {p.vendor.gstNo}</div>}
-          </div>
-          <div>
-            {/* The order and style are printed by instruction - see the note in
-                PurchaseOrderBody. The buyer's name is still withheld. */}
-            {!perLine && headOrderNo && <div>Order No: {headOrderNo}</div>}
-            {!perLine && headStyleNo && <div>Style No: {headStyleNo}</div>}
-            {p.header.paymentTerms && <div>Payment: {p.header.paymentTerms}</div>}
-          </div>
-        </div>
-        <table className="data doc-lines">
-          <thead>
-            <tr><th>#</th><th>Description</th><th>HSN</th><th className="num">Qty</th><th>UOM</th><th className="num">Rate</th><th className="num">Amount</th></tr>
-          </thead>
-          <tbody>
-            {p.lines.map((l) => (
-              <tr key={l.poId}>
-                <td>{l.lineNo}</td>
-                <td>
-                  {describe(l)}{l.gsm ? ` · ${l.gsm}` : ''}
-                  {perLine && (l.orderNo || l.styleNo) && (
-                    <div className="muted">
-                      {[l.orderNo && `Order ${l.orderNo}`, l.styleNo && `Style ${l.styleNo}`]
-                        .filter(Boolean)
-                        .join(' · ')}
-                    </div>
-                  )}
-                  {l.remarks && <div className="muted" style={{ whiteSpace: 'pre-line' }}>{l.remarks}</div>}
-                </td>
-                <td>{l.hsnCode ?? ''}</td>
-                <td className="num">{qty(l.orderQty)}</td>
-                <td>{l.uom}</td>
-                <td className="num">{money(l.rate)}</td>
-                <td className="num">{money(l.amount)}</td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr><td colSpan={6} className="num"><strong>Total</strong></td><td className="num"><strong>{money(p.totalAmount)}</strong></td></tr>
-          </tfoot>
-        </table>
-        <p><strong>Amount in words:</strong> {p.amountInWords}</p>
-        {p.header.remarks && <p className="muted" style={{ whiteSpace: 'pre-line' }}><strong>Remarks:</strong> {p.header.remarks}</p>}
-        <div className="doc-sign"><div>Prepared by</div><div>Authorised signatory</div></div>
-      </div>
-    </div>
+      <PurchaseOrderSheet doc={p} />
+    </>
   );
 }
 

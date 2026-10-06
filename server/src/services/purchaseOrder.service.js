@@ -887,10 +887,26 @@ function project(po) {
 //  QUERIES
 // ===========================================================================
 
+/**
+ * Lines of one style, counting the style a line inherits from its buyer order.
+ *
+ * A line names its own style only sometimes; the rest of the time the style is
+ * the buyer order's, which is what the registers and the printed PO already
+ * display. Filtering has to follow the same precedence or the filter would hide
+ * rows that visibly carry the style it was given.
+ *
+ * Wrapped in `AND` rather than spread as a bare `OR`, because `searchFilter`
+ * also returns an `OR` and the later spread would silently replace this one.
+ */
+function styleFilter(styleId) {
+  if (!styleId) return {};
+  return { AND: [{ OR: [{ styleId }, { styleId: null, order: { styleId } }] }] };
+}
+
 export async function list(query) {
   const {
     page, pageSize, skip, take, orderBy, search, includeDeleted,
-    approvalStatus, status, vendorId, orderId, quotationId, containerNo, item, orderMode,
+    approvalStatus, status, vendorId, orderId, styleId, quotationId, containerNo, item, orderMode,
     uom, dateFrom, dateTo, pendingReceipt, headerId,
   } = query;
 
@@ -901,6 +917,7 @@ export async function list(query) {
     ...(status ? { status } : {}),
     ...(vendorId ? { vendorId } : {}),
     ...(orderId ? { orderId } : {}),
+    ...styleFilter(styleId),
     ...(quotationId ? { quotationId } : {}),
     ...(containerNo ? { containerNo } : {}),
     ...(item ? { item } : {}),
@@ -943,7 +960,7 @@ export const DOCUMENT_SORTABLE = ['poNo', 'poDate', 'createdAt'];
 export async function listDocuments(query) {
   const {
     page, pageSize, skip, take, orderBy, search, includeDeleted,
-    approvalStatus, status, vendorId, orderId, quotationId, containerNo, item, orderMode,
+    approvalStatus, status, vendorId, orderId, styleId, quotationId, containerNo, item, orderMode,
     uom, dateFrom, dateTo, pendingReceipt,
   } = query;
 
@@ -952,6 +969,7 @@ export async function listDocuments(query) {
     ...(approvalStatus ? { approvalStatus } : {}),
     ...(status ? { status } : {}),
     ...(orderId ? { orderId } : {}),
+    ...styleFilter(styleId),
     ...(quotationId ? { quotationId } : {}),
     ...(containerNo ? { containerNo } : {}),
     ...(item ? { item } : {}),
@@ -992,7 +1010,7 @@ export async function listDocuments(query) {
             id: true, poId: true, lineNo: true, item: true, subCategory: true,
             accessoriesItem: true, accessoryType: true, uom: true, orderQty: true,
             receivedQty: true, rate: true, amount: true, status: true, approvalStatus: true,
-            workflowState: true, orderId: true, containerNo: true,
+            workflowState: true, orderId: true, styleId: true, containerNo: true,
           },
         },
       },
@@ -1002,9 +1020,21 @@ export async function listDocuments(query) {
 
   const orderIds = [...new Set(headers.flatMap((h) => [h.orderId, ...h.lines.map((l) => l.orderId)]).filter(Boolean))];
   const orders = orderIds.length
-    ? await prisma.buyerOrder.findMany({ where: { id: { in: orderIds } }, select: { id: true, orderNo: true } })
+    ? await prisma.buyerOrder.findMany({
+        where: { id: { in: orderIds } },
+        select: { id: true, orderNo: true, style: { select: { styleNo: true } } },
+      })
     : [];
   const orderNo = new Map(orders.map((o) => [o.id, o.orderNo]));
+  /** The style a line shows when it does not name one of its own. */
+  const orderStyleNo = new Map(orders.map((o) => [o.id, o.style?.styleNo ?? null]));
+
+  // Read only the styles a line named itself; the rest came back with the order.
+  const ownStyleIds = [...new Set(headers.flatMap((h) => h.lines.map((l) => l.styleId)).filter(Boolean))];
+  const ownStyles = ownStyleIds.length
+    ? await prisma.style.findMany({ where: { id: { in: ownStyleIds } }, select: { id: true, styleNo: true } })
+    : [];
+  const styleNo = new Map(ownStyles.map((s) => [s.id, s.styleNo]));
 
   const rows = headers.map((h) => {
     const live = h.lines.filter((l) => l.approvalStatus !== 'REJECTED' && l.status !== 'CANCELLED');
@@ -1027,6 +1057,13 @@ export async function listDocuments(query) {
       orderQty: uoms.length === 1 ? sum('orderQty') : null,
       receivedQty: uoms.length === 1 ? sum('receivedQty') : null,
       orderNos: [...new Set([h.orderId, ...h.lines.map((l) => l.orderId)].filter(Boolean).map((id) => orderNo.get(id)).filter(Boolean))],
+      /** Each line's own style where it has one, otherwise its buyer order's. */
+      styleNos: [...new Set(
+        [
+          orderStyleNo.get(h.orderId),
+          ...h.lines.map((l) => (l.styleId ? styleNo.get(l.styleId) : orderStyleNo.get(l.orderId))),
+        ].filter(Boolean),
+      )],
       /** The container(s) this document buys for - the header's, and any a line overrode. */
       containerNos: [...new Set([h.containerNo, ...h.lines.map((l) => l.containerNo)].filter(Boolean))],
       approvalStatus: documentStatus(h.lines.map((l) => ({ status: l.status === 'CANCELLED' ? 'CANCELLED' : l.approvalStatus }))),
@@ -1579,22 +1616,61 @@ export async function rejectDocument(headerId, { reason }, actor) {
   return getDocument(headerId);
 }
 
-/** The whole document as the vendor receives it - every live line. */
+/**
+ * The whole document as the vendor receives it - every live line.
+ *
+ * ---------------------------------------------------------------------------
+ *  THE SAME CONTRACT AS `printView`, WITH `lines` WHERE THAT HAS `line`
+ *
+ *  The office raises accessories on the multi-line form and fabric on the
+ *  single one, so these two payloads feed what the mill reads as "the purchase
+ *  order" - and they used to print as two different documents: this one had no
+ *  ship-to block, no terms and no approval line. A vendor cannot be expected to
+ *  know that the sheet without the terms is bound by the same ones.
+ *
+ *  So this returns the shape `printView` returns, and both are rendered by one
+ *  template. A field added to the PO sheet now appears on both or neither.
+ * ---------------------------------------------------------------------------
+ */
 export async function printDocument(headerId) {
   const doc = await getDocument(headerId);
   const lines = doc.lines.filter((l) => l.approvalStatus !== 'REJECTED' && l.status !== 'CANCELLED');
   const total = lines.reduce((a, l) => a.plus(D(l.amount)), ZERO);
+  /** One PO per style is the norm: the header speaks for the lines when they agree. */
+  const orderNos = [...new Set(lines.map((l) => l.order?.orderNo).filter(Boolean))];
+  const styleNos = [...new Set(lines.map((l) => l.style?.styleNo ?? l.order?.style?.styleNo).filter(Boolean))];
+  /**
+   * The container is the one reference a multi-line PO genuinely splits on:
+   * the office buys cloth for one shipment and trims for the next on a single
+   * sheet, which is why the line carries its own column at all. So it is
+   * counted separately from the order and the style - lines that disagree on
+   * the container must not push the order number down into the rows with it.
+   */
+  const containerNos = [...new Set(lines.map((l) => l.containerNo).filter(Boolean))];
+  const fullyApproved = lines.length > 0 && lines.every((l) => l.approvalStatus === 'APPROVED');
   return {
-    header: {
-      poNo: doc.poNo,
-      poDate: doc.poDate,
-      deliveryDate: doc.deliveryDate,
-      paymentTerms: doc.paymentTerms,
-      remarks: doc.remarks,
-      address: doc.address,
-      orderNo: doc.order?.orderNo ?? null,
+    documentTitle: 'PURCHASE ORDER',
+    poId: doc.poNo,
+    poDate: doc.poDate,
+    deliveryDate: doc.deliveryDate,
+    paymentTerms: doc.paymentTerms,
+    /** A PO that has not been approved must not print as though it had been. */
+    printable: fullyApproved,
+    printWarning: fullyApproved
+      ? null
+      : 'Not every line on this purchase order is approved. It is a draft, not an '
+        + 'instruction to a vendor.',
+    vendor: {
+      name: doc.vendor.vendorName,
+      code: doc.vendor.vendorCode,
+      /** The address as it stood when the PO was raised, not as it stands now. */
+      address: doc.address ?? doc.vendor.address ?? null,
+      pinCode: doc.vendor.pinCode,
+      gstNo: doc.vendor.gstNo,
+      contactPerson: doc.vendor.contactPerson,
+      phone: doc.vendor.phone,
+      email: doc.vendor.email,
     },
-    vendor: doc.vendor,
     lines: lines.map((l) => ({
       lineNo: l.lineNo,
       poId: l.poId,
@@ -1611,22 +1687,60 @@ export async function printDocument(headerId) {
       orderQty: l.orderQty,
       rate: l.rate,
       amount: l.amount,
+      /**
+       * Composed here, by the same expression the single-PO sheet uses, so the
+       * two sheets describe the same goods in the same words. The office raises
+       * accessories on this form and fabric on the other; a description that
+       * differed between them would read as a difference in the goods.
+       */
+      description: [l.item, l.subCategory, l.accessoriesItem, l.accessoryType,
+        l.size ? `Size ${l.size}` : null, l.content, l.gsm, l.count, l.colorCode]
+        .filter(Boolean)
+        .join(' / '),
+      excessAllowedPct: D(l.excessAllowed).mul(100).toFixed(2),
       approvalStatus: l.approvalStatus,
+      approvedByName: l.approvedByName,
+      approvedAt: l.approvedAt,
       orderNo: l.order?.orderNo ?? null,
       /** A line may name its own style; otherwise it is the buyer order's. */
       styleNo: l.style?.styleNo ?? l.order?.style?.styleNo ?? null,
+      containerNo: l.containerNo ?? null,
       // Single-form POs keep their remarks on the line, not the header.
       remarks: l.remarks && l.remarks !== doc.remarks ? l.remarks : null,
     })),
-    totalAmount: total.toFixed(2),
-    amountInWords: amountInWords(total),
-    /** Printable as the vendor's copy only once every line on it is approved. */
-    fullyApproved: lines.length > 0 && lines.every((l) => l.approvalStatus === 'APPROVED'),
+    totals: {
+      amount: total.toFixed(2),
+      amountInWords: amountInWords(total),
+    },
+    /**
+     * The header speaks for the lines only where they agree. A multi-line PO
+     * whose lines name different orders or styles cannot be summed up in one
+     * heading, so the template prints each row's own instead.
+     */
+    references: {
+      orderNo: doc.order?.orderNo ?? (orderNos.length === 1 ? orderNos[0] : null),
+      styleNo: styleNos.length === 1 ? styleNos[0] : null,
+      containerNo: doc.containerNo ?? (containerNos.length === 1 ? containerNos[0] : null),
+      perLine: orderNos.length > 1 || styleNos.length > 1,
+      containerPerLine: containerNos.length > 1,
+    },
+    /**
+     * A document is approved when every line on it is. The names are the one
+     * line's where there is only one; several approvers cannot sign as one.
+     */
+    approval: {
+      status: fullyApproved ? 'APPROVED' : 'PENDING',
+      approvedByName: lines.length === 1 ? lines[0].approvedByName : null,
+      approvedAt: lines.length === 1 ? lines[0].approvedAt : null,
+      rejectionReason: null,
+    },
+    remarks: doc.remarks,
     company: {
       name: env.COMPANY_NAME,
       address: env.COMPANY_ADDRESS,
       gstin: env.COMPANY_GSTIN,
     },
+    printedAt: new Date().toISOString(),
   };
 }
 
@@ -2309,6 +2423,8 @@ export async function printView(id) {
       orderNo: po.order?.orderNo ?? null,
       buyerName: po.order?.buyer?.buyerName ?? null,
       styleNo: po.style?.styleNo ?? po.order?.style?.styleNo ?? null,
+      /** One line, so one container: it never has to drop into the row. */
+      containerNo: po.containerNo ?? null,
       quotationNo: po.quotation?.quotationNo ?? null,
       chain: traceability(po).chain,
     },

@@ -28,6 +28,8 @@ export const poListQuery = listQuery.extend({
   status: statusGeneral.optional(),
   vendorId: uuid.optional(),
   orderId: uuid.optional(),
+  /// The line's own style, or the one it inherits from its buyer order.
+  styleId: uuid.optional(),
   quotationId: uuid.optional(),
   /// Exact match, as on the planning lists - "what else is on this container".
   containerNo: z.string().trim().max(40).optional(),

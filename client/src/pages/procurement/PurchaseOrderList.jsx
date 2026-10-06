@@ -17,6 +17,7 @@ import { useOptionalColumns } from '../../hooks/useOptionalColumns.js';
 import {
   orders as ordersApi,
   purchaseOrders as poApi,
+  styles as stylesApi,
   vendors as vendorsApi,
 } from '../../services/erp.js';
 import {
@@ -76,6 +77,7 @@ const COLUMNS = [
   { key: 'amount', label: 'Amount' },
   { key: 'received', label: 'Received', optional: true },
   { key: 'orderNo', label: 'Order No', optional: true },
+  { key: 'styleNo', label: 'Style No', optional: true },
   { key: 'containerNo', label: 'Container', optional: true },
   { key: 'workflow', label: 'Approval', optional: true },
   { key: 'status', label: 'Status' },
@@ -94,12 +96,14 @@ export default function PurchaseOrderList() {
       status: '',
       vendorId: '',
       orderId: '',
+      styleId: '',
       orderMode: '',
     },
   });
 
   const [vendorOptions, setVendorOptions] = useState([]);
   const [orderOptions, setOrderOptions] = useState([]);
+  const [styleOptions, setStyleOptions] = useState([]);
   const [creating, setCreating] = useState(false);
   const [banner, setBanner] = useState(null);
 
@@ -108,6 +112,7 @@ export default function PurchaseOrderList() {
   useEffect(() => {
     vendorsApi.options().then(setVendorOptions).catch(loadFailed(setVendorOptions, 'vendors'));
     ordersApi.options().then(setOrderOptions).catch(loadFailed(setOrderOptions, 'orders'));
+    stylesApi.options().then(setStyleOptions).catch(loadFailed(setStyleOptions, 'styles'));
   }, []);
 
   return (
@@ -185,6 +190,17 @@ export default function PurchaseOrderList() {
             />
           </Field>
 
+          <Field label="Style" htmlFor="po-f-style">
+            <RecordSelect
+              id="po-f-style"
+              options={styleOptions}
+              getLabel={(s) => s.styleNo}
+              placeholder="All styles"
+              value={list.filters.styleId ?? ''}
+              onChange={(e) => list.setFilter('styleId', e.target.value)}
+            />
+          </Field>
+
           <Field label="Status" htmlFor="po-f-status">
             <EnumSelect
               id="po-f-status"
@@ -220,6 +236,7 @@ export default function PurchaseOrderList() {
                 <th className="num">Amount</th>
                 {cols.show('received') && <th className="num">Received</th>}
                 {cols.show('orderNo') && <th>Order No</th>}
+                {cols.show('styleNo') && <th>Style No</th>}
                 {cols.show('containerNo') && <th>Container</th>}
                 {cols.show('workflow') && <th>Approval</th>}
                 <th>Status</th>
@@ -284,6 +301,7 @@ export default function PurchaseOrderList() {
                       <td className="num">{doc.receivedQty == null ? '-' : fmtNum(doc.receivedQty)}</td>
                     )}
                     {cols.show('orderNo') && <td className="code">{doc.orderNos.length ? doc.orderNos.join(', ') : '-'}</td>}
+                    {cols.show('styleNo') && <td className="code">{doc.styleNos?.length ? doc.styleNos.join(', ') : '-'}</td>}
                     {/* A document may buy for more than one container, exactly as
                         it may buy for more than one order - both are listed. */}
                     {cols.show('containerNo') && (

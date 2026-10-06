@@ -300,6 +300,24 @@ function PoMeta({ label, value }) {
 }
 
 /**
+ * The references a PO row has to state for itself, as one line of small type.
+ *
+ * A reference drops into the row only when the lines disagree about it, and
+ * the order/style pair is judged separately from the container: a sheet that
+ * buys for two shipments against one style still names that style once in the
+ * header.
+ */
+function PoRowReferences({ line, perLine, containerPerLine }) {
+  const parts = [
+    perLine && line.orderNo && `Order ${line.orderNo}`,
+    perLine && line.styleNo && `Style ${line.styleNo}`,
+    containerPerLine && line.containerNo && `Container ${line.containerNo}`,
+  ].filter(Boolean);
+  if (!parts.length) return null;
+  return <div className="po-item-note">{parts.join(' · ')}</div>;
+}
+
+/**
  * THE PURCHASE ORDER, IN THE FORM A VENDOR EXPECTS TO RECEIVE IT.
  *
  * The gate pass and the GRN are internal - a guard or a store keeper reads
@@ -316,9 +334,23 @@ function PoMeta({ label, value }) {
  * because that is what the format is and what a second line would need.
  */
 function PurchaseOrderBody({ doc }) {
-  const { line, totals, approval } = doc;
+  const { totals, approval } = doc;
   const company = companyOf(doc);
-  const excess = Number(line.excessAllowedPct) > 0 ? line.excessAllowedPct : null;
+  /**
+   * One sheet, whether the PO carries one line or eight.
+   *
+   * The single-item form sends `line` and the multi-item form sends `lines`;
+   * accessories are raised on the second and fabric on the first, which is the
+   * only reason they ever printed differently. They do not any more.
+   */
+  const lines = doc.lines ?? [doc.line];
+  /** Stated in the terms only when every line is held to the same figure. */
+  const excesses = [...new Set(lines.map((l) => l.excessAllowedPct))];
+  const excess = excesses.length === 1 && Number(excesses[0]) > 0 ? excesses[0] : null;
+  /** When the lines disagree on order or style, each row names its own. */
+  const perLine = doc.references?.perLine ?? false;
+  /** Likewise for the container, which a multi-line PO splits on by design. */
+  const containerPerLine = doc.references?.containerPerLine ?? false;
 
   return (
     <>
@@ -362,8 +394,14 @@ function PurchaseOrderBody({ doc }) {
           delivery. The buyer's NAME is still withheld - the style and our own
           order number identify the job without identifying the customer.
         */}
-        <PoMeta label="Order No" value={doc.references?.orderNo} />
-        <PoMeta label="Style No" value={doc.references?.styleNo} />
+        <PoMeta label="Order No" value={perLine ? null : doc.references?.orderNo} />
+        <PoMeta label="Style No" value={perLine ? null : doc.references?.styleNo} />
+        {/* The shipment the goods are bought for. The vendor marks it on the
+            packing list, which is how a delivery weeks later is matched back
+            to the container it was ordered against. */}
+        <PoMeta label="Container No" value={containerPerLine ? null : doc.references?.containerNo} />
+        <PoMeta label="Deliver by" value={doc.deliveryDate ? fmtDate(doc.deliveryDate) : null} />
+        <PoMeta label="Payment" value={doc.paymentTerms} />
       </div>
 
       <table className="print-table po-items">
@@ -379,22 +417,29 @@ function PurchaseOrderBody({ doc }) {
           </tr>
         </thead>
         <tbody>
-          <tr>
-            <td className="po-sr">1</td>
-            <td>
-              <strong>{line.description}</strong>
-              {excess && (
-                <div className="po-item-note">
-                  Excess permitted on this order: {excess}%
-                </div>
-              )}
-            </td>
-            <td>{line.hsnCode ?? '-'}</td>
-            <td>{line.uom}</td>
-            <td className="num">{fmtNum(line.orderQty, { decimals: 4 })}</td>
-            <td className="num">{fmtNum(line.rate, { decimals: 4 })}</td>
-            <td className="num">{fmtMoney(line.amount)}</td>
-          </tr>
+          {lines.map((line, i) => (
+            <tr key={line.poId ?? i}>
+              <td className="po-sr">{i + 1}</td>
+              <td>
+                <strong>{line.description}</strong>
+                <PoRowReferences line={line} perLine={perLine} containerPerLine={containerPerLine} />
+                {/* Only where it is not already stated once in the terms. */}
+                {!excess && Number(line.excessAllowedPct) > 0 && (
+                  <div className="po-item-note">
+                    Excess permitted on this line: {line.excessAllowedPct}%
+                  </div>
+                )}
+                {line.remarks && (
+                  <div className="po-item-note" style={{ whiteSpace: 'pre-line' }}>{line.remarks}</div>
+                )}
+              </td>
+              <td>{line.hsnCode ?? '-'}</td>
+              <td>{line.uom}</td>
+              <td className="num">{fmtNum(line.orderQty, { decimals: 4 })}</td>
+              <td className="num">{fmtNum(line.rate, { decimals: 4 })}</td>
+              <td className="num">{fmtMoney(line.amount)}</td>
+            </tr>
+          ))}
         </tbody>
       </table>
 
@@ -439,6 +484,27 @@ function PurchaseOrderBody({ doc }) {
         <div className="po-approval">Rejected: {approval.rejectionReason}</div>
       )}
     </>
+  );
+}
+
+/**
+ * The purchase order sheet on its own, for the multi-item document route.
+ *
+ * The same header, body and signatures this file's page renders for a
+ * single-item PO - imported rather than copied, so the sheet the mill gets for
+ * accessories cannot drift back into being a different document from the one
+ * it gets for fabric.
+ */
+export function PurchaseOrderSheet({ doc }) {
+  return (
+    <article className="print-sheet">
+      <Header doc={doc} />
+      {doc.printable === false && doc.printWarning && (
+        <div className="print-draft-watermark">DRAFT — {doc.printWarning}</div>
+      )}
+      <PurchaseOrderBody doc={doc} />
+      <Signatures names={doc.signatures ?? ['Prepared By', 'Checked By', 'Authorised By']} />
+    </article>
   );
 }
 
