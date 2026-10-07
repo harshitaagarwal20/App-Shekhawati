@@ -332,10 +332,11 @@ export const grns = {
    */
   create: (body) => request({ method: 'POST', url: '/grns', data: body }),
   /**
-   * The register: ONE ROW PER RECEIPT DOCUMENT. A delivery that received three
-   * PO lines is one entry here, where `list` reads it as three. Same filters.
+   * The register: ONE ROW PER PURCHASE ORDER, with its receipts inside it. An
+   * order delivered on three vendor bills reads as one entry here, where
+   * `list` reads it as three. Same filters.
    */
-  listDocuments: (params) => requestList({ method: 'GET', url: '/grns/documents', params }),
+  listByPurchaseOrder: (params) => requestList({ method: 'GET', url: '/grns/by-purchase-order', params }),
   /** Multi-line: one delivery, one bill, several PO lines. */
   createDocument: (body) => request({ method: 'POST', url: '/grns/documents', data: body }),
   getDocument: (id) => request({ method: 'GET', url: `/grns/documents/${id}` }),

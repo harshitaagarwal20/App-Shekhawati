@@ -1,15 +1,22 @@
 /**
- * GRN list. Sheet: "GRN".
+ * Goods Receipt register. Sheet: "GRN".
  *
- * ONE ROW PER RECEIPT DOCUMENT - a delivery that received three lines of the
- * same purchase order is one entry, not three. The lines are GRN-001,
- * GRN-001/2, GRN-001/3; they share a lorry, a vendor bill and a GRN number,
- * and they are listed on the document page.
+ * ONE ROW PER PURCHASE ORDER, not per receipt.
  *
- * The footer totals come from the server with the page - quantity and value
- * for the whole filtered set, not just the rows on screen, and not summed
- * here. They stay LINE-level on purpose: filter to one item and the footer
- * totals that item, not the whole deliveries it arrived in.
+ * An order is delivered in instalments, and each instalment is necessarily its
+ * own receipt document: the vendor's bill number lives on the GRN header, and
+ * one bill may be receipted against one PO exactly once. So SSO-001 arriving on
+ * bill 354 and again on bill 355 is two GRNs by construction - and read one per
+ * row, the register could not answer the question it is opened to answer, which
+ * is how much of SSO-001 has actually turned up.
+ *
+ * Here the order is the row and the cumulative figure is the headline. Its
+ * receipts are still every one of them there, one line each, when the row is
+ * opened - with their own GRN numbers, bills, dates and quantities.
+ *
+ * The footer totals come from the server with the page - they add up RECEIPTS
+ * across the whole filtered set, not just the rows on screen, and not summed
+ * here.
  */
 
 import { useEffect, useState } from 'react';
@@ -50,37 +57,33 @@ const PURPOSE_OPTIONS = [
 /**
  * What this register can show, and what it shows unasked.
  *
- * Stores open Goods Received to find a receipt: whose it was, what came in,
- * how much, and whether it has been posted. The commercial detail - ordered
- * quantity, rate, amount, variation against the order - is what accounts and
- * the buyer check on one receipt, so it is optional here rather than absent.
- * A receipt over tolerance still paints its whole row, with or without the
- * Variation column showing.
+ * Stores open Goods Received to ask what has arrived against an order: whose it
+ * was, what it was, how much was ordered and how much is actually in. The
+ * commercial detail - value, variation against the order - is what accounts and
+ * the buyer check, so it is optional here rather than absent.
  *
- * Rate and Variation belong to a LINE, not to a delivery: a three-line receipt
- * has three of each, and averaging them would invent a figure the system does
- * not hold. They show for a single-line receipt and say "per line" otherwise,
- * which is the document page's cue.
+ * There is no Rate column any more and no single Bill No: an order delivered on
+ * three bills has three of each, and averaging them would invent a figure the
+ * system does not hold. Both live on the receipt lines inside the row.
  */
 const COLUMNS = [
-  { key: 'grnNo', label: 'GRN No' },
-  { key: 'date', label: 'Date' },
-  { key: 'poId', label: 'PO No', optional: true },
-  { key: 'billNo', label: 'Bill No', optional: true },
+  { key: 'poNo', label: 'PO No' },
+  { key: 'lastReceipt', label: 'Last Receipt' },
+  { key: 'poDate', label: 'PO Date', optional: true },
+  { key: 'container', label: 'Container', optional: true },
   { key: 'vendor', label: 'Vendor' },
   { key: 'item', label: 'Item' },
   { key: 'uom', label: 'UOM', optional: true },
   { key: 'orderQty', label: 'Order Qty' },
-  { key: 'receivingQty', label: 'Receiving Qty' },
-  { key: 'rate', label: 'Rate', optional: true },
+  { key: 'receivedQty', label: 'Received' },
+  { key: 'receipts', label: 'Receipts' },
   { key: 'amount', label: 'Amount', optional: true },
-  { key: 'variation', label: 'Variation', optional: true },
-  { key: 'posted', label: 'Posted' },
+  { key: 'status', label: 'Status' },
 ];
 
-/** How a line reads in the Item column - what distinguishes it from a sibling. */
+/** What distinguishes one PO line from its siblings in the Item column. */
 const describeLine = (l) =>
-  [l.purchaseOrder?.subCategory, l.purchaseOrder?.accessoriesItem, l.purchaseOrder?.accessoryType]
+  [l.subCategory, l.accessoriesItem, l.accessoryType, l.colorCode]
     .filter(Boolean)
     .join(' · ');
 
@@ -90,8 +93,8 @@ export default function GrnList() {
 
   const cols = useOptionalColumns('grns', COLUMNS);
 
-  const list = useResourceList((params) => grnApi.listDocuments(params), {
-    defaultSort: 'grnDate',
+  const list = useResourceList((params) => grnApi.listByPurchaseOrder(params), {
+    defaultSort: 'poDate',
     defaultDir: 'desc',
     initialFilters: {
       purpose: '',
@@ -104,22 +107,29 @@ export default function GrnList() {
   const [vendorOptions, setVendorOptions] = useState([]);
   const [creating, setCreating] = useState(false);
   const [banner, setBanner] = useState(null);
+  /** Which orders are opened to show their receipts. Ids, not indexes. */
+  const [opened, setOpened] = useState(() => new Set());
+
+  const toggle = (id) =>
+    setOpened((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   const canCreate = can('GRN.CREATE');
   const totals = list.meta?.totals;
 
   /*
-   * Where the footer's figures sit, counted rather than written as literals.
-   *
-   * The label runs up to the column before Receiving Qty, the quantity and the
-   * amount sit under their own columns, and whatever is left is spanned. With
-   * columns that come and go, a hard-coded colSpan here is wrong the moment
-   * somebody hides one - which is what the Rate column did to the old `8`.
+   * Where the footer's figures sit, counted rather than written as literals -
+   * with columns that come and go, a hard-coded colSpan is wrong the moment
+   * somebody hides one. The chevron cell is the +1.
    */
   const span = (...keys) => keys.filter((k) => cols.show(k)).length;
-  const footLabelSpan = span('grnNo', 'date', 'poId', 'billNo', 'vendor', 'item', 'uom', 'orderQty');
-  // Variation, Posted, and the column menu's own header cell.
-  const footTailSpan = span('variation', 'posted') + 1;
+  const footLabelSpan =
+    span('poNo', 'lastReceipt', 'poDate', 'container', 'vendor', 'item', 'uom', 'orderQty') + 1;
+  const footTailSpan = span('receipts', 'status') + 1;
 
   useEffect(() => {
     vendorsApi.options().then(setVendorOptions).catch(loadFailed(setVendorOptions, 'vendors'));
@@ -131,19 +141,15 @@ export default function GrnList() {
         title="Goods Receipt Notes"
         actions={
           <>
-            <ExportButton
-              dataset="grns"
-              params={list.query}
-              rowCount={list.meta.total}
-            />
+            <ExportButton dataset="grns" params={list.query} rowCount={list.meta.total} />
             {canCreate && (
               <>
-              <button type="button" className="btn" onClick={() => navigate('/grns/new-document')}>
-                Receive several PO lines
-              </button>
-              <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
-                Post a receipt
-              </button>
+                <button type="button" className="btn" onClick={() => navigate('/grns/new-document')}>
+                  Receive several PO lines
+                </button>
+                <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
+                  Post a receipt
+                </button>
               </>
             )}
           </>
@@ -208,28 +214,30 @@ export default function GrnList() {
           <table className="data">
             <thead>
               <tr>
-                <SortableTh field="grnNo" label="GRN No" sortBy={list.sortBy} sortDir={list.sortDir} onSort={list.toggleSort} />
-                <SortableTh field="grnDate" label="Date" sortBy={list.sortBy} sortDir={list.sortDir} onSort={list.toggleSort} />
-                {cols.show('poId') && <th>PO No</th>}
-                {cols.show('billNo') && <SortableTh field="billNo" label="Bill No" sortBy={list.sortBy} sortDir={list.sortDir} onSort={list.toggleSort} />}
+                <th style={{ width: 28 }} />
+                <SortableTh field="poNo" label="PO No" sortBy={list.sortBy} sortDir={list.sortDir} onSort={list.toggleSort} />
+                <th>Last Receipt</th>
+                {cols.show('poDate') && (
+                  <SortableTh field="poDate" label="PO Date" sortBy={list.sortBy} sortDir={list.sortDir} onSort={list.toggleSort} />
+                )}
+                {cols.show('container') && <th>Container</th>}
                 <th>Vendor</th>
                 <th>Item</th>
                 {cols.show('uom') && <th>UOM</th>}
-                {/* Not sortable: these are sums over a document's lines, and
-                    the database orders the HEADERS this register pages. */}
+                {/* Not sortable: these are sums over an order's receipts, and
+                    the database orders the PURCHASE ORDERS this register pages. */}
                 <th className="num">Order Qty</th>
-                <th className="num">Receiving Qty</th>
-                {cols.show('rate') && <th className="num">Rate</th>}
+                <th className="num">Received</th>
+                <th className="num">Receipts</th>
                 {cols.show('amount') && <th className="num">Amount</th>}
-                {cols.show('variation') && <th className="num">Variation</th>}
-                <th>Posted</th>
+                <th>Status</th>
                 <ColumnMenu {...cols} />
               </tr>
             </thead>
             <tbody>
               {list.loading && (
                 <tr>
-                  <td colSpan={cols.colSpan} className="loading-row">
+                  <td colSpan={cols.colSpan + 1} className="loading-row">
                     <Spinner label="Loading receipts..." />
                   </td>
                 </tr>
@@ -237,7 +245,7 @@ export default function GrnList() {
 
               {!list.loading && list.rows.length === 0 && (
                 <tr>
-                  <td colSpan={cols.colSpan}>
+                  <td colSpan={cols.colSpan + 1}>
                     <EmptyState
                       title="No receipts found"
                       message={list.search ? 'Try clearing the search or filters.' : undefined}
@@ -247,78 +255,134 @@ export default function GrnList() {
               )}
 
               {!list.loading &&
-                list.rows.map((doc) => {
-                  const [first] = doc.lines;
-                  const more = doc.lineCount - 1;
-                  // Rate and variation are a line's own; a one-line receipt has
-                  // exactly one of each, and nothing else does.
-                  const single = doc.lineCount === 1 ? first : null;
-                  return (
+                list.rows.map((po) => {
+                  const [first] = po.lines;
+                  const more = po.lineCount - 1;
+                  const isOpen = opened.has(po.id);
+                  return [
                     <tr
-                      key={doc.id}
-                      onClick={() => navigate(`/grns/documents/${doc.id}`)}
-                      className={`clickable ${doc.toleranceBreached ? 'row-warn' : ''} ${doc.reversed ? 'inactive' : ''}`}
+                      key={po.id}
+                      onClick={() => toggle(po.id)}
+                      className={`clickable ${po.toleranceBreached ? 'row-warn' : ''} ${po.reversed ? 'inactive' : ''}`}
                     >
-                      <td className="code">{doc.grnNo}</td>
-                      <td className="nowrap">{fmtDate(doc.grnDate)}</td>
-                      {/* A delivery may answer more than one purchase order. */}
-                      {cols.show('poId') && (
-                        <td className="code">{doc.poNos?.length ? doc.poNos.join(', ') : '-'}</td>
-                      )}
-                      {cols.show('billNo') && <td>{doc.billNo}</td>}
-                      <td>{doc.vendor?.vendorName ?? '-'}</td>
+                      <td className="faint" style={{ textAlign: 'center' }}>
+                        {isOpen ? '▾' : '▸'}
+                      </td>
+                      <td className="code">{po.poNo}</td>
+                      <td className="nowrap">{fmtDate(po.lastReceiptDate)}</td>
+                      {cols.show('poDate') && <td className="nowrap">{fmtDate(po.poDate)}</td>}
+                      {cols.show('container') && <td className="code">{po.containerNo ?? '-'}</td>}
+                      <td>{po.vendor?.vendorName ?? '-'}</td>
                       <td>
                         {first?.item}
                         {first && describeLine(first) && (
                           <span className="faint"> {'·'} {describeLine(first)}</span>
                         )}
-                        {more > 0 && <div className="faint">+ {more} more line{more === 1 ? '' : 's'}</div>}
+                        {more > 0 && (
+                          <div className="faint">+ {more} more line{more === 1 ? '' : 's'}</div>
+                        )}
                       </td>
-                      {cols.show('uom') && <td>{doc.uom ?? 'Mixed'}</td>}
+                      {cols.show('uom') && <td>{po.uom ?? 'Mixed'}</td>}
                       <td className="num">
-                        {doc.orderQty == null
-                          ? <span className="faint">Mixed UOM</span>
-                          : fmtNum(doc.orderQty)}
+                        {po.orderQty == null ? <span className="faint">Mixed UOM</span> : fmtNum(po.orderQty)}
                       </td>
                       <td className="num">
-                        {doc.receivingQty == null
-                          ? <span className="faint">Mixed UOM</span>
-                          : <strong>{fmtNum(doc.receivingQty)}</strong>}
-                        {doc.lineCount > 1 && <div className="faint">{doc.lineCount} lines</div>}
+                        {po.receivedQty == null ? (
+                          <span className="faint">Mixed UOM</span>
+                        ) : (
+                          <strong>{fmtNum(po.receivedQty)}</strong>
+                        )}
                       </td>
-                      {cols.show('rate') && (
-                        <td className="num">
-                          {single
-                            ? fmtNum(single.inventoryRate, { decimals: 4 })
-                            : <span className="faint">per line</span>}
-                        </td>
-                      )}
-                      {cols.show('amount') && <td className="num">{fmtMoney(doc.totalAmount)}</td>}
-                      {cols.show('variation') && (
-                        <td className="num">
-                          {single
-                            ? `${single.variationPctDisplay}%`
-                            : <span className="faint">per line</span>}
-                          {doc.toleranceBreached && <div className="faint">over tolerance</div>}
-                        </td>
-                      )}
+                      <td className="num">
+                        {po.receiptCount}
+                        {po.billNos?.length > 0 && (
+                          <div className="faint">bill {po.billNos.slice(0, 3).join(', ')}{po.billNos.length > 3 ? '...' : ''}</div>
+                        )}
+                      </td>
+                      {cols.show('amount') && <td className="num">{fmtMoney(po.totalAmount)}</td>}
                       <td>
-                        {doc.reversed ? (
+                        {po.reversed ? (
                           <StatusBadge status="CANCELLED" />
-                        ) : doc.posted ? (
+                        ) : po.posted ? (
                           <StatusBadge status="COMPLETED" />
                         ) : (
                           <span className="faint">not posted</span>
                         )}
-                        {doc.partlyReversed && <div className="faint">part reversed</div>}
+                        {po.partlyReversed && <div className="faint">part reversed</div>}
+                        {po.toleranceBreached && <div className="faint">over tolerance</div>}
                       </td>
                       <td />
-                    </tr>
-                  );
+                    </tr>,
+
+                    /* The receipts themselves - what the old register showed one
+                       per row, now nested under the order they belong to. */
+                    isOpen && (
+                      <tr key={`${po.id}-receipts`} className="subrow">
+                        <td />
+                        <td colSpan={cols.colSpan}>
+                          <table className="data" style={{ margin: 0 }}>
+                            <thead>
+                              <tr>
+                                <th>GRN No</th>
+                                <th>Date</th>
+                                <th>Bill No</th>
+                                <th>Item</th>
+                                <th className="num">Received</th>
+                                <th className="num">Rate</th>
+                                <th className="num">Amount</th>
+                                <th className="num">Variation</th>
+                                <th>Posted</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {po.receipts.map((g) => (
+                                <tr
+                                  key={g.id}
+                                  className={`clickable ${g.toleranceBreached ? 'row-warn' : ''} ${g.reversed ? 'inactive' : ''}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigate(`/grns/${g.id}`);
+                                  }}
+                                >
+                                  <td className="code">{g.grnNo}</td>
+                                  <td className="nowrap">{fmtDate(g.grnDate)}</td>
+                                  <td>{g.billNo}</td>
+                                  <td>
+                                    {g.item}
+                                    {g.poLine && describeLine(g.poLine) && (
+                                      <span className="faint"> {'·'} {describeLine(g.poLine)}</span>
+                                    )}
+                                  </td>
+                                  <td className="num">
+                                    <strong>{fmtNum(g.receivingQty)}</strong> {g.uom}
+                                  </td>
+                                  <td className="num">{fmtNum(g.inventoryRate, { decimals: 4 })}</td>
+                                  <td className="num">{fmtMoney(g.amount)}</td>
+                                  <td className="num">{g.variationPctDisplay}%</td>
+                                  <td>
+                                    {g.reversed ? (
+                                      <span className="badge badge-inactive">reversed</span>
+                                    ) : g.posted ? (
+                                      <StatusBadge status="COMPLETED" />
+                                    ) : (
+                                      <span className="faint">not posted</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </td>
+                        <td />
+                      </tr>
+                    ),
+                  ];
                 })}
             </tbody>
 
-            {/* Totals for the whole filtered set, summed by the server. */}
+            {/* Totals for the whole filtered set, summed by the server. They
+                add up RECEIPTS, not orders - which is why they sit under the
+                Received column rather than the Order Qty one. */}
             {totals && !list.loading && list.rows.length > 0 && (
               <tfoot>
                 <tr>
@@ -328,7 +392,6 @@ export default function GrnList() {
                   <td className="num">
                     <strong>{fmtNum(totals.receivingQty)}</strong>
                   </td>
-                  {cols.show('rate') && <td />}
                   {cols.show('amount') && (
                     <td className="num">
                       <strong>{fmtMoney(totals.amount)}</strong>

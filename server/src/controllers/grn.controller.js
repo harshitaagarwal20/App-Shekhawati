@@ -52,13 +52,15 @@ export const list = asyncHandler(async (req, res) => {
 });
 
 /**
- * One row per receipt DOCUMENT rather than per line - same filters as `list`,
- * and the same totals envelope, because the footer is the same footer.
+ * One row per PURCHASE ORDER rather than per receipt line - an order delivered
+ * on three bills is one entry, with its three receipts inside it. Same filters
+ * as `list`, and the same totals envelope, because the footer is the same
+ * footer: it still adds up RECEIPTS, not orders.
  */
-export const listDocuments = asyncHandler(async (req, res) => {
+export const listByPurchaseOrder = asyncHandler(async (req, res) => {
   const q = parseListQuery(req, {
-    sortable: service.DOCUMENT_SORTABLE,
-    defaultSort: 'grnDate',
+    sortable: service.PO_SORTABLE,
+    defaultSort: 'poDate',
     defaultDir: 'desc',
   });
   const {
@@ -66,7 +68,7 @@ export const listDocuments = asyncHandler(async (req, res) => {
     dateFrom, dateTo, breachesOnly,
   } = req.query;
 
-  const result = await service.listDocuments({
+  const result = await service.listByPurchaseOrder({
     ...q,
     purchaseOrderId,
     vendorId,

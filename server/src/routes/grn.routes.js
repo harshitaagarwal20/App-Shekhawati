@@ -30,10 +30,12 @@ router.post('/', can('GRN.CREATE'), validate({ body: createGrnSchema }), c.creat
 /** MULTI-LINE: one delivery, one bill, several PO lines. Before '/:id'. */
 router.post('/documents', can('GRN.CREATE'), validate({ body: createGrnDocumentSchema }), c.createDocument);
 /**
- * The register: one row per receipt document. Declared BEFORE '/documents/:id'
- * so the bare path is not read as a receipt whose id is the empty string.
+ * THE REGISTER: one row per PURCHASE ORDER, with its receipts inside it. An
+ * order delivered on three vendor bills is three GRN documents - that is forced
+ * by the one-bill-per-PO rule - and reading them as three unrelated receipts is
+ * what this answers. Before '/:id', or the path is read as a receipt id.
  */
-router.get('/documents', can('GRN.VIEW'), validate({ query: grnListQuery }), c.listDocuments);
+router.get('/by-purchase-order', can('GRN.VIEW'), validate({ query: grnListQuery }), c.listByPurchaseOrder);
 router.get('/documents/:id', can('GRN.VIEW'), validate({ params: idParam }), c.getDocument);
 
 router.get('/:id', can('GRN.VIEW'), validate({ params: idParam }), c.get);
