@@ -38,10 +38,14 @@ import prisma from '../config/prisma.js';
 import { ApiError } from '../utils/ApiError.js';
 import { nextNumber } from './documentNumber.service.js';
 import { assertValueInList } from './masterList.service.js';
+import { subCategoryListFor } from '../domain/itemCategory.js';
 import {
   createRoll,
+  describeFabricName,
   describeItem,
+  isRollTrackedCategory,
   itemIdentity,
+  lockItemLocation,
   postMovement,
   resolveOrCreateItem,
 } from './inventory.service.js';
@@ -53,10 +57,21 @@ const DEFAULT_LOCATION = 'MAIN STORE';
 /** Opening stock is cloth and trims on a rack, not work in progress. */
 const DEFAULT_CATEGORY = 'Fabric';
 
-/** Values that have to exist in the List Masters before a row can be posted. */
+/**
+ * Values that have to exist in the List Masters before a row can be posted.
+ *
+ * `subCategory` is absent because the list it must belong to depends on the
+ * item - a fabric weight from L_FabricSubCat, a stationery article from
+ * L_StationeryItem - and `subCategoryListFor()` is what decides. See
+ * `assertRowDropdowns()`.
+ *
+ * `accessoryType` is absent for a different reason: a purchase order carries
+ * it as FREE TEXT, and a value refused here that a PO accepts would mean the
+ * trim could be ordered but not loaded.
+ */
 const LIST_FIELDS = [
   ['itemCategory', 'ItemCategory'],
-  ['subCategory', 'FabricSubCat'],
+  ['accessoriesItem', 'AccessoriesItem'],
   ['colorCode', 'ColorCode'],
   ['uom', 'UOM'],
   ['gsm', 'GSM'],
@@ -77,24 +92,63 @@ const LIST_FIELDS = [
 function normaliseRow(raw, i) {
   const at = (field) => ({ field: `rows.${i}.${field}` });
 
+  const itemCategory = String(raw.itemCategory ?? DEFAULT_CATEGORY).trim();
   const subCategory = String(raw.subCategory ?? raw.fabricType ?? '').trim();
   const colorCode = String(raw.colorCode ?? raw.color ?? '').trim();
+  const accessoriesItem = String(raw.accessoriesItem ?? '').trim();
+  const accessoryType = String(raw.accessoryType ?? '').trim();
   const qty = D(raw.qty ?? 0);
 
-  if (!subCategory) throw ApiError.badRequest('Fabric type is required', at('subCategory'));
-  if (!colorCode) throw ApiError.badRequest('Colour is required', at('colorCode'));
+  /*
+   * WHAT A ROW MUST CARRY DEPENDS ON WHAT IT IS.
+   *
+   * Cloth is identified by its weight and colour, and the office sheet has
+   * both. A trim is identified by the accessories item - "Button", "Zip" -
+   * and has no weight at all, so demanding a fabric type of it would be
+   * demanding a value somebody has to invent.
+   *
+   * UOM IS REQUIRED FOR A TRIM, and that is the important one. It is part of
+   * the item's identity, so a button loaded in Pcs and later ordered in Gross
+   * is TWO items: the opening stock would sit beside the first receipt instead
+   * of adding to it, and the store would hold one button under two codes.
+   * Metres is a safe default for cloth; there is no safe default between Pcs,
+   * Gross and Dozen, so the row has to say.
+   */
+  const rollTracked = isRollTrackedCategory(itemCategory);
+
+  if (rollTracked) {
+    if (!subCategory) throw ApiError.badRequest('Fabric type is required', at('subCategory'));
+    if (!colorCode) throw ApiError.badRequest('Colour is required', at('colorCode'));
+  } else {
+    if (!accessoriesItem) {
+      throw ApiError.badRequest(
+        `${itemCategory} needs an accessories item - the trim itself, as a purchase order names it.`,
+        at('accessoriesItem'),
+      );
+    }
+    if (!String(raw.uom ?? '').trim()) {
+      throw ApiError.badRequest(
+        `UOM is required for ${accessoriesItem}. It is part of the item's identity, so the same ` +
+          'trim loaded in one unit and ordered in another becomes two separate stock items.',
+        at('uom'),
+      );
+    }
+  }
+
   if (!qty.greaterThan(0)) {
-    throw ApiError.badRequest(
-      `Quantity for ${subCategory} / ${colorCode} must be greater than zero`,
-      at('qty'),
-    );
+    const what = rollTracked ? `${subCategory} / ${colorCode}` : accessoriesItem;
+    throw ApiError.badRequest(`Quantity for ${what} must be greater than zero`, at('qty'));
   }
 
   return {
     lineNo: i + 1,
-    itemCategory: String(raw.itemCategory ?? DEFAULT_CATEGORY).trim(),
+    itemCategory,
     subCategory,
     colorCode,
+    accessoriesItem,
+    accessoryType,
+    /** Decided once, here, so nothing downstream re-derives it per branch. */
+    rollTracked,
     gsm: raw.gsm ? String(raw.gsm).trim() : null,
     content: raw.content ? String(raw.content).trim() : null,
     count: raw.count ? String(raw.count).trim() : null,
@@ -125,14 +179,67 @@ async function assertRowDropdowns(row) {
     if (value === null || value === undefined || value === '') continue;
     await assertValueInList(listCode, value, { field });
   }
+
+  /*
+   * Sub-category follows the item, exactly as it does on a purchase order
+   * line: a fabric weight from L_FabricSubCat, a stationery article from
+   * L_StationeryItem. Checking it against the fabric list regardless - which
+   * is what the flat table above used to do - refused every stationery row
+   * and every trim that carried one.
+   */
+  if (row.subCategory) {
+    await assertValueInList(subCategoryListFor(row.itemCategory), row.subCategory, {
+      field: 'subCategory',
+    });
+  }
 }
 
-/** Has this item already had an opening balance posted against it? */
-async function openingAlreadyPosted(tx, itemId) {
-  return tx.stockLedger.findFirst({
-    where: { itemId, documentType: 'OPENING_BALANCE' },
+/**
+ * Has this item already had an opening balance posted against it?
+ *
+ * Checked against the ROLL, not merely against a ledger row existing: once
+ * `reverse()` below write off a wrong entry, its IN row stays on the ledger
+ * forever (nothing here erases history) but the roll it financed is gone. An
+ * item whose only opening balance has been reversed is exactly an item that
+ * has never successfully carried one - so it is clear to load again.
+ */
+async function openingAlreadyPosted(tx, itemId, { rollTracked = true } = {}) {
+  if (rollTracked) {
+    return tx.stockLedger.findFirst({
+      where: { itemId, documentType: 'OPENING_BALANCE', direction: 'IN', roll: { deletedAt: null } },
+      select: { id: true, documentNo: true, entryDate: true, qty: true },
+    });
+  }
+
+  /*
+   * BULK STOCK HAS NO ROLL TO HAVE BEEN WRITTEN OFF, so the reversal marks
+   * itself instead: `reverseEntry()` posts its OUT with `documentId` set to
+   * the id of the IN row it undoes. An opening balance is live while no such
+   * OUT points at it.
+   *
+   * Counting net quantity instead would be wrong in both directions - a
+   * partly issued balance would still be live, and one fully issued would
+   * read as never posted and let the whole figure be loaded a second time.
+   */
+  const ins = await tx.stockLedger.findMany({
+    where: { itemId, documentType: 'OPENING_BALANCE', direction: 'IN', rollId: null },
     select: { id: true, documentNo: true, entryDate: true, qty: true },
+    orderBy: { entryDate: 'asc' },
   });
+  if (!ins.length) return null;
+
+  const reversed = await tx.stockLedger.findMany({
+    where: {
+      itemId,
+      documentType: 'OPENING_BALANCE',
+      direction: 'OUT',
+      documentId: { in: ins.map((r) => r.id) },
+    },
+    select: { documentId: true },
+  });
+  const undone = new Set(reversed.map((r) => r.documentId));
+
+  return ins.find((r) => !undone.has(r.id)) ?? null;
 }
 
 /**
@@ -178,7 +285,9 @@ export async function preview(rows) {
     if (item?.deletedAt) {
       problems.push(`Inventory item ${item.itemCode} has been deleted. Restore it first.`);
     } else if (item) {
-      const existingOpening = await openingAlreadyPosted(prisma, item.id);
+      const existingOpening = await openingAlreadyPosted(prisma, item.id, {
+        rollTracked: row.rollTracked,
+      });
       if (existingOpening) {
         problems.push(
           `Opening stock was already posted for this item on ${existingOpening.documentNo}. ` +
@@ -249,7 +358,7 @@ export async function apply(rows, actor = {}) {
       for (const row of normalised) {
         const { item } = await resolveOrCreateItem(tx, row, actor.userId);
 
-        const already = await openingAlreadyPosted(tx, item.id);
+        const already = await openingAlreadyPosted(tx, item.id, { rollTracked: row.rollTracked });
         if (already) {
           throw ApiError.conflict(
             `Opening stock for ${describeItem(row)} was already posted on ` +
@@ -259,21 +368,27 @@ export async function apply(rows, actor = {}) {
         }
 
         /*
-         * A ROLL, because fabric in this system is tracked as rolls.
+         * A ROLL FOR CLOTH, A PLAIN BALANCE FOR A TRIM.
          *
-         * Everything downstream - fabric issue, job work, cutting - works on a
-         * roll, so opening stock that posted only a ledger balance would be
-         * stock nobody could issue. One roll per row: the office sheet says
-         * "5987 metres of 10OZ Natural", not how many pieces that is, and a
-         * roll count invented here would be invented data. A roll can be split
-         * later; it cannot be un-invented.
+         * Fabric is tracked roll by roll and everything downstream of it -
+         * fabric issue, job work, cutting - works on a roll, so cloth posted
+         * as a bare ledger balance would be stock nobody could issue. One roll
+         * per row: the office sheet says "5987 metres of 10OZ Natural", not
+         * how many pieces that is, and a roll count invented here would be
+         * invented data. A roll can be split later; it cannot be un-invented.
+         *
+         * Buttons and zips are the opposite case. They are counted in bulk off
+         * a balance and no screen in this application asks which roll a button
+         * came off - inventing a "roll" of 5000 buttons would put a fabric
+         * record in the way of every accessory issue, and `isRollTracked` on
+         * the item says plainly that it does not belong there.
          */
-        const roll = await createRoll(
+        const roll = !row.rollTracked ? null : await createRoll(
           tx,
           {
             rollNo: row.rollNo,
             inventoryItemId: item.id,
-            fabricName: describeItem(row),
+            fabricName: describeFabricName(row),
             colorCode: row.colorCode,
             content: row.content,
             count: row.count,
@@ -290,16 +405,21 @@ export async function apply(rows, actor = {}) {
 
         await postMovement(tx, {
           itemId: item.id,
-          rollId: roll.id,
+          rollId: roll?.id ?? null,
           direction: 'IN',
           qty: row.qty,
           rate: row.rate,
           entryDate,
           location: row.location,
           documentType: 'OPENING_BALANCE',
-          // The roll IS the document here: there is no receipt behind an
-          // opening balance, and the ledger row has to point somewhere real.
-          documentId: roll.id,
+          /*
+           * `documentId` is NOT NULL, and there is no receipt behind an opening
+           * balance for it to point at. For cloth the roll is the document -
+           * it is the thing that was created and the thing a reversal writes
+           * off. A trim has no roll, so the ITEM is what the balance is about
+           * and what the row points at.
+           */
+          documentId: roll?.id ?? item.id,
           documentNo,
           snapshot: {
             itemCategory: row.itemCategory,
@@ -317,7 +437,8 @@ export async function apply(rows, actor = {}) {
         posted.push({
           lineNo: row.lineNo,
           itemCode: item.itemCode,
-          rollNo: roll.rollNo,
+          /** Null for a trim, which is held in bulk and has no roll. */
+          rollNo: roll?.rollNo ?? null,
           description: describeItem(row),
           qty: row.qty.toFixed(4),
           uom: row.uom,
@@ -334,4 +455,319 @@ export async function apply(rows, actor = {}) {
     },
     { timeout: 60_000, maxWait: 15_000 },
   );
+}
+
+/**
+ * Undoes one roll an opening balance wrongly created - a fabric type keyed
+ * wrong, a colour pasted into the wrong column, a figure tried out while
+ * learning the screen.
+ *
+ * ---------------------------------------------------------------------------
+ *  WHY THIS EXISTS AND WHAT IT DELIBERATELY DOES NOT DO
+ *
+ *  `apply()`'s own guard means a wrong row cannot be fixed by posting a
+ *  correction over it - the item already carries an opening balance - and
+ *  until now there was no way back from that at all except editing the
+ *  database by hand. This gives the office the one way back the design
+ *  always implied: take the wrong roll back OUT, the same way every other
+ *  correction in this system is made, by posting the reversing movement
+ *  rather than erasing the one that was wrong.
+ *
+ *  It reverses ONE ROLL, not a whole file. A paste of forty rows is forty
+ *  independent opening balances the moment they are posted - the thing being
+ *  undone is "this fabric and colour were loaded wrong", and that is a
+ *  property of one roll, not of the batch it happened to arrive in.
+ *
+ *  It is narrow on purpose. A roll that has been issued, held, relocated
+ *  under a different balance, or graded differently from how it was created
+ *  is no longer simply "the opening balance, entered wrong" - something has
+ *  happened since that this function is not the place to unwind. The same
+ *  restraint `apply()` itself takes with a quantity loaded wrong: once stock
+ *  has moved, the ledger is what records the correction, not an edit.
+ * ---------------------------------------------------------------------------
+ */
+export async function reverse(rollId, { reason } = {}, actor = {}) {
+  if (!reason?.trim()) {
+    throw ApiError.badRequest('A reason is required to reverse an opening balance.', { field: 'reason' });
+  }
+
+  return prisma.$transaction(async (tx) => {
+    /*
+     * THE LOCK BEFORE THE READ.
+     *
+     * F-03's lesson again: without it, a fabric issue committing between this
+     * transaction's read of the balance and its write could take cloth out
+     * from under a reversal that had already decided the roll was untouched.
+     */
+    await tx.$executeRaw`SELECT id FROM fabric_rolls WHERE id = ${rollId}::uuid FOR UPDATE`;
+
+    const roll = await tx.fabricRoll.findFirst({
+      where: { id: rollId, deletedAt: null },
+      select: {
+        id: true, rollNo: true, inventoryItemId: true, location: true, rate: true,
+        receivedQty: true, balanceQty: true, isHeld: true, uom: true,
+        colorCode: true, content: true, gsm: true,
+      },
+    });
+    if (!roll) throw ApiError.notFound('Fabric roll');
+
+    const opening = await tx.stockLedger.findFirst({
+      where: { rollId, documentType: 'OPENING_BALANCE', direction: 'IN' },
+      select: { id: true, documentNo: true, itemCategory: true },
+    });
+    if (!opening) {
+      throw ApiError.badRequest(
+        `${roll.rollNo} was not created by an opening balance. A roll received on a GRN is ` +
+          'undone through GRN Reversal, not here.',
+      );
+    }
+
+    if (roll.isHeld) {
+      throw ApiError.conflict(`${roll.rollNo} is held. Lift the hold before reversing it.`);
+    }
+    if (!D(roll.balanceQty).equals(D(roll.receivedQty))) {
+      throw ApiError.conflict(
+        `${roll.rollNo} has already moved - ${D(roll.receivedQty).minus(D(roll.balanceQty)).toFixed(4)} ` +
+          `${roll.uom} issued against it since it was loaded. An opening balance can only be reversed ` +
+          'while every metre of it is still exactly where it was posted.',
+      );
+    }
+
+    const at = new Date();
+
+    await postMovement(tx, {
+      itemId: roll.inventoryItemId,
+      rollId: roll.id,
+      direction: 'OUT',
+      qty: D(roll.balanceQty),
+      rate: roll.rate,
+      entryDate: at,
+      location: roll.location,
+      // This roll's own receipt, not the shared FIFO pool for the item: other
+      // rolls of the same fabric must not have their cost layers touched by
+      // undoing a mistake that was never theirs.
+      preferSourceLedgerIds: [opening.id],
+      documentType: 'OPENING_BALANCE',
+      documentId: roll.id,
+      documentNo: opening.documentNo,
+      snapshot: {
+        itemCategory: opening.itemCategory,
+        colorCode: roll.colorCode,
+        gsm: roll.gsm,
+        content: roll.content,
+        uom: roll.uom,
+      },
+      remarks: `Opening balance reversed - entered in error. ${reason.trim()}`,
+      actor,
+    });
+
+    /*
+     * Written off, not merely emptied - the same two stamps GRN Reversal
+     * leaves on a roll it takes back out, and for the same reason: the soft
+     * delete removes it from every live-roll query, and `writtenOffAt` frees
+     * its number because the mistake was in the data, not on the rack - there
+     * is no physical roll this label still belongs to.
+     */
+    await tx.fabricRoll.update({
+      where: { id: roll.id },
+      data: {
+        balanceQty: { decrement: D(roll.balanceQty) },
+        deletedAt: at,
+        deletedById: actor.userId ?? null,
+        writtenOffAt: at,
+        updatedById: actor.userId ?? null,
+        remarks: `Reversed: ${reason.trim()}`,
+      },
+    });
+
+    return { rollNo: roll.rollNo, qty: D(roll.balanceQty).toFixed(4), uom: roll.uom };
+  });
+}
+
+/**
+ * The same, for stock held in BULK - a trim loaded wrong.
+ *
+ * ---------------------------------------------------------------------------
+ *  WHY THIS IS A SECOND FUNCTION RATHER THAN A BRANCH IN `reverse()`
+ *
+ *  `reverse()` is keyed on a roll because for cloth the roll IS the opening
+ *  balance: it is what was created, what gets written off, and what the screens
+ *  give the office to select. A button has no roll. What identifies "these five
+ *  thousand buttons, loaded wrong" is the LEDGER ROW the opening balance wrote,
+ *  so that is what this takes.
+ *
+ *  THE "UNTOUCHED" TEST IS THE COST LAYER, NOT THE BALANCE.
+ *
+ *  `reverse()` can ask whether the roll still holds every metre it arrived
+ *  with. Bulk stock has no such handle: the item's balance may have risen on a
+ *  GRN since and fallen again on an issue, so a balance that happens to equal
+ *  the opening figure proves nothing about whether the opening stock itself was
+ *  consumed. The FIFO layer this very ledger row opened does prove it - while
+ *  its `qtyRemaining` still equals its `qtyIn`, not one unit of THIS opening
+ *  balance has been issued, whatever else has happened to the item. It is the
+ *  same question `reverse()` asks, put to the thing that can answer it here.
+ * ---------------------------------------------------------------------------
+ */
+export async function reverseEntry(ledgerId, { reason } = {}, actor = {}) {
+  if (!reason?.trim()) {
+    throw ApiError.badRequest('A reason is required to reverse an opening balance.', {
+      field: 'reason',
+    });
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const opening = await tx.stockLedger.findFirst({
+      where: { id: ledgerId, documentType: 'OPENING_BALANCE', direction: 'IN' },
+      select: {
+        id: true, itemId: true, location: true, rate: true, rollId: true, documentNo: true,
+        itemCategory: true, colorCode: true, gsm: true, content: true, uom: true,
+        item: { select: { itemCode: true, description: true } },
+      },
+    });
+    if (!opening) throw ApiError.notFound('Opening balance entry');
+
+    if (opening.rollId) {
+      throw ApiError.badRequest(
+        `${opening.item.itemCode} is tracked roll by roll. Reverse it through the roll the opening ` +
+          'balance created, not through its ledger entry.',
+      );
+    }
+
+    /*
+     * THE LOCK BEFORE THE READ - the ordering `reverse()` takes with its
+     * `FOR UPDATE` on the roll. Without it an issue committing between the
+     * layer test below and the posting could consume the very layer this
+     * reversal had just decided was untouched, and the OUT would fall through
+     * to FIFO order and take somebody else's cost.
+     */
+    await lockItemLocation(tx, opening.itemId, opening.location);
+
+    const alreadyReversed = await tx.stockLedger.findFirst({
+      where: {
+        itemId: opening.itemId,
+        documentType: 'OPENING_BALANCE',
+        direction: 'OUT',
+        documentId: opening.id,
+      },
+      select: { id: true },
+    });
+    if (alreadyReversed) {
+      throw ApiError.conflict(
+        `The opening balance for ${opening.item.itemCode} on ${opening.documentNo} has already ` +
+          'been reversed.',
+      );
+    }
+
+    const layer = await tx.stockCostLayer.findFirst({
+      where: { sourceLedgerId: opening.id },
+      select: { qtyIn: true, qtyRemaining: true },
+    });
+    if (!layer) {
+      throw ApiError.conflict(
+        `No cost layer remains for the opening balance of ${opening.item.itemCode}, so there is ` +
+          'nothing of it left to take back out.',
+      );
+    }
+    if (!D(layer.qtyRemaining).equals(D(layer.qtyIn))) {
+      throw ApiError.conflict(
+        `${opening.item.itemCode} has already moved - ` +
+          `${D(layer.qtyIn).minus(D(layer.qtyRemaining)).toFixed(4)} ${opening.uom} issued against ` +
+          'this opening balance since it was loaded. An opening balance can only be reversed while ' +
+          'every unit of it is still exactly where it was posted.',
+      );
+    }
+
+    const qty = D(layer.qtyRemaining);
+
+    await postMovement(tx, {
+      itemId: opening.itemId,
+      direction: 'OUT',
+      qty,
+      rate: opening.rate,
+      entryDate: new Date(),
+      location: opening.location,
+      // This balance's own layer, not the shared FIFO pool for the item: stock
+      // of the same trim received since must not be costed away by undoing a
+      // mistake that was never its.
+      preferSourceLedgerIds: [opening.id],
+      documentType: 'OPENING_BALANCE',
+      /** The IN row this undoes - what makes the reversal findable again. */
+      documentId: opening.id,
+      documentNo: opening.documentNo,
+      snapshot: {
+        itemCategory: opening.itemCategory,
+        colorCode: opening.colorCode,
+        gsm: opening.gsm,
+        content: opening.content,
+        uom: opening.uom,
+      },
+      remarks: `Opening balance reversed - entered in error. ${reason.trim()}`,
+      actor,
+    });
+
+    return {
+      itemCode: opening.item.itemCode,
+      description: opening.item.description,
+      qty: qty.toFixed(4),
+      uom: opening.uom,
+    };
+  });
+}
+
+/**
+ * `reverseEntry()` over a batch, one entry at a time.
+ *
+ * Not one transaction, for the reason spelled out on `reverseMany()` below: a
+ * paste of forty trims is forty independent opening balances, and one that has
+ * already been issued against is no reason to refuse undoing the thirty-nine
+ * beside it that nobody has touched.
+ */
+export async function reverseManyEntries(ledgerIds, { reason } = {}, actor = {}) {
+  const ids = [...new Set(ledgerIds ?? [])];
+  if (!ids.length) throw ApiError.badRequest('Choose at least one entry.', { field: 'ledgerIds' });
+
+  const reversed = [];
+  const failed = [];
+  for (const ledgerId of ids) {
+    try {
+      reversed.push({ ledgerId, ...(await reverseEntry(ledgerId, { reason }, actor)) });
+    } catch (err) {
+      const entry = await prisma.stockLedger.findUnique({
+        where: { id: ledgerId },
+        select: { item: { select: { itemCode: true } } },
+      });
+      failed.push({ ledgerId, itemCode: entry?.item?.itemCode ?? ledgerId, message: err.message });
+    }
+  }
+
+  return { reversed, failed };
+}
+
+/**
+ * `reverse()` over a batch, one roll at a time.
+ *
+ * NOT one transaction for the lot. A paste of forty rows is forty
+ * independent opening balances - see the note on `reverse()` - and so a roll
+ * three issues have already touched is not a reason to refuse undoing the
+ * thirty-nine beside it that nobody has. Each roll keeps its own pass/fail,
+ * the same shape `apply()`'s own preview gives the office before anything
+ * commits, except here every row has already tried to write and the report
+ * says what actually happened rather than what would.
+ */
+export async function reverseMany(rollIds, { reason } = {}, actor = {}) {
+  const ids = [...new Set(rollIds ?? [])];
+  if (!ids.length) throw ApiError.badRequest('Choose at least one roll.', { field: 'rollIds' });
+
+  const reversed = [];
+  const failed = [];
+  for (const rollId of ids) {
+    try {
+      reversed.push({ rollId, ...(await reverse(rollId, { reason }, actor)) });
+    } catch (err) {
+      const roll = await prisma.fabricRoll.findUnique({ where: { id: rollId }, select: { rollNo: true } });
+      failed.push({ rollId, rollNo: roll?.rollNo ?? rollId, message: err.message });
+    }
+  }
+
+  return { reversed, failed };
 }

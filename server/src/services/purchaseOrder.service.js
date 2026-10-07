@@ -2338,6 +2338,27 @@ export async function preview(input) {
     requirement: {
       qty: requirement.requirement ? requirement.requirement.toFixed(4) : null,
       uom: requirement.uom ?? null,
+      /**
+       * THE BOM AVERAGE PER PIECE - the figure the requirement is computed
+       * FROM, not only the product of it.
+       *
+       * `requirementFor()` has always returned it and this payload dropped it,
+       * so a buyer saw the total a style requires with no sight of the average
+       * behind it. For fabric that average is the Style Master's own "Avg
+       * Fabric Utilization / Pc"; for an accessory it is the matching BOM
+       * line's. Both arrive through the one calculation, which is why an
+       * accessory purchase order showed no average either - nothing did.
+       */
+      perPiece: requirement.perPiece ? requirement.perPiece.toFixed(4) : null,
+      /** The order quantity the average was multiplied by, for the arithmetic. */
+      orderQty: requirement.qty ? requirement.qty.toFixed(4) : null,
+      /** Declared on the BOM line, and already inside `qty` above. */
+      wastagePct: requirement.wastagePct ? requirement.wastagePct.toFixed(6) : null,
+      wastagePctDisplay: requirement.wastagePct
+        ? requirement.wastagePct.mul(100).toDecimalPlaces(2).toFixed(2)
+        : null,
+      /** Null where the Style Master header is the source, which has no line. */
+      bomLineNo: requirement.bomLineNo ?? null,
       basis: requirement.basis,
       reason: requirement.reason ?? null,
       /** An AS_PER_STYLE order cannot be saved while this is false. */

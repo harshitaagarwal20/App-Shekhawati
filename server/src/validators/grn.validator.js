@@ -345,6 +345,17 @@ const openingStockRow = z.object({
   color: z.string().trim().max(60).optional(),
   qty: decimal('Quantity', { min: 0, allowZero: false }),
 
+  /**
+   * ACCESSORIES. The same two columns a purchase order names a trim by, and
+   * deliberately the same field names: an item loaded here has to be THE SAME
+   * item a later PO for that trim resolves to, and identity is built from
+   * these. Which of these and `subCategory` are required depends on the
+   * category - see `normaliseRow()` in openingStock.service.js.
+   */
+  accessoriesItem: z.string().trim().max(80).optional(),
+  /// Free text, exactly as on a PO line - "4-hole horn, 18L" for a Button.
+  accessoryType: z.string().trim().max(120).optional(),
+
   itemCategory: z.string().trim().max(60).optional(),
   gsm: z.string().trim().max(20).optional(),
   content: z.string().trim().max(80).optional(),
@@ -363,4 +374,30 @@ export const openingStockSchema = z.object({
     .array(openingStockRow)
     .min(1, 'Add at least one row')
     .max(500, 'More than 500 rows at once - split the file'),
+});
+
+export const reverseOpeningBalanceSchema = z.object({
+  reason: z.string().trim().min(1, 'A reason is required').max(500),
+});
+
+export const reverseOpeningBalanceBatchSchema = z.object({
+  rollIds: z
+    .array(z.string().uuid())
+    .min(1, 'Choose at least one roll')
+    .max(200, 'More than 200 at once - do it in smaller batches'),
+  reason: z.string().trim().min(1, 'A reason is required').max(500),
+});
+
+/**
+ * The same, for stock held in BULK - a trim, not a roll.
+ *
+ * Keyed on the opening balance's own LEDGER ENTRY, because a button has no
+ * roll to name. See `reverseEntry()` in openingStock.service.js.
+ */
+export const reverseOpeningEntryBatchSchema = z.object({
+  ledgerIds: z
+    .array(z.string().uuid())
+    .min(1, 'Choose at least one entry')
+    .max(200, 'More than 200 at once - do it in smaller batches'),
+  reason: z.string().trim().min(1, 'A reason is required').max(500),
 });

@@ -86,6 +86,7 @@ import {
   DEFAULT_LOCATION,
   assertRollNoAvailable,
   createRoll,
+  describeFabricName,
   describeItem,
   postMovement,
   recomputeBalance,
@@ -550,6 +551,162 @@ export async function list(query) {
   };
 }
 
+/** What the receipt register can sort by - columns of the header itself. */
+export const DOCUMENT_SORTABLE = ['grnNo', 'grnDate', 'billNo', 'createdAt'];
+
+/**
+ * The register as the store sees it: ONE ROW PER RECEIPT DOCUMENT.
+ *
+ * `list()` answers per LINE, which is right for a stock enquiry tracing one
+ * item - but a delivery that received three lines of the same purchase order
+ * read there as three goods receipts. It is one lorry, one vendor bill, one
+ * GRN number; the lines are GRN-001, GRN-001/2, GRN-001/3 and belong together.
+ * This pages the headers instead, so the register counts deliveries.
+ *
+ * Every line-level filter still applies, as "the document has at least one
+ * line that matches", and the footer totals stay line-level: they add up the
+ * MATCHING LINES of the matching documents, not whole documents, so filtering
+ * to one item does not silently total its siblings in the same delivery.
+ */
+export async function listDocuments(query) {
+  const {
+    page, pageSize, skip, take, orderBy, search, includeDeleted,
+    purchaseOrderId, gatePassId, itemId, purpose, status, breachesOnly,
+    vendorId, dateFrom, dateTo,
+  } = query;
+
+  const lineWhere = {
+    deletedAt: null,
+    ...(purchaseOrderId ? { purchaseOrderId } : {}),
+    ...(gatePassId ? { gatePassId } : {}),
+    ...(itemId ? { inventoryItemId: itemId } : {}),
+    ...(purpose ? { purpose } : {}),
+    ...(status ? { status } : {}),
+    ...(breachesOnly ? { toleranceBreached: true } : {}),
+    ...searchFilter(search, SEARCH),
+  };
+
+  // The vendor and the date are the HEADER's own - one delivery has one of
+  // each, and every line repeats them - so they filter the document directly.
+  const headerWhere = {
+    ...(includeDeleted ? {} : { deletedAt: null }),
+    ...(vendorId ? { vendorId } : {}),
+    ...(dateFrom || dateTo
+      ? {
+          grnDate: {
+            ...(dateFrom ? { gte: new Date(dateFrom) } : {}),
+            ...(dateTo ? { lte: new Date(dateTo) } : {}),
+          },
+        }
+      : {}),
+  };
+  const where = { ...headerWhere, lines: { some: lineWhere } };
+
+  const [headers, total, totals] = await Promise.all([
+    prisma.grnHeader.findMany({
+      where,
+      orderBy,
+      skip,
+      take,
+      include: {
+        vendor: { select: { id: true, vendorName: true } },
+        lines: {
+          where: { deletedAt: null },
+          orderBy: { lineNo: 'asc' },
+          include: {
+            ...LIST_INCLUDE,
+            /*
+             * Over LIST_INCLUDE's `{ id, poId }`: the register names the PO
+             * DOCUMENT (hence `headerId`), and the Item column distinguishes
+             * one line of a delivery from its siblings - which for an
+             * accessory is the sub-category and the trim, not the category.
+             */
+            purchaseOrder: {
+              select: {
+                id: true,
+                poId: true,
+                headerId: true,
+                subCategory: true,
+                accessoriesItem: true,
+                accessoryType: true,
+              },
+            },
+          },
+        },
+      },
+    }),
+    prisma.grnHeader.count({ where }),
+    prisma.grn.aggregate({
+      where: { ...lineWhere, header: headerWhere },
+      _sum: { receivingQty: true, amount: true },
+    }),
+  ]);
+
+  // The PO DOCUMENT each line was received against. A line names its own PO
+  // line (PO-001/2); the register shows the order the vendor was given, which
+  // is its header - and one delivery may well serve two orders.
+  const poHeaderIds = [
+    ...new Set(headers.flatMap((h) => h.lines.map((l) => l.purchaseOrder?.headerId)).filter(Boolean)),
+  ];
+  const poHeaders = poHeaderIds.length
+    ? await prisma.purchaseOrderHeader.findMany({
+        where: { id: { in: poHeaderIds } },
+        select: { id: true, poNo: true },
+      })
+    : [];
+  const poNo = new Map(poHeaders.map((h) => [h.id, h.poNo]));
+
+  const sumOf = (rows, field, dp) =>
+    rows.reduce((a, r) => a.plus(D(r[field] ?? 0)), ZERO).toFixed(dp);
+
+  const rows = headers.map((h) => {
+    const lines = h.lines.map(project);
+    /*
+     * F-04 again: a reversed line's stock has been taken back out, so it adds
+     * nothing to the delivery's quantity or value. It stays in `lines` - it
+     * happened, and the register should show that it did - but out of the
+     * sums, exactly as `getDocument()` treats it.
+     */
+    const live = lines.filter((l) => !l.reversed);
+    const uoms = [...new Set(live.map((l) => l.uom))];
+    return {
+      id: h.id,
+      grnNo: h.grnNo,
+      grnDate: h.grnDate,
+      billNo: h.billNo,
+      billDate: h.billDate,
+      location: h.location,
+      vendor: h.vendor,
+      lineCount: lines.length,
+      lines,
+      poNos: [...new Set(lines.map((l) => poNo.get(l.purchaseOrder?.headerId)).filter(Boolean))],
+      /** Quantities only add up when every line is in the same unit. */
+      uom: uoms.length === 1 ? uoms[0] : null,
+      orderQty: uoms.length === 1 ? sumOf(live, 'orderQty', 4) : null,
+      receivingQty: uoms.length === 1 ? sumOf(live, 'receivingQty', 4) : null,
+      totalAmount: sumOf(live, 'amount', 2),
+      /** One line over tolerance is a delivery worth opening. */
+      toleranceBreached: live.some((l) => l.toleranceBreached),
+      /** A receipt is born posted, so this is only ever false mid-repair. */
+      posted: live.length > 0 && live.every((l) => l.posted),
+      /** Nothing of this delivery is in stock any more. */
+      reversed: lines.length > 0 && live.length === 0,
+      partlyReversed: live.length > 0 && live.length < lines.length,
+    };
+  });
+
+  return {
+    rows,
+    total,
+    page,
+    pageSize,
+    totals: {
+      receivingQty: D(totals._sum.receivingQty ?? 0).toFixed(4),
+      amount: D(totals._sum.amount ?? 0).toFixed(2),
+    },
+  };
+}
+
 export async function getById(id) {
   const grn = await prisma.grn.findFirst({ where: { id, deletedAt: null }, include: INCLUDE });
   if (!grn) throw ApiError.notFound('GRN');
@@ -985,7 +1142,7 @@ async function writeLine(tx, ctx, { header, lineNo }, actor) {
             grnId: grn.id,
             vendorId: po.vendorId,
             inventoryItemId: item.id,
-            fabricName: spec.fabricName ?? describeItem({ ...po, itemCategory: po.item }),
+            fabricName: spec.fabricName ?? describeFabricName({ ...po, itemCategory: po.item }),
             colorCode: po.colorCode,
             content: po.content,
             count: po.count,

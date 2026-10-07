@@ -29,6 +29,11 @@ router.post('/', can('GRN.CREATE'), validate({ body: createGrnSchema }), c.creat
 
 /** MULTI-LINE: one delivery, one bill, several PO lines. Before '/:id'. */
 router.post('/documents', can('GRN.CREATE'), validate({ body: createGrnDocumentSchema }), c.createDocument);
+/**
+ * The register: one row per receipt document. Declared BEFORE '/documents/:id'
+ * so the bare path is not read as a receipt whose id is the empty string.
+ */
+router.get('/documents', can('GRN.VIEW'), validate({ query: grnListQuery }), c.listDocuments);
 router.get('/documents/:id', can('GRN.VIEW'), validate({ params: idParam }), c.getDocument);
 
 router.get('/:id', can('GRN.VIEW'), validate({ params: idParam }), c.get);

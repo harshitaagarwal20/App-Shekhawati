@@ -180,3 +180,50 @@ export const applyOpeningStock = asyncHandler(async (req, res) =>
     201,
   ),
 );
+
+/** Takes one wrongly-loaded opening balance roll back out. See the service. */
+export const reverseOpeningBalance = asyncHandler(async (req, res) =>
+  ok(
+    res,
+    await openingStock.reverse(req.params.id, req.body, {
+      userId: req.auth.userId,
+      fullName: req.auth.fullName ?? req.auth.username ?? null,
+    }),
+  ),
+);
+
+/** The same, over a batch of rolls - one pass/fail per roll. See the service. */
+export const reverseOpeningBalanceBatch = asyncHandler(async (req, res) =>
+  ok(
+    res,
+    await openingStock.reverseMany(req.body.rollIds, { reason: req.body.reason }, {
+      userId: req.auth.userId,
+      fullName: req.auth.fullName ?? req.auth.username ?? null,
+    }),
+  ),
+);
+
+/**
+ * Takes one wrongly-loaded BULK opening balance back out - a trim, which has
+ * no roll and is named by its ledger entry instead. See `reverseEntry()`.
+ */
+export const reverseOpeningEntry = asyncHandler(async (req, res) =>
+  ok(
+    res,
+    await openingStock.reverseEntry(req.params.id, req.body, {
+      userId: req.auth.userId,
+      fullName: req.auth.fullName ?? req.auth.username ?? null,
+    }),
+  ),
+);
+
+/** The same, over a batch of entries - one pass/fail each. See the service. */
+export const reverseOpeningEntryBatch = asyncHandler(async (req, res) =>
+  ok(
+    res,
+    await openingStock.reverseManyEntries(req.body.ledgerIds, { reason: req.body.reason }, {
+      userId: req.auth.userId,
+      fullName: req.auth.fullName ?? req.auth.username ?? null,
+    }),
+  ),
+);

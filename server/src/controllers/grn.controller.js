@@ -51,6 +51,49 @@ export const list = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * One row per receipt DOCUMENT rather than per line - same filters as `list`,
+ * and the same totals envelope, because the footer is the same footer.
+ */
+export const listDocuments = asyncHandler(async (req, res) => {
+  const q = parseListQuery(req, {
+    sortable: service.DOCUMENT_SORTABLE,
+    defaultSort: 'grnDate',
+    defaultDir: 'desc',
+  });
+  const {
+    purchaseOrderId, vendorId, gatePassId, itemId, purpose, status,
+    dateFrom, dateTo, breachesOnly,
+  } = req.query;
+
+  const result = await service.listDocuments({
+    ...q,
+    purchaseOrderId,
+    vendorId,
+    gatePassId,
+    itemId,
+    purpose,
+    status,
+    dateFrom,
+    dateTo,
+    breachesOnly,
+  });
+
+  return res.status(200).json({
+    success: true,
+    data: result.rows,
+    meta: {
+      total: result.total,
+      page: result.page,
+      pageSize: result.pageSize,
+      pageCount: result.pageSize > 0 ? Math.ceil(result.total / result.pageSize) : 0,
+      hasNext: result.page * result.pageSize < result.total,
+      hasPrev: result.page > 1,
+      totals: result.totals,
+    },
+  });
+});
+
 export const get = asyncHandler(async (req, res) => ok(res, await service.getById(req.params.id)));
 
 /**

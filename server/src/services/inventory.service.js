@@ -224,6 +224,22 @@ export function itemIdentity(source) {
   };
 }
 
+/**
+ * Whether stock of this category is followed roll by roll, or held in bulk.
+ *
+ * Fabric is the only roll-tracked category: everything downstream of a roll -
+ * fabric issue, job work, cutting - works on one. Buttons and zips are counted
+ * in bulk off a balance.
+ *
+ * Exported because `resolveOrCreateItem()` below stamps it onto the item and
+ * opening stock has to know the same answer BEFORE the item exists, to decide
+ * whether the row it is about to post needs a roll at all. Two copies of this
+ * one comparison is how a row ends up with a roll it should not have.
+ */
+export function isRollTrackedCategory(itemCategory) {
+  return itemCategory === 'Fabric';
+}
+
 /** How the item reads on an issue slip. */
 export function describeItem(source) {
   return (
@@ -239,6 +255,25 @@ export function describeItem(source) {
     ]
       .filter(Boolean)
       .join(' / ') || (source.item ?? source.itemCategory ?? 'Item')
+  );
+}
+
+/**
+ * A roll's own fabric name - item and sub-category, nothing a roll already
+ * has its own column for.
+ *
+ * `describeItem` bakes content, GSM and colour into the string too, which is
+ * right for a one-off description on a slip that has no such columns. A roll
+ * does - `content`, `gsm` and `colorCode` are each stored separately - so
+ * using `describeItem` for `fabricName` does not make the name richer, it
+ * repeats three facts the roll already carries elsewhere. Every screen that
+ * then shows the name next to those columns (or appends them itself, as the
+ * roll picker does) printed the colour and the GSM twice.
+ */
+export function describeFabricName(source) {
+  return (
+    [source.item ?? source.itemCategory, source.subCategory].filter(Boolean).join(' / ')
+    || (source.item ?? source.itemCategory ?? 'Fabric')
   );
 }
 
@@ -293,7 +328,7 @@ export async function resolveOrCreateItem(tx, source, actorId) {
        */
       category: categoryOf(identity.itemCategory, { field: 'item' }),
       // Fabric is followed roll by roll; everything else is held in bulk.
-      isRollTracked: identity.itemCategory === 'Fabric',
+      isRollTracked: isRollTrackedCategory(identity.itemCategory),
       createdById: actorId ?? null,
       updatedById: actorId ?? null,
     },
@@ -343,11 +378,18 @@ export async function resolveOrCreateItem(tx, source, actorId) {
  *  `hashtextextended` gives the 64 bits the lock function takes; a collision
  *  between two unrelated pairs costs an occasional needless wait and nothing
  *  else, since the lock is advisory and guards no data on its own.
+ *
+ *  EXPORTED for callers that must read the balance or the cost layers and THEN
+ *  decide, rather than simply posting. `postMovement()` takes this lock itself,
+ *  but a caller that read first would have read outside it. Reversing a bulk
+ *  opening balance is exactly that case: it has no roll to lock `FOR UPDATE`
+ *  the way the fabric path does, and it must see a cost layer that cannot be
+ *  consumed between the check and the posting.
  * ---------------------------------------------------------------------------
  *
  * @param {import('@prisma/client').Prisma.TransactionClient} tx
  */
-async function lockItemLocation(tx, itemId, location) {
+export async function lockItemLocation(tx, itemId, location) {
   // `$executeRaw`, not `$queryRaw`: pg_advisory_xact_lock returns `void`, and
   // Prisma cannot deserialise a void column - it fails with "Failed to
   // deserialize column of type 'void'" rather than taking the lock. Nothing is

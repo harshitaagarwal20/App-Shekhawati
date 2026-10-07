@@ -1,8 +1,15 @@
 /**
  * GRN list. Sheet: "GRN".
  *
- * The footer totals come from the server with the page - receipts and value for
- * the whole filtered set, not just the rows on screen, and not summed here.
+ * ONE ROW PER RECEIPT DOCUMENT - a delivery that received three lines of the
+ * same purchase order is one entry, not three. The lines are GRN-001,
+ * GRN-001/2, GRN-001/3; they share a lorry, a vendor bill and a GRN number,
+ * and they are listed on the document page.
+ *
+ * The footer totals come from the server with the page - quantity and value
+ * for the whole filtered set, not just the rows on screen, and not summed
+ * here. They stay LINE-level on purpose: filter to one item and the footer
+ * totals that item, not the whole deliveries it arrived in.
  */
 
 import { useEffect, useState } from 'react';
@@ -49,11 +56,16 @@ const PURPOSE_OPTIONS = [
  * the buyer check on one receipt, so it is optional here rather than absent.
  * A receipt over tolerance still paints its whole row, with or without the
  * Variation column showing.
+ *
+ * Rate and Variation belong to a LINE, not to a delivery: a three-line receipt
+ * has three of each, and averaging them would invent a figure the system does
+ * not hold. They show for a single-line receipt and say "per line" otherwise,
+ * which is the document page's cue.
  */
 const COLUMNS = [
   { key: 'grnNo', label: 'GRN No' },
   { key: 'date', label: 'Date' },
-  { key: 'poId', label: 'PO ID', optional: true },
+  { key: 'poId', label: 'PO No', optional: true },
   { key: 'billNo', label: 'Bill No', optional: true },
   { key: 'vendor', label: 'Vendor' },
   { key: 'item', label: 'Item' },
@@ -66,13 +78,19 @@ const COLUMNS = [
   { key: 'posted', label: 'Posted' },
 ];
 
+/** How a line reads in the Item column - what distinguishes it from a sibling. */
+const describeLine = (l) =>
+  [l.purchaseOrder?.subCategory, l.purchaseOrder?.accessoriesItem, l.purchaseOrder?.accessoryType]
+    .filter(Boolean)
+    .join(' · ');
+
 export default function GrnList() {
   const { can } = useAuth();
   const navigate = useNavigate();
 
   const cols = useOptionalColumns('grns', COLUMNS);
 
-  const list = useResourceList((params) => grnApi.list(params), {
+  const list = useResourceList((params) => grnApi.listDocuments(params), {
     defaultSort: 'grnDate',
     defaultDir: 'desc',
     initialFilters: {
@@ -89,6 +107,19 @@ export default function GrnList() {
 
   const canCreate = can('GRN.CREATE');
   const totals = list.meta?.totals;
+
+  /*
+   * Where the footer's figures sit, counted rather than written as literals.
+   *
+   * The label runs up to the column before Receiving Qty, the quantity and the
+   * amount sit under their own columns, and whatever is left is spanned. With
+   * columns that come and go, a hard-coded colSpan here is wrong the moment
+   * somebody hides one - which is what the Rate column did to the old `8`.
+   */
+  const span = (...keys) => keys.filter((k) => cols.show(k)).length;
+  const footLabelSpan = span('grnNo', 'date', 'poId', 'billNo', 'vendor', 'item', 'uom', 'orderQty');
+  // Variation, Posted, and the column menu's own header cell.
+  const footTailSpan = span('variation', 'posted') + 1;
 
   useEffect(() => {
     vendorsApi.options().then(setVendorOptions).catch(loadFailed(setVendorOptions, 'vendors'));
@@ -179,16 +210,18 @@ export default function GrnList() {
               <tr>
                 <SortableTh field="grnNo" label="GRN No" sortBy={list.sortBy} sortDir={list.sortDir} onSort={list.toggleSort} />
                 <SortableTh field="grnDate" label="Date" sortBy={list.sortBy} sortDir={list.sortDir} onSort={list.toggleSort} />
-                {cols.show('poId') && <th>PO ID</th>}
+                {cols.show('poId') && <th>PO No</th>}
                 {cols.show('billNo') && <SortableTh field="billNo" label="Bill No" sortBy={list.sortBy} sortDir={list.sortDir} onSort={list.toggleSort} />}
                 <th>Vendor</th>
                 <th>Item</th>
                 {cols.show('uom') && <th>UOM</th>}
-                <SortableTh field="orderQty" label="Order Qty" sortBy={list.sortBy} sortDir={list.sortDir} onSort={list.toggleSort} className="num" />
-                <SortableTh field="receivingQty" label="Receiving Qty" sortBy={list.sortBy} sortDir={list.sortDir} onSort={list.toggleSort} className="num" />
-                {cols.show('rate') && <SortableTh field="inventoryRate" label="Rate" sortBy={list.sortBy} sortDir={list.sortDir} onSort={list.toggleSort} className="num" />}
-                {cols.show('amount') && <SortableTh field="amount" label="Amount" sortBy={list.sortBy} sortDir={list.sortDir} onSort={list.toggleSort} className="num" />}
-                {cols.show('variation') && <SortableTh field="variationPct" label="Variation" sortBy={list.sortBy} sortDir={list.sortDir} onSort={list.toggleSort} className="num" />}
+                {/* Not sortable: these are sums over a document's lines, and
+                    the database orders the HEADERS this register pages. */}
+                <th className="num">Order Qty</th>
+                <th className="num">Receiving Qty</th>
+                {cols.show('rate') && <th className="num">Rate</th>}
+                {cols.show('amount') && <th className="num">Amount</th>}
+                {cols.show('variation') && <th className="num">Variation</th>}
                 <th>Posted</th>
                 <ColumnMenu {...cols} />
               </tr>
@@ -214,61 +247,94 @@ export default function GrnList() {
               )}
 
               {!list.loading &&
-                list.rows.map((g) => (
-                  <tr
-                    key={g.id}
-                    onClick={() => navigate(`/grns/${g.id}`)}
-                    className={`clickable ${g.toleranceBreached ? 'row-warn' : ''}`}
-                  >
-                    <td className="code">{g.grnNo}</td>
-                    <td className="nowrap">{fmtDate(g.grnDate)}</td>
-                    {cols.show('poId') && <td className="code">{g.purchaseOrder?.poId ?? '-'}</td>}
-                    {cols.show('billNo') && <td>{g.billNo}</td>}
-                    <td>{g.vendor?.vendorName ?? '-'}</td>
-                    <td>
-                      {g.item}
-                      {g.inventoryItem && <div className="faint">{g.inventoryItem.itemCode}</div>}
-                    </td>
-                    {cols.show('uom') && <td>{g.uom}</td>}
-                    <td className="num">{fmtNum(g.orderQty)}</td>
-                    <td className="num">
-                      <strong>{fmtNum(g.receivingQty)}</strong>
-                    </td>
-                    {cols.show('rate') && <td className="num">{fmtNum(g.inventoryRate, { decimals: 4 })}</td>}
-                    {cols.show('amount') && <td className="num">{fmtMoney(g.amount)}</td>}
-                    {cols.show('variation') && (
-                      <td className="num">
-                        {g.variationPctDisplay}%
-                        {g.toleranceBreached && <div className="faint">over tolerance</div>}
-                      </td>
-                    )}
-                    <td>
-                      {g.posted ? (
-                        <StatusBadge status="COMPLETED" />
-                      ) : (
-                        <span className="faint">not posted</span>
+                list.rows.map((doc) => {
+                  const [first] = doc.lines;
+                  const more = doc.lineCount - 1;
+                  // Rate and variation are a line's own; a one-line receipt has
+                  // exactly one of each, and nothing else does.
+                  const single = doc.lineCount === 1 ? first : null;
+                  return (
+                    <tr
+                      key={doc.id}
+                      onClick={() => navigate(`/grns/documents/${doc.id}`)}
+                      className={`clickable ${doc.toleranceBreached ? 'row-warn' : ''} ${doc.reversed ? 'inactive' : ''}`}
+                    >
+                      <td className="code">{doc.grnNo}</td>
+                      <td className="nowrap">{fmtDate(doc.grnDate)}</td>
+                      {/* A delivery may answer more than one purchase order. */}
+                      {cols.show('poId') && (
+                        <td className="code">{doc.poNos?.length ? doc.poNos.join(', ') : '-'}</td>
                       )}
-                    </td>
-                    <td />
-                  </tr>
-                ))}
+                      {cols.show('billNo') && <td>{doc.billNo}</td>}
+                      <td>{doc.vendor?.vendorName ?? '-'}</td>
+                      <td>
+                        {first?.item}
+                        {first && describeLine(first) && (
+                          <span className="faint"> {'·'} {describeLine(first)}</span>
+                        )}
+                        {more > 0 && <div className="faint">+ {more} more line{more === 1 ? '' : 's'}</div>}
+                      </td>
+                      {cols.show('uom') && <td>{doc.uom ?? 'Mixed'}</td>}
+                      <td className="num">
+                        {doc.orderQty == null
+                          ? <span className="faint">Mixed UOM</span>
+                          : fmtNum(doc.orderQty)}
+                      </td>
+                      <td className="num">
+                        {doc.receivingQty == null
+                          ? <span className="faint">Mixed UOM</span>
+                          : <strong>{fmtNum(doc.receivingQty)}</strong>}
+                        {doc.lineCount > 1 && <div className="faint">{doc.lineCount} lines</div>}
+                      </td>
+                      {cols.show('rate') && (
+                        <td className="num">
+                          {single
+                            ? fmtNum(single.inventoryRate, { decimals: 4 })
+                            : <span className="faint">per line</span>}
+                        </td>
+                      )}
+                      {cols.show('amount') && <td className="num">{fmtMoney(doc.totalAmount)}</td>}
+                      {cols.show('variation') && (
+                        <td className="num">
+                          {single
+                            ? `${single.variationPctDisplay}%`
+                            : <span className="faint">per line</span>}
+                          {doc.toleranceBreached && <div className="faint">over tolerance</div>}
+                        </td>
+                      )}
+                      <td>
+                        {doc.reversed ? (
+                          <StatusBadge status="CANCELLED" />
+                        ) : doc.posted ? (
+                          <StatusBadge status="COMPLETED" />
+                        ) : (
+                          <span className="faint">not posted</span>
+                        )}
+                        {doc.partlyReversed && <div className="faint">part reversed</div>}
+                      </td>
+                      <td />
+                    </tr>
+                  );
+                })}
             </tbody>
 
             {/* Totals for the whole filtered set, summed by the server. */}
             {totals && !list.loading && list.rows.length > 0 && (
               <tfoot>
                 <tr>
-                  <td colSpan={8} className="faint">
+                  <td colSpan={footLabelSpan} className="faint">
                     Totals for the filtered set
                   </td>
                   <td className="num">
                     <strong>{fmtNum(totals.receivingQty)}</strong>
                   </td>
-                  <td />
-                  <td className="num">
-                    <strong>{fmtMoney(totals.amount)}</strong>
-                  </td>
-                  <td colSpan={2} />
+                  {cols.show('rate') && <td />}
+                  {cols.show('amount') && (
+                    <td className="num">
+                      <strong>{fmtMoney(totals.amount)}</strong>
+                    </td>
+                  )}
+                  <td colSpan={footTailSpan} />
                 </tr>
               </tfoot>
             )}

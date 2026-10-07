@@ -43,8 +43,10 @@ export default function RollDetail() {
   const [banner, setBanner] = useState(null);
   const [relocating, setRelocating] = useState(false);
   const [grading, setGrading] = useState(false);
+  const [reversing, setReversing] = useState(false);
 
   const canRelocate = can('FABRIC_ROLL.EDIT');
+  const canReverseOpeningBalance = can('FABRIC_ROLL.CREATE');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -74,6 +76,17 @@ export default function RollDetail() {
 
   const { roll, chain, movements } = data;
 
+  /*
+   * A reversible opening balance, worked out from what is already on the
+   * page rather than a flag the server would otherwise have to add: exactly
+   * one movement, and that movement is the OPENING_BALANCE receipt itself.
+   * The service re-checks every one of these conditions itself under a lock
+   * before it writes anything - this is only what decides whether the button
+   * is worth offering.
+   */
+  const isUnreversedOpeningBalance =
+    movements.length === 1 && movements[0].documentType === 'OPENING_BALANCE' && movements[0].direction === 'IN';
+
   return (
     <>
       <PageHeader
@@ -98,6 +111,11 @@ export default function RollDetail() {
             {canRelocate && (
               <button type="button" className="btn" onClick={() => setGrading(true)}>
                 Grade shade
+              </button>
+            )}
+            {canReverseOpeningBalance && !roll.isHeld && isUnreversedOpeningBalance && (
+              <button type="button" className="btn btn-danger" onClick={() => setReversing(true)}>
+                Reverse opening balance
               </button>
             )}
           </>
@@ -265,6 +283,18 @@ export default function RollDetail() {
           }}
         />
       )}
+
+      {reversing && (
+        <ReverseOpeningBalanceDialog
+          roll={roll}
+          onCancel={() => setReversing(false)}
+          onDone={async (message) => {
+            setReversing(false);
+            setBanner({ kind: 'success', text: message });
+            await load();
+          }}
+        />
+      )}
     </>
   );
 }
@@ -380,6 +410,69 @@ function RelocateDialog({ roll, onCancel, onDone }) {
         </Field>
         <Field label="Remarks">
           <TextArea rows={2} value={remarks} onChange={(e) => setRemarks(e.target.value)} />
+        </Field>
+      </div>
+    </Modal>
+  );
+}
+
+/**
+ * Takes one wrongly-loaded opening balance roll back out.
+ *
+ * A reason is required, not optional: this is the one write in the
+ * application that undoes a roll rather than moving it, and the ledger entry
+ * it posts carries that reason forward as the only explanation anyone
+ * reading the stock register later will have for why the cloth that was "on
+ * the rack at go-live" no longer is.
+ */
+function ReverseOpeningBalanceDialog({ roll, onCancel, onDone }) {
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  async function go() {
+    setBusy(true);
+    setError('');
+    try {
+      await invApi.reverseOpeningBalance(roll.id, { reason });
+      onDone(`${roll.rollNo} reversed - ${fmtNum(roll.balanceQty)} ${roll.uom} taken back out.`);
+    } catch (e) {
+      setError(e.message);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal
+      title={`Reverse opening balance ${roll.rollNo}?`}
+      size="narrow"
+      onClose={onCancel}
+      footer={
+        <>
+          <button type="button" className="btn" onClick={onCancel} disabled={busy}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="btn btn-danger"
+            onClick={go}
+            disabled={busy || !reason.trim()}
+          >
+            {busy ? 'Reversing...' : 'Reverse'}
+          </button>
+        </>
+      }
+    >
+      <div className="modal-body">
+        <Alert kind="error">{error}</Alert>
+        <p style={{ marginTop: 0 }}>
+          This takes {fmtNum(roll.balanceQty)} {roll.uom} of {roll.rollNo} back out and writes the
+          roll off. It only works while nothing has been issued against it yet, and it cannot be
+          undone - the fabric type and colour will be free to load an opening balance for again
+          afterwards.
+        </p>
+        <Field label="Reason" required hint="Why this roll should not have been loaded.">
+          <TextArea rows={2} value={reason} onChange={(e) => setReason(e.target.value)} />
         </Field>
       </div>
     </Modal>

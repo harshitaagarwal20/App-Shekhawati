@@ -29,41 +29,94 @@ import {
   Alert,
   EmptyState,
   Field,
+  MasterSelect,
   PageHeader,
   Spinner,
   TextArea,
   TextInput,
+  VarietySelect,
 } from '../../components/ui.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
 import { fmtNum } from '../../utils/format.js';
 
+/**
+ * CLOTH AND TRIM ARE LOADED SEPARATELY, BY CHOICE.
+ *
+ * They are identified by different columns - fabric by its weight and colour,
+ * a trim by the accessories item itself - and the office keeps them on
+ * different sheets. One grid that carried every column of both would ask the
+ * storeman to leave half of them blank on every row, which is how a fabric
+ * type ends up typed into a button row. So the screen has a mode, and the
+ * paste parser and the grid follow it.
+ */
+const FABRIC = 'FABRIC';
+const ACCESSORIES = 'ACCESSORIES';
+
 let seq = 0;
 const key = () => `r${++seq}`;
-const blank = () => ({
-  key: key(), fabricType: '', color: '', qty: '', rate: '', location: 'MAIN STORE', rollNo: '',
-});
+
+const blank = (mode) =>
+  mode === ACCESSORIES
+    ? {
+        key: key(), accessoriesItem: '', accessoryType: '', color: '', qty: '', uom: '',
+        rate: '', location: 'MAIN STORE',
+      }
+    : {
+        key: key(), fabricType: '', color: '', qty: '', rate: '', location: 'MAIN STORE', rollNo: '',
+      };
+
+/** A spreadsheet cell that is actually a number, commas and all. */
+const isNum = (c) => c !== '' && Number.isFinite(Number(String(c).replace(/,/g, '')));
+const toNum = (c) => String(c).replace(/,/g, '');
 
 /**
- * Pasted spreadsheet rows, split into the three columns that matter.
+ * Pasted spreadsheet rows, split into the columns that matter for the mode.
  *
  * Tab-separated is what Excel and Google Sheets put on the clipboard; comma is
  * accepted for a CSV someone has opened in a text editor. A header row is
- * dropped by looking at the third column: "Qty mtr." is not a number, and a
- * real quantity always is.
+ * dropped the same way in both modes - by requiring a real number where the
+ * quantity belongs, because "Qty mtr." is not one.
+ *
+ * FABRIC expects the office's three columns in order: type, colour, quantity.
+ *
+ * ACCESSORIES cannot assume a fixed position, because some sheets carry a
+ * variety column between the item and the quantity and some do not. So the
+ * quantity is the first numeric cell after the item, anything between the two
+ * is the variety, and whatever follows is taken as the unit. A sheet with no
+ * unit column leaves it to the default chosen above the paste box - a trim
+ * sheet is almost always all in one unit, and UOM is part of the item's
+ * identity, so it is asked for rather than guessed per row.
  */
-function parsePaste(text) {
-  return text
+function parsePaste(text, mode, defaultUom) {
+  const lines = text
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean)
-    .map((line) => line.split(/\t|,/).map((c) => c.trim()))
-    .filter((cells) => cells.length >= 3 && Number.isFinite(Number(cells[2].replace(/,/g, ''))))
+    .map((line) => line.split(/\t|,/).map((c) => c.trim()));
+
+  if (mode === ACCESSORIES) {
+    return lines
+      .map((cells) => {
+        const qtyAt = cells.findIndex((c, i) => i > 0 && isNum(c));
+        if (qtyAt < 0 || !cells[0]) return null;
+        return {
+          ...blank(ACCESSORIES),
+          accessoriesItem: cells[0],
+          accessoryType: cells.slice(1, qtyAt).filter(Boolean).join(' '),
+          qty: toNum(cells[qtyAt]),
+          uom: cells[qtyAt + 1] || defaultUom || '',
+        };
+      })
+      .filter(Boolean);
+  }
+
+  return lines
+    .filter((cells) => cells.length >= 3 && isNum(cells[2]))
     .map((cells) => ({
-      ...blank(),
-      key: key(),
+      ...blank(FABRIC),
       fabricType: cells[0],
       color: cells[1],
-      qty: cells[2].replace(/,/g, ''),
+      qty: toNum(cells[2]),
     }));
 }
 
@@ -71,7 +124,9 @@ export default function OpeningStockPage() {
   const { can } = useAuth();
   const navigate = useNavigate();
 
-  const [rows, setRows] = useState([blank()]);
+  const [mode, setMode] = useState(FABRIC);
+  const [pasteUom, setPasteUom] = useState('Pcs');
+  const [rows, setRows] = useState([blank(FABRIC)]);
   const [paste, setPaste] = useState('');
   const [preview, setPreview] = useState(null);
   const [busy, setBusy] = useState('');
@@ -79,20 +134,52 @@ export default function OpeningStockPage() {
   const [done, setDone] = useState(null);
 
   const mayLoad = can('FABRIC_ROLL.CREATE');
+  const isTrim = mode === ACCESSORIES;
   const setRow = (k, patch) => setRows((rs) => rs.map((r) => (r.key === k ? { ...r, ...patch } : r)));
 
   /** Only the rows that say something. A blank trailing row is not an error. */
-  const filled = rows.filter((r) => r.fabricType || r.color || r.qty);
+  const filled = rows.filter((r) =>
+    isTrim ? r.accessoriesItem || r.qty : r.fabricType || r.color || r.qty,
+  );
 
+  /*
+   * `itemCategory` is sent for a trim and left off for cloth, which defaults to
+   * Fabric on the server. "Accessories" is the exact L_ItemCategory value -
+   * trim is recorded one way, as that list's own note explains, so the item a
+   * later purchase order resolves to is the item loaded here.
+   */
   const payload = () =>
-    filled.map((r) => ({
-      fabricType: r.fabricType,
-      color: r.color,
-      qty: String(r.qty),
-      rate: r.rate === '' ? undefined : String(r.rate),
-      location: r.location || undefined,
-      rollNo: r.rollNo || undefined,
-    }));
+    filled.map((r) =>
+      isTrim
+        ? {
+            itemCategory: 'Accessories',
+            accessoriesItem: r.accessoriesItem,
+            accessoryType: r.accessoryType || undefined,
+            colorCode: r.color || undefined,
+            qty: String(r.qty),
+            uom: r.uom || undefined,
+            rate: r.rate === '' ? undefined : String(r.rate),
+            location: r.location || undefined,
+          }
+        : {
+            fabricType: r.fabricType,
+            color: r.color,
+            qty: String(r.qty),
+            rate: r.rate === '' ? undefined : String(r.rate),
+            location: r.location || undefined,
+            rollNo: r.rollNo || undefined,
+          },
+    );
+
+  /** Switching mode starts the grid again - the columns are not the same ones. */
+  function switchMode(next) {
+    if (next === mode) return;
+    setMode(next);
+    setRows([blank(next)]);
+    setPaste('');
+    setPreview(null);
+    setError('');
+  }
 
   /** Any edit invalidates the answer the server gave about the old rows. */
   function change(k, patch) {
@@ -130,7 +217,8 @@ export default function OpeningStockPage() {
       <>
         <PageHeader title="Opening stock" />
         <Alert kind="error">
-          Loading opening stock needs FABRIC_ROLL.CREATE - it creates rolls and puts them on hand.
+          Loading opening stock needs FABRIC_ROLL.CREATE - it puts stock on hand, and for cloth it
+          creates the rolls that hold it.
         </Alert>
       </>
     );
@@ -163,7 +251,8 @@ export default function OpeningStockPage() {
                   <tr key={r.lineNo}>
                     <td>{r.lineNo}</td>
                     <td><span className="code">{r.itemCode}</span> — {r.description}</td>
-                    <td className="code">{r.rollNo}</td>
+                    {/* Null for a trim, which is held in bulk and has no roll. */}
+                    <td className="code">{r.rollNo ?? '—'}</td>
                     <td className="num">{fmtNum(r.qty)} {r.uom}</td>
                     <td>{r.location}</td>
                   </tr>
@@ -184,23 +273,67 @@ export default function OpeningStockPage() {
 
       <Alert kind="info">
         Stock that was already here when this system started. Everything bought since comes in on a
-        GRN against a purchase order — <strong>this is for the cloth that has no order behind it</strong>,
-        and it can be posted only once per fabric and colour.
+        GRN against a purchase order — <strong>this is for what has no order behind it</strong>, and
+        it can be posted only once per stock item.
       </Alert>
 
       {error && <Alert kind="error">{error}</Alert>}
 
+      {/* Cloth and trim are identified by different columns - see the note on
+          FABRIC/ACCESSORIES above. */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="card-header">What are you loading?</div>
+        <div className="card-body" style={{ display: 'flex', gap: 8 }}>
+          <button
+            type="button"
+            className={`btn ${mode === FABRIC ? 'btn-primary' : ''}`}
+            onClick={() => switchMode(FABRIC)}
+          >
+            Fabric
+          </button>
+          <button
+            type="button"
+            className={`btn ${isTrim ? 'btn-primary' : ''}`}
+            onClick={() => switchMode(ACCESSORIES)}
+          >
+            Accessories
+          </button>
+        </div>
+      </div>
+
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-header">Paste from the spreadsheet</div>
         <div className="card-body">
+          {/* UOM is part of a trim's identity, so it is chosen rather than
+              guessed: the same button in Pcs and in Gross is two stock items. */}
+          {isTrim && (
+            <Field
+              label="Unit for pasted rows"
+              hint="Used where the paste carries no unit column. Editable per row afterwards."
+            >
+              <MasterSelect
+                listCode="UOM"
+                value={pasteUom}
+                onChange={(e) => setPasteUom(e.target.value)}
+              />
+            </Field>
+          )}
           <Field
-            label="Fabric type, colour, quantity"
-            hint="Copy the three columns straight out of Excel. A header row is ignored."
+            label={isTrim ? 'Item, variety, quantity, unit' : 'Fabric type, colour, quantity'}
+            hint={
+              isTrim
+                ? 'Copy the columns straight out of Excel. The quantity is the first number after the item; anything between is the variety. A header row is ignored.'
+                : 'Copy the three columns straight out of Excel. A header row is ignored.'
+            }
           >
             <TextArea
               rows={4}
               value={paste}
-              placeholder={'10OZ\tMid Night Blue\t2200\n10OZ\tSky Grey\t1800'}
+              placeholder={
+                isTrim
+                  ? 'Button\t4-hole horn 18L\t5000\tPcs\nZip\t20 cm\t1200\tPcs'
+                  : '10OZ\tMid Night Blue\t2200\n10OZ\tSky Grey\t1800'
+              }
               onChange={(e) => setPaste(e.target.value)}
             />
           </Field>
@@ -209,9 +342,13 @@ export default function OpeningStockPage() {
             className="btn"
             disabled={!paste.trim()}
             onClick={() => {
-              const parsed = parsePaste(paste);
+              const parsed = parsePaste(paste, mode, pasteUom);
               if (!parsed.length) {
-                setError('Nothing in that paste looked like a row — three columns are needed, and the third has to be a number.');
+                setError(
+                  isTrim
+                    ? 'Nothing in that paste looked like a row — each line needs the item and then a quantity that is a number.'
+                    : 'Nothing in that paste looked like a row — three columns are needed, and the third has to be a number.',
+                );
                 return;
               }
               setRows(parsed);
@@ -238,12 +375,15 @@ export default function OpeningStockPage() {
             <thead>
               <tr>
                 <th>#</th>
-                <th>Fabric type</th>
+                {isTrim ? <th>Item</th> : <th>Fabric type</th>}
+                {isTrim && <th>Variety</th>}
                 <th>Colour</th>
                 <th className="num">Qty</th>
+                {isTrim && <th>UOM</th>}
                 <th className="num">Rate</th>
                 <th>Location</th>
-                <th>Roll no</th>
+                {/* A trim has no roll - it is counted in bulk off a balance. */}
+                {!isTrim && <th>Roll no</th>}
                 <th>Checked</th>
                 <th />
               </tr>
@@ -255,19 +395,61 @@ export default function OpeningStockPage() {
                 return (
                   <tr key={r.key} className={bad ? 'row-bad' : ''}>
                     <td>{i + 1}</td>
-                    <td style={{ minWidth: 120 }}>
-                      <TextInput aria-label="Fabric type" value={r.fabricType}
-                        placeholder="10OZ" onChange={(e) => change(r.key, { fabricType: e.target.value })} />
-                    </td>
+                    {isTrim ? (
+                      <td style={{ minWidth: 160 }}>
+                        <MasterSelect
+                          listCode="AccessoriesItem"
+                          aria-label="Accessories item"
+                          placeholder="Select item..."
+                          value={r.accessoriesItem}
+                          currentValue={r.accessoriesItem}
+                          onChange={(e) => change(r.key, { accessoriesItem: e.target.value })}
+                        />
+                      </td>
+                    ) : (
+                      <td style={{ minWidth: 120 }}>
+                        <TextInput aria-label="Fabric type" value={r.fabricType}
+                          placeholder="10OZ" onChange={(e) => change(r.key, { fabricType: e.target.value })} />
+                      </td>
+                    )}
+                    {/* The SAME picker the Style BOM and the purchase order use,
+                        so a variety chosen here lands on the one stock item a
+                        later PO for it resolves to - see VarietySelect. A value
+                        that arrived by paste is kept visible either way. */}
+                    {isTrim && (
+                      <td style={{ minWidth: 170 }}>
+                        <VarietySelect
+                          accessoriesItem={r.accessoriesItem}
+                          aria-label="Variety"
+                          placeholder={r.accessoriesItem ? 'Select variety...' : 'Choose the item first'}
+                          value={r.accessoryType}
+                          currentValue={r.accessoryType}
+                          onChange={(e) => change(r.key, { accessoryType: e.target.value })}
+                        />
+                      </td>
+                    )}
                     <td style={{ minWidth: 160 }}>
                       <TextInput aria-label="Colour" value={r.color}
-                        placeholder="Black" onChange={(e) => change(r.key, { color: e.target.value })} />
+                        placeholder={isTrim ? 'optional' : 'Black'}
+                        onChange={(e) => change(r.key, { color: e.target.value })} />
                     </td>
                     <td className="num" style={{ minWidth: 110 }}>
                       <TextInput type="number" min="0" step="any" aria-label="Quantity"
                         style={{ width: 110, textAlign: 'right' }} value={r.qty}
                         onChange={(e) => change(r.key, { qty: e.target.value })} />
                     </td>
+                    {isTrim && (
+                      <td style={{ minWidth: 110 }}>
+                        <MasterSelect
+                          listCode="UOM"
+                          aria-label="UOM"
+                          placeholder="Unit..."
+                          value={r.uom}
+                          currentValue={r.uom}
+                          onChange={(e) => change(r.key, { uom: e.target.value })}
+                        />
+                      </td>
+                    )}
                     <td className="num" style={{ minWidth: 110 }}>
                       <TextInput type="number" min="0" step="any" aria-label="Rate"
                         style={{ width: 110, textAlign: 'right' }} value={r.rate}
@@ -277,10 +459,12 @@ export default function OpeningStockPage() {
                       <TextInput aria-label="Location" value={r.location}
                         onChange={(e) => change(r.key, { location: e.target.value })} />
                     </td>
-                    <td style={{ minWidth: 120 }}>
-                      <TextInput aria-label="Roll no" value={r.rollNo}
-                        placeholder="auto" onChange={(e) => change(r.key, { rollNo: e.target.value })} />
-                    </td>
+                    {!isTrim && (
+                      <td style={{ minWidth: 120 }}>
+                        <TextInput aria-label="Roll no" value={r.rollNo}
+                          placeholder="auto" onChange={(e) => change(r.key, { rollNo: e.target.value })} />
+                      </td>
+                    )}
                     <td style={{ minWidth: 200 }}>
                       {!line ? (
                         <span className="faint">—</span>
@@ -308,7 +492,7 @@ export default function OpeningStockPage() {
         </TableWrap>
         <div className="card-body">
           <button type="button" className="btn"
-            onClick={() => { setRows((rs) => [...rs, blank()]); setPreview(null); }}>
+            onClick={() => { setRows((rs) => [...rs, blank(mode)]); setPreview(null); }}>
             Add a row
           </button>
         </div>

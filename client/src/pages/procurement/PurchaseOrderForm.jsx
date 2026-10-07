@@ -451,7 +451,19 @@ export default function PurchaseOrderForm({ purchaseOrder, onSaved, onCancel }) 
           )}
           <RHFInput form={form} name="size" label="Size" hint="As the vendor must supply it, e.g. 20 cm, 18L, 12 x 16." />
           <RHFMasterSelect form={form} name="uom" label="UOM" listCode="UOM" required />
-          <RHFQty form={form} name="orderQty" label="Order Qty" required uom={uom} />
+          {/* The BOM average is what bounds this box, so it is quoted on it. */}
+          <RHFQty
+            form={form}
+            name="orderQty"
+            label="Order Qty"
+            required
+            uom={uom}
+            hint={
+              preview?.requirement?.perPiece
+                ? `BOM average ${fmtNum(preview.requirement.perPiece, { decimals: 4 })} ${preview.requirement.uom}/pc`
+                : undefined
+            }
+          />
           <RHFQty form={form} name="rate" label="Rate" required />
           <RHFInput
             form={form}
@@ -512,13 +524,48 @@ function ServerFigures({ preview, loading }) {
   }
   if (!preview) return null;
 
-  const { quantity, excess } = preview;
+  const { quantity, excess, requirement } = preview;
 
   return (
     <div style={{ marginTop: 18 }}>
       <div className="fieldset-title">
         Calculated <span className="faint">&mdash; by the server</span>
       </div>
+
+      {/*
+        THE BOM AVERAGE, STATED BEFORE THE CEILING IT PRODUCES.
+
+        The quantity ceiling below is this average times the order quantity, so
+        a buyer asked to justify a quantity was being shown the answer without
+        the figure it came from. Fabric reads it from the Style Master header
+        and an accessory from its BOM line; both come through one calculation,
+        so both are shown the same way here.
+      */}
+      {requirement?.perPiece && (
+        <div className="card" style={{ marginTop: 14 }}>
+          <div className="card-header">
+            <span>BOM average</span>
+            <span className="faint" style={{ fontWeight: 400, fontSize: 12 }}>
+              {requirement.source === 'STYLE_HEADER'
+                ? 'Style Master'
+                : `BOM line ${requirement.bomLineNo}`}
+            </span>
+          </div>
+          <div className="card-body">
+            <p style={{ marginTop: 0, marginBottom: 4 }}>
+              <strong>{fmtNum(requirement.perPiece, { decimals: 4 })}</strong>{' '}
+              {requirement.uom} per piece
+              {Number(requirement.wastagePct) > 0 && (
+                <span className="faint"> &middot; {requirement.wastagePctDisplay}% wastage</span>
+              )}
+            </p>
+            <p className="faint" style={{ fontSize: 12, marginBottom: 0 }}>
+              {fmtNum(requirement.orderQty)} pcs on the order &rarr;{' '}
+              {fmtNum(requirement.qty, { decimals: 4 })} {requirement.uom} required
+            </p>
+          </div>
+        </div>
+      )}
 
 
       {!excess.withinCeiling && (

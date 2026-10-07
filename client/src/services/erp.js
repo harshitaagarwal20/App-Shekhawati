@@ -331,6 +331,11 @@ export const grns = {
    * ledger is not a state this system holds.
    */
   create: (body) => request({ method: 'POST', url: '/grns', data: body }),
+  /**
+   * The register: ONE ROW PER RECEIPT DOCUMENT. A delivery that received three
+   * PO lines is one entry here, where `list` reads it as three. Same filters.
+   */
+  listDocuments: (params) => requestList({ method: 'GET', url: '/grns/documents', params }),
   /** Multi-line: one delivery, one bill, several PO lines. */
   createDocument: (body) => request({ method: 'POST', url: '/grns/documents', data: body }),
   getDocument: (id) => request({ method: 'GET', url: `/grns/documents/${id}` }),
@@ -450,6 +455,20 @@ export const inventory = {
   /** Grade a roll's shade band and dye lot. Closed once the roll has been cut from. */
   markRollShade: (id, body) =>
     request({ method: 'PATCH', url: `/inventory/rolls/${id}/shade`, data: body }),
+  /** Takes a wrongly-loaded opening balance roll back out. Only while it is untouched. */
+  reverseOpeningBalance: (id, body) =>
+    request({ method: 'POST', url: `/inventory/rolls/${id}/reverse-opening-balance`, data: body }),
+  /** The same, over a batch of rolls. One pass/fail per roll - nothing all-or-nothing. */
+  reverseOpeningBalanceBatch: (body) =>
+    request({ method: 'POST', url: '/inventory/rolls/reverse-opening-balance', data: body }),
+  /**
+   * The same for BULK stock - a trim, which has no roll and is named by the
+   * ledger entry its opening balance wrote. See reverseEntry() on the server.
+   */
+  reverseOpeningEntry: (id, body) =>
+    request({ method: 'POST', url: `/inventory/opening-stock/entries/${id}/reverse`, data: body }),
+  reverseOpeningEntryBatch: (body) =>
+    request({ method: 'POST', url: '/inventory/opening-stock/entries/reverse', data: body }),
 };
 
 // --- Fabric Issue (shop floor) ----------------------------------------------

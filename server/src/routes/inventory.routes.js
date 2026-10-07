@@ -36,6 +36,9 @@ import {
   stockSummaryQuery,
   updateItemSchema,
   openingStockSchema,
+  reverseOpeningBalanceSchema,
+  reverseOpeningBalanceBatchSchema,
+  reverseOpeningEntryBatchSchema,
 } from '../validators/grn.validator.js';
 
 const router = Router();
@@ -95,10 +98,63 @@ router.post(
   c.applyOpeningStock,
 );
 
+/**
+ * UNDOING A BULK OPENING BALANCE - a trim, which has no roll.
+ *
+ * The roll routes below cannot serve these: a button is identified by the
+ * ledger entry the opening balance wrote, not by a roll that was never
+ * created. Same permission as loading it, for the reason given above.
+ *
+ * Batch first, so "reverse" is not read as an entry id.
+ */
+router.post(
+  '/opening-stock/entries/reverse',
+  can('FABRIC_ROLL.CREATE'),
+  validate({ body: reverseOpeningEntryBatchSchema }),
+  c.reverseOpeningEntryBatch,
+);
+
+router.post(
+  '/opening-stock/entries/:id/reverse',
+  can('FABRIC_ROLL.CREATE'),
+  validate({ params: idParam, body: reverseOpeningBalanceSchema }),
+  c.reverseOpeningEntry,
+);
+
 router.get('/rolls', can('FABRIC_ROLL.VIEW'), validate({ query: rollListQuery }), c.listRolls);
+
+/**
+ * `reverse-opening-balance` over a batch of rolls, selected from this same
+ * list - a paste that loaded forty rows wrong is undone the way it was
+ * loaded, not forty single-roll trips. Before `/rolls/:id` for the same
+ * reason `/opening-stock` sits before it: Express would otherwise read
+ * "reverse-opening-balance" as a roll id.
+ */
+router.post(
+  '/rolls/reverse-opening-balance',
+  can('FABRIC_ROLL.CREATE'),
+  validate({ body: reverseOpeningBalanceBatchSchema }),
+  c.reverseOpeningBalanceBatch,
+);
 
 /** One roll, with its whole chain: GRN, vendor, PO, order, and issue history. */
 router.get('/rolls/:id', can('FABRIC_ROLL.VIEW'), validate({ params: idParam }), c.getRoll);
+
+/**
+ * Takes one wrongly-loaded opening balance roll back out.
+ *
+ * Same permission as loading it in the first place - FABRIC_ROLL.CREATE is
+ * what actually creates and un-creates a roll, and INVENTORY stays read-only
+ * (see the note above /opening-stock). The service itself refuses anything
+ * this route does not: a roll not from an opening balance, one that has
+ * already moved, or one that is held.
+ */
+router.post(
+  '/rolls/:id/reverse-opening-balance',
+  can('FABRIC_ROLL.CREATE'),
+  validate({ params: idParam, body: reverseOpeningBalanceSchema }),
+  c.reverseOpeningBalance,
+);
 
 /** Grading a roll's shade and dye lot - see markRollShade() for when it closes. */
 router.patch(

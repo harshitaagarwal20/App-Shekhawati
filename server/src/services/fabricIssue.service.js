@@ -1492,16 +1492,30 @@ export async function rollOptions({ orderId, colorCode, stage, location, include
   // An order narrows the list to rolls bought for it, but never hides the rest:
   // a storeman substituting fabric across orders is normal, and a picker that
   // silently omits a roll they are holding is worse than one that flags it.
-  return rolls.map((r) => ({
-    ...r,
-    poId: r.grn?.purchaseOrder?.poId ?? null,
-    orderNo: r.grn?.purchaseOrder?.order?.orderNo ?? null,
-    forThisOrder: orderId ? r.grn?.purchaseOrder?.order?.id === orderId : null,
-    label:
-      `${r.rollNo} - ${[r.fabricName, r.colorCode, r.gsm].filter(Boolean).join(' / ')} ` +
-      (r.shade || r.dyeLot
-        ? `[${[r.shade && `shade ${r.shade}`, r.dyeLot && `lot ${r.dyeLot}`].filter(Boolean).join(', ')}] `
-        : '') +
-      `(${D(r.balanceQty).toFixed(2)} ${r.uom})`,
-  }));
+  return rolls.map((r) => {
+    /*
+     * A roll made before `fabricName` was trimmed to item/sub-category still
+     * has the colour and the GSM baked into it - `describeFabricName` only
+     * changed what NEW rolls are given, and this label cannot un-ring that
+     * bell by editing the row. What it can do is stop repeating a fact
+     * `fabricName` already states: colour and GSM are appended here only when
+     * they are not already sitting inside the name.
+     */
+    const extra = [
+      r.colorCode && !r.fabricName?.includes(r.colorCode) ? r.colorCode : null,
+      r.gsm && !r.fabricName?.includes(r.gsm) ? r.gsm : null,
+    ];
+    return {
+      ...r,
+      poId: r.grn?.purchaseOrder?.poId ?? null,
+      orderNo: r.grn?.purchaseOrder?.order?.orderNo ?? null,
+      forThisOrder: orderId ? r.grn?.purchaseOrder?.order?.id === orderId : null,
+      label:
+        `${r.rollNo} - ${[r.fabricName, ...extra].filter(Boolean).join(' / ')} ` +
+        (r.shade || r.dyeLot
+          ? `[${[r.shade && `shade ${r.shade}`, r.dyeLot && `lot ${r.dyeLot}`].filter(Boolean).join(', ')}] `
+          : '') +
+        `(${D(r.balanceQty).toFixed(2)} ${r.uom})`,
+    };
+  });
 }
