@@ -5,7 +5,7 @@
  *   router.get('/', authenticate, can('BUYER.VIEW'), controller.list)
  *
  * `can()` grants when the user holds ANY of the listed permission codes.
- * `canAll()` requires all of them. ADMIN passes everything by construction
+ * ADMIN passes everything by construction
  * (see authenticate.js, which sets `has()` to short-circuit for that role).
  */
 
@@ -39,39 +39,5 @@ export function can(...codes) {
     }
   };
 }
-
-/** Grants only if the user holds every one of `codes`. */
-export function canAll(...codes) {
-  const required = codes.flat();
-  return (req, _res, next) => {
-    try {
-      ensureAuth(req);
-      const missing = required.filter((code) => !req.auth.has(code));
-      if (missing.length === 0) return next();
-      return next(
-        ApiError.forbidden(`This action requires: ${required.join(', ')}`, { required, missing }),
-      );
-    } catch (err) {
-      next(err);
-    }
-  };
-}
-
-/** Grants if the user holds one of the named roles. Prefer `can()`. */
-export function hasRole(...roleCodes) {
-  const required = roleCodes.flat();
-  return (req, _res, next) => {
-    try {
-      ensureAuth(req);
-      if (req.auth.isAdmin || required.some((r) => req.auth.roles.includes(r))) return next();
-      return next(ApiError.forbidden(`This action is restricted to: ${required.join(', ')}`));
-    } catch (err) {
-      next(err);
-    }
-  };
-}
-
-/** Restricts a route to administrators. */
-export const adminOnly = hasRole('ADMIN');
 
 export default can;

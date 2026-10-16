@@ -10,17 +10,8 @@
  *  whose latest version was rejected.
  *
  *  So state is never rendered as a bare word in a table cell. `StateBadge`
- *  gives each state its own colour and shape, `LockNotice` says out loud when a
- *  document has stopped moving and why, and `WorkflowTrail` shows the whole
- *  history rather than just where it ended up.
- *
- *  THE BUTTONS COME FROM THE SERVER
- *
- *  `WorkflowActions` renders whatever `allowed` the API returned for this
- *  document's state - the transition table in approvalEngine.js, rendered. A
- *  screen that builds its own buttons drifts from the server's rules the first
- *  time either changes; this one cannot offer an action the server would
- *  refuse.
+ *  gives each state its own colour and shape, and `WorkflowTrail` shows the
+ *  whole history rather than just where it ended up.
  * ---------------------------------------------------------------------------
  */
 
@@ -61,29 +52,6 @@ export function StateBadge({ state, size = '', title }) {
   );
 }
 
-/**
- * Says out loud that a document has stopped moving, and why.
- *
- * A locked document with no explanation is the single most common way a user
- * concludes the system is broken - they press Edit, nothing happens, and there
- * is nowhere on the screen that says the record is finished.
- */
-export function LockNotice({ locked, reason, children }) {
-  if (!locked) return null;
-  return (
-    <div className="lock-notice" role="status">
-      <span className="lock-icon" aria-hidden="true">
-        🔒
-      </span>
-      <div>
-        <strong>This document is locked.</strong>
-        {reason && <div className="muted">{reason}</div>}
-        {children}
-      </div>
-    </div>
-  );
-}
-
 /*
  * THE FOUR-STEP PROGRESS BAR IS GONE, deliberately.
  *
@@ -108,37 +76,6 @@ export function LockNotice({ locked, reason, children }) {
  */
 
 /**
- * The actions this document may take next.
- *
- * Rendered from the server's own transition table, and filtered by what the
- * user is allowed to do - `can` hides an action the API would refuse, which is
- * a convenience; the API refuses it regardless, which is the security.
- */
-export function WorkflowActions({ allowed = [], permission, can, onAction, busy }) {
-  const permitted = !permission || can?.(permission);
-  const actionable = allowed.filter((a) => a.to !== 'DRAFT');
-  if (!permitted || actionable.length === 0) return null;
-
-  return (
-    <div className="row workflow-actions">
-      {actionable.map((a) => (
-        <button
-          key={a.to}
-          type="button"
-          className={`btn btn-sm ${a.to === 'APPROVED' ? 'btn-primary' : ''} ${
-            a.to === 'REJECTED' || a.to === 'CANCELLED' ? 'btn-danger' : ''
-          }`}
-          disabled={busy}
-          onClick={() => onAction(a)}
-        >
-          {a.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-/**
  * The approval trail: every transition, who made it and when.
  *
  * Every approvable document in this system renders this same component, which
@@ -149,43 +86,53 @@ export function WorkflowTrail({ history = [], title = 'Approval trail', emptyMes
   return (
     <div className="card">
       <div className="card-header">{title}</div>
-      <TableWrap>
-        <table className="data">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>When</th>
-              <th>Action</th>
-              <th>From &rarr; To</th>
-              <th>By</th>
-              <th>Remarks</th>
-            </tr>
-          </thead>
-          <tbody>
-            {history.map((h) => (
-              <tr key={h.id}>
-                <td className="faint">{h.sequenceNo}</td>
-                <td className="nowrap">{fmtDateTime(h.actedAt)}</td>
-                <td>{fmtEnum(h.action)}</td>
-                <td className="muted nowrap">
-                  {h.fromStatus ? fmtEnum(h.fromStatus) : '-'} &rarr;{' '}
-                  {h.toStatus ? fmtEnum(h.toStatus) : '-'}
-                </td>
-                <td>{h.actedByName ?? '-'}</td>
-                <td className="muted">{h.remarks ?? '-'}</td>
-              </tr>
-            ))}
-            {history.length === 0 && (
-              <tr>
-                <td colSpan={6} className="muted" style={{ padding: 20 }}>
-                  {emptyMessage ?? 'Nothing recorded yet.'}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </TableWrap>
+      <TrailTable history={history} emptyMessage={emptyMessage} />
     </div>
+  );
+}
+
+/**
+ * The trail's table on its own, for a screen that shows it inside a card of its
+ * own alongside something else - an order's amendments, a plan's allocations.
+ */
+export function TrailTable({ history = [], emptyMessage }) {
+  return (
+    <TableWrap>
+      <table className="data">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>When</th>
+            <th>Action</th>
+            <th>From &rarr; To</th>
+            <th>By</th>
+            <th>Remarks</th>
+          </tr>
+        </thead>
+        <tbody>
+          {history.map((h) => (
+            <tr key={h.id}>
+              <td className="faint">{h.sequenceNo}</td>
+              <td className="nowrap">{fmtDateTime(h.actedAt)}</td>
+              <td>{fmtEnum(h.action)}</td>
+              <td className="muted nowrap">
+                {h.fromStatus ? fmtEnum(h.fromStatus) : '-'} &rarr;{' '}
+                {h.toStatus ? fmtEnum(h.toStatus) : '-'}
+              </td>
+              <td>{h.actedByName ?? '-'}</td>
+              <td className="muted">{h.remarks ?? '-'}</td>
+            </tr>
+          ))}
+          {history.length === 0 && (
+            <tr>
+              <td colSpan={6} className="muted" style={{ padding: 20 }}>
+                {emptyMessage ?? 'Nothing recorded yet.'}
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </TableWrap>
   );
 }
 

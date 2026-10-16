@@ -59,5 +59,27 @@ export default defineConfig({
      * has to read a trace; there is no reason to ship them to the browser.
      */
     sourcemap: 'hidden',
+    /**
+     * Libraries in chunks of their own.
+     *
+     * React, the router and axios change only when package.json does, but
+     * bundled with our code they got a new hash on every deploy and every user
+     * downloaded them again. Split out, a deploy invalidates only the app's own
+     * chunks and the vendor ones stay in the browser cache for the year the
+     * server allows.
+     *
+     * The form libraries get a chunk too: only lazy screens import them, so it
+     * stays off the startup path, and the first form opened caches it for
+     * every other form.
+     */
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined;
+          if (/[\\/]node_modules[\\/](zod|react-hook-form|@hookform)[\\/]/.test(id)) return 'vendor-forms';
+          return 'vendor';
+        },
+      },
+    },
   },
 });

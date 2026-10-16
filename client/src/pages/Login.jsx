@@ -1,32 +1,53 @@
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { z } from 'zod';
 import { useAuth } from '../context/AuthContext.jsx';
 import { Alert, Field, TextInput } from '../components/ui.jsx';
 
-const schema = z.object({
-  username: z.string().trim().min(1, 'Username is required'),
-  password: z.string().min(1, 'Password is required'),
-});
+/**
+ * Sign-in.
+ *
+ * Plain state rather than react-hook-form and zod, on purpose. This screen is
+ * eager - it is the first paint for anyone signed out - so whatever it imports
+ * lands in the startup bundle. The two form libraries are ~80 kB minified and
+ * every other form in the app is lazy, so leaving them here made every cold
+ * load pay for them just to check that two boxes are not empty.
+ */
+function validate({ username, password }) {
+  const errors = {};
+  if (!username.trim()) errors.username = { message: 'Username is required' };
+  if (!password) errors.password = { message: 'Password is required' };
+  return errors;
+}
 
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [serverError, setServerError] = useState('');
+  const [values, setValues] = useState({ username: '', password: '' });
+  const [errors, setErrors] = useState({});
+  const [isSubmitting, setSubmitting] = useState(false);
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-  } = useForm({ resolver: zodResolver(schema), defaultValues: { username: '', password: '' } });
+  const register = (name) => ({
+    name,
+    value: values[name],
+    onChange: (e) => setValues((v) => ({ ...v, [name]: e.target.value })),
+  });
 
-  async function onSubmit(values) {
+  async function handleSubmit(event) {
+    event.preventDefault();
+    const found = validate(values);
+    setErrors(found);
+    if (Object.keys(found).length > 0) return;
+    setSubmitting(true);
+    await onSubmit({ username: values.username.trim(), password: values.password });
+    setSubmitting(false);
+  }
+
+  async function onSubmit(credentials) {
     setServerError('');
     try {
-      const user = await login(values);
+      const user = await login(credentials);
       const target = user.mustChangePassword
         ? '/change-password'
         : (location.state?.from?.pathname ?? '/');
@@ -38,7 +59,7 @@ export default function Login() {
 
   return (
     <div className="auth-page">
-      <form className="auth-card" onSubmit={handleSubmit(onSubmit)} noValidate>
+      <form className="auth-card" onSubmit={handleSubmit} noValidate>
         <h1>Sekawati Impex ERP</h1>
         <p className="sub">Sign in to continue</p>
 

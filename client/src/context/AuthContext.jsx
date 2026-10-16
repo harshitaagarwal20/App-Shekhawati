@@ -11,7 +11,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { auth as authApi } from '../services/erp.js';
 import { setSessionLostHandler, tokenStore } from '../services/api.js';
-import { forgetDataTransferCatalogues } from '../components/dataTransfer.jsx';
+import { forgetDataTransferCatalogues } from '../services/dataTransferCache.js';
 
 const AuthContext = createContext(null);
 

@@ -12,7 +12,7 @@
  * every time it opens. `invalidateMasterList()` clears the cache after an edit.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { masterLists } from '../services/erp.js';
 import { useIsMounted } from './useIsMounted.js';
 
@@ -88,62 +88,6 @@ export function useMasterList(code) {
   }, [code, load]);
 
   return { values, loading, error, reload };
-}
-
-/**
- * Several master lists at once, in a single request.
- * @param {string[]} codes
- * @returns {{lists: Record<string, {id:string,value:string}[]>, loading: boolean, error: Error|null}}
- */
-export function useMasterLists(codes) {
-  const key = useMemo(() => [...new Set(codes)].sort().join(','), [codes]);
-  const [lists, setLists] = useState({});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    const wanted = key ? key.split(',') : [];
-    if (!wanted.length) {
-      setLists({});
-      setLoading(false);
-      return () => {};
-    }
-
-    const missing = wanted.filter((c) => !cache.has(c));
-    const seed = Object.fromEntries(
-      wanted.filter((c) => cache.has(c)).map((c) => [c, cache.get(c).values]),
-    );
-
-    if (!missing.length) {
-      setLists(seed);
-      setLoading(false);
-      return () => {};
-    }
-
-    setLoading(true);
-    masterLists
-      .manyValues(missing)
-      .then((result) => {
-        for (const [code, values] of Object.entries(result)) {
-          cache.set(code, { values, at: Date.now() });
-        }
-        if (!cancelled) {
-          setLists({ ...seed, ...result });
-          setError(null);
-        }
-      })
-      .catch((e) => {
-        if (!cancelled) setError(e);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => { cancelled = true; };
-  }, [key]);
-
-  return { lists, loading, error };
 }
 
 export default useMasterList;

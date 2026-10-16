@@ -21,8 +21,9 @@ import {
   TextArea,
 } from '../../components/ui.jsx';
 import QuotationForm from './QuotationForm.jsx';
-import { fmtDate, fmtDateTime } from '../../utils/format.js';
+import { fmtDate } from '../../utils/format.js';
 import TableWrap from '../../components/TableWrap.jsx';
+import { WorkflowTrail } from '../../components/workflow.jsx';
 import { PartOfDocument } from '../procurement/DocumentPages.jsx';
 
 
@@ -270,44 +271,7 @@ export default function QuotationDetail() {
       </div>
 
       {/* --- Trail --------------------------------------------------------- */}
-      <div className="card">
-        <div className="card-header">Authorisation trail</div>
-        <TableWrap>
-          <table className="data">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>When</th>
-                <th>Action</th>
-                <th>From &rarr; To</th>
-                <th>By</th>
-                <th>Remarks</th>
-              </tr>
-            </thead>
-            <tbody>
-              {history.map((h) => (
-                <tr key={h.id}>
-                  <td className="faint">{h.sequenceNo}</td>
-                  <td className="nowrap">{fmtDateTime(h.actedAt)}</td>
-                  <td>{h.action.replace(/_/g, ' ')}</td>
-                  <td className="muted">
-                    {h.fromStatus ?? '-'} &rarr; {h.toStatus ?? '-'}
-                  </td>
-                  <td>{h.actedByName ?? '-'}</td>
-                  <td className="muted">{h.remarks ?? '-'}</td>
-                </tr>
-              ))}
-              {history.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="muted" style={{ padding: 20 }}>
-                    Nothing recorded yet.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </TableWrap>
-      </div>
+      <WorkflowTrail history={history} title="Authorisation trail" />
 
       {editing && (
         <Modal title={`Edit quotation ${quotation.quotationNo}`} size="wide" onClose={() => setEditing(false)}>

@@ -27,8 +27,9 @@ import {
   STATE_LABEL,
   UnitAllocationTable,
   fmtDate,
-  fmtQty, fmtDateTime, fmtEnum } from './planningShared.jsx';
+  fmtQty, fmtEnum } from './planningShared.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
+import { TrailTable } from '../../components/workflow.jsx';
 
 const STATUS_OPTIONS = [
   { value: 'PENDING', label: 'Pending' },
@@ -484,41 +485,7 @@ export default function PlanningDetail() {
 
         <div className="card-body">
           <div className="fieldset-title">Trail</div>
-          <TableWrap>
-            <table className="data">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>When</th>
-                  <th>Action</th>
-                  <th>From &rarr; To</th>
-                  <th>By</th>
-                  <th>Remarks</th>
-                </tr>
-              </thead>
-              <tbody>
-                {history.map((h) => (
-                  <tr key={h.id}>
-                    <td className="faint">{h.sequenceNo}</td>
-                    <td className="nowrap">{fmtDateTime(h.actedAt)}</td>
-                    <td>{h.action.replace(/_/g, ' ')}</td>
-                    <td className="muted">
-                      {h.fromStatus ?? '-'} &rarr; {h.toStatus ?? '-'}
-                    </td>
-                    <td>{h.actedByName ?? '-'}</td>
-                    <td className="muted">{h.remarks ?? '-'}</td>
-                  </tr>
-                ))}
-                {history.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="muted" style={{ padding: 20 }}>
-                      Nothing recorded yet.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </TableWrap>
+          <TrailTable history={history} />
         </div>
       </div>
 

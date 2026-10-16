@@ -448,10 +448,3 @@ export const styleMaster = {
      */
   }),
 };
-
-export const MASTERS = {
-  buyers: buyerMaster,
-  vendors: vendorMaster,
-  employees: employeeMaster,
-  styles: styleMaster,
-};

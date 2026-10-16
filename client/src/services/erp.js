@@ -27,9 +27,6 @@ export const masterLists = {
 
   /** Values of one list, by list CODE - the dropdown endpoint. */
   values: (code, params) => request({ method: 'GET', url: `/master-lists/values/${code}`, params }),
-  /** Several lists in one round trip: { UOM: [...], ColorCode: [...] }. */
-  manyValues: (codes, params) =>
-    request({ method: 'GET', url: '/master-lists/values', params: { codes: codes.join(','), ...params } }),
 
   addValue: (listId, body) => request({ method: 'POST', url: `/master-lists/${listId}/values`, data: body }),
   updateValue: (valueId, body) => request({ method: 'PATCH', url: `/master-lists/values/${valueId}`, data: body }),

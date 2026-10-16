@@ -78,7 +78,7 @@ import * as cuttingIssueService from './cuttingIssue.service.js';
 import * as cutPiecesReceiptService from './cutPiecesReceipt.service.js';
 import * as excessService from './excess.service.js';
 import * as auditService from './audit.service.js';
-import { MASTER_IMPORTS, importColumns } from './import.service.js';
+import { importColumns } from './import.service.js';
 
 /** The list-query keys every screen has, on top of each entry's own filters. */
 const COMMON_FILTERS = ['search', 'status', 'includeDeleted'];
@@ -486,9 +486,4 @@ export function allDatasets() {
 
 export function datasetFor(key) {
   return BY_KEY.get(key) ?? null;
-}
-
-/** The masters that can be imported as well as exported. */
-export function importableKeys() {
-  return Object.keys(MASTER_IMPORTS);
 }

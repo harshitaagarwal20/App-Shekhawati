@@ -25,8 +25,6 @@ const requiredDropdown = (max, label) => requiredText(max, label);
 
 // --- List Master -----------------------------------------------------------
 
-export const masterListQuery = listQuery;
-
 export const createMasterListSchema = z.object({
   code: z
     .string()

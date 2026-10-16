@@ -33,9 +33,6 @@
 /** The office's timezone. Not the browser's. */
 export const DISPLAY_TIMEZONE = 'Asia/Kolkata';
 
-/** The office's date format. */
-export const DATE_FORMAT = 'DD-MM-YYYY';
-
 const DATE_PARTS = new Intl.DateTimeFormat('en-GB', {
   timeZone: DISPLAY_TIMEZONE,
   year: 'numeric',
@@ -119,13 +116,6 @@ export function nowLocalInput() {
 
 export function todayInput() {
   return toDateInput(new Date());
-}
-
-/** How long ago, in whole days. For "waiting since" columns. */
-export function daysAgo(value) {
-  const date = parse(value);
-  if (!date) return null;
-  return Math.floor((Date.now() - date.getTime()) / 86400000);
 }
 
 // ---------------------------------------------------------------------------

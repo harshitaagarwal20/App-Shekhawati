@@ -458,20 +458,3 @@ export function FieldGroup({ title, hint, children }) {
     </>
   );
 }
-
-/**
- * A read-only value that came from the server already calculated.
- *
- * Deliberately not an input: there is nothing here for a user to type, because
- * there is nothing here the server would accept. Used for amounts, variations,
- * permitted quantities and every other derived figure.
- */
-export function ServerValue({ label, value, sub, tone = '' }) {
-  return (
-    <div className={`stat ${tone}`}>
-      <div className="label">{label}</div>
-      <div className="value">{value ?? '-'}</div>
-      {sub && <div className="sub">{sub}</div>}
-    </div>
-  );
-}

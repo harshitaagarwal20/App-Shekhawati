@@ -9,7 +9,6 @@
  */
 
 import { Link } from 'react-router-dom';
-import TableWrap from '../../components/TableWrap.jsx';
 
 /** A labelled read-only value. */
 /**
@@ -101,48 +100,6 @@ export function TraceChain({ title = 'Traceability', chain, links = [], complete
           </p>
         )}
       </div>
-    </div>
-  );
-}
-
-/** A small table with a caption, for the "what hangs off this" panels. */
-export function RelatedTable({ title, count, note, columns, rows, renderRow, emptyMessage, onRowClick }) {
-  return (
-    <div className="card" style={{ marginBottom: 16 }}>
-      <div className="card-header">
-        <span>{title}</span>
-        <span className="faint" style={{ fontWeight: 400, fontSize: 12 }}>
-          {note ?? (count !== undefined ? `${count} record(s)` : '')}
-        </span>
-      </div>
-      {rows.length === 0 ? (
-        <div className="card-body muted">{emptyMessage}</div>
-      ) : (
-        <TableWrap>
-          <table className="data">
-            <thead>
-              <tr>
-                {columns.map((c) => (
-                  <th key={c.key ?? c.label} className={c.num ? 'num' : ''}>
-                    {c.label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr className="clickable"
-                  key={r.id}
-                  onClick={onRowClick ? () => onRowClick(r) : undefined}
-                  style={onRowClick ? { cursor: 'pointer' } : undefined}
-                >
-                  {renderRow(r)}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </TableWrap>
-      )}
     </div>
   );
 }

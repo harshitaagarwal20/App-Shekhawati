@@ -1599,24 +1599,6 @@ table.data tr.inactive td { color: var(--text-faint); }
 .state-rectification { background: #fff9db; color: #8a6100; border-color: #ffe066; }
 .state-cancelled     { background: #f1f3f5; color: #868e96; border-color: #dee2e6; text-decoration: line-through; }
 
-/* --- Locked --------------------------------------------------------------- */
-
-.lock-notice {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  padding: 12px 14px;
-  margin-bottom: 16px;
-  border: 1px solid var(--border);
-  border-left: 4px solid #868e96;
-  border-radius: 8px;
-  background: var(--surface-2);
-  font-size: 13px;
-}
-.lock-notice .lock-icon { font-size: 16px; line-height: 1.2; }
-
-.workflow-actions { flex-wrap: wrap; }
-
 /* --- Excess panel --------------------------------------------------------- */
 
 .excess-panel { margin-bottom: 16px; border-left: 4px solid var(--border); }

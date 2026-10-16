@@ -36,37 +36,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { dataExports, dataImports } from '../services/erp.js';
 import { Alert, Modal, Spinner } from './ui.jsx';
 import { useIsMounted } from '../hooks/useIsMounted.js';
+import { catalogueOnce } from '../services/dataTransferCache.js';
 
 // ===========================================================================
-//  THE CATALOGUES
+//  THE CATALOGUES - cached in services/dataTransferCache.js
 // ===========================================================================
-
-/**
- * One request per catalogue per session, shared by every button.
- *
- * Held in a module variable rather than in React state because it is the same
- * answer for every screen and it does not change while the user is signed in -
- * their permissions are re-read server-side on every request anyway, so the
- * worst a stale catalogue can do is show a button whose action is then refused
- * with a sentence saying why.
- */
-const cache = { exports: null, imports: null };
-
-function catalogueOnce(which, fetcher) {
-  cache[which] ??= fetcher().catch(() => {
-    // A catalogue that will not load hides the buttons rather than breaking
-    // the screen they sit on. Exporting is never the reason someone opened it.
-    cache[which] = null;
-    return null;
-  });
-  return cache[which];
-}
-
-/** Resets the cached catalogues. Called on sign-out. */
-export function forgetDataTransferCatalogues() {
-  cache.exports = null;
-  cache.imports = null;
-}
 
 function useCatalogueEntry(which, key, fetcher, read) {
   const [entry, setEntry] = useState(null);

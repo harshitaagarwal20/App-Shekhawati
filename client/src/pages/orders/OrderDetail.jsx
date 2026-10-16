@@ -24,6 +24,7 @@ import {
 import OrderForm from './OrderForm.jsx';
 import { fmtDate, fmtDateTime, fmtPctFromFraction } from '../../utils/format.js';
 import TableWrap from '../../components/TableWrap.jsx';
+import { TrailTable } from '../../components/workflow.jsx';
 
 
 const fmtQty = (v) => (v === null || v === undefined ? '-' : Number(v).toLocaleString());
@@ -386,41 +387,7 @@ export default function OrderDetail() {
       {/* --- Trail --------------------------------------------------------- */}
       <div className="card">
         <div className="card-header">Approval &amp; amendment trail</div>
-        <TableWrap>
-          <table className="data">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>When</th>
-                <th>Action</th>
-                <th>From &rarr; To</th>
-                <th>By</th>
-                <th>Remarks</th>
-              </tr>
-            </thead>
-            <tbody>
-              {approvals.map((a) => (
-                <tr key={a.id}>
-                  <td className="faint">{a.sequenceNo}</td>
-                  <td className="nowrap">{fmtDateTime(a.actedAt)}</td>
-                  <td>{a.action.replace(/_/g, ' ')}</td>
-                  <td className="muted">
-                    {a.fromStatus ?? '-'} &rarr; {a.toStatus ?? '-'}
-                  </td>
-                  <td>{a.actedByName ?? '-'}</td>
-                  <td className="muted">{a.remarks ?? '-'}</td>
-                </tr>
-              ))}
-              {approvals.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="muted" style={{ padding: 20 }}>
-                    Nothing recorded yet.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </TableWrap>
+        <TrailTable history={approvals} />
         {amendments.length > 0 && (
           <div className="card-body">
             <div className="fieldset-title">Amendments</div>

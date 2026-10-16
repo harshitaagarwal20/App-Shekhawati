@@ -58,9 +58,3 @@ export async function peekNumber(documentType, { scopeKey = '' } = {}) {
   const padded = String(seq.nextNumber).padStart(seq.padLength, '0');
   return `${seq.prefix}${seq.prefix ? seq.separator : ''}${padded}${seq.suffix}`;
 }
-
-export async function listSequences() {
-  return prisma.documentSequence.findMany({
-    orderBy: [{ documentType: 'asc' }, { scopeKey: 'asc' }],
-  });
-}

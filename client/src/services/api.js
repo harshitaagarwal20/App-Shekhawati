@@ -282,11 +282,3 @@ export async function requestList(config) {
 }
 
 export default api;
-
-/**
- * The API base, for the few places that need a URL rather than a request —
- * a CSV download the browser performs itself, for instance.
- */
-export function apiBaseUrl() {
-  return api.defaults.baseURL;
-}
