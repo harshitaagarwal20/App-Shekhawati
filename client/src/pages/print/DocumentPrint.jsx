@@ -899,6 +899,7 @@ function JobWorkBody({ doc }) {
       <div className="po-meta">
         <PoMeta label="Job No" value={doc.jobNo} />
         <PoMeta label="Date" value={fmtDate(doc.issueDate)} />
+        <PoMeta label="Delivery date" value={doc.deliveryDate ? fmtDate(doc.deliveryDate) : null} />
         <PoMeta label="Process" value={doc.processLabel} />
         <PoMeta label="Fabric stage" value={fmtEnum(doc.fabricStage)} />
         <PoMeta label="Buyer order" value={references.orderNo} />
@@ -1005,6 +1006,7 @@ function FabricIssueChallanBody({ doc }) {
       <div className="po-meta">
         <PoMeta label="Challan No" value={doc.challanNo} />
         <PoMeta label="Date" value={fmtDate(doc.issueDate)} />
+        <PoMeta label="Delivery date" value={doc.deliveryDate ? fmtDate(doc.deliveryDate) : null} />
         <PoMeta label="Purpose" value={process} />
         <PoMeta label="Job work PO" value={po ? `${po.jobWorkNo} (part ${po.challanSeq})` : null} />
         <PoMeta label="Buyer order" value={references.orderNo} />

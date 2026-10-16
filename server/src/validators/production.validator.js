@@ -94,6 +94,8 @@ export const createFabricIssueSchema = z.object({
   issueNo: optionalText(40),
   /// Excel: "Date" (Auto) - defaults to today.
   issueDate: isoDate.optional(),
+  /// Optional due date for the work/fabric return.
+  deliveryDate: isoDate.nullish(),
 
   /// Excel: "Roll No" -> FabricRoll. The whole issue hangs off this.
   rollId: uuid,
@@ -150,6 +152,7 @@ export const createFabricIssueSchema = z.object({
  */
 export const updateFabricIssueSchema = z.object({
   issueDate: isoDate.optional(),
+  deliveryDate: isoDate.nullish(),
   fabricName: optionalText(120),
   colorCode: optionalText(60),
   // `status` moves through POST /fabric-issues/:id/status, checked against
@@ -206,6 +209,7 @@ const jobWorkBody = z.object({
   /// Job number, per process: DY-001 for dyeing, PJ-001 for printing.
   dyeIssueNo: optionalText(40),
   issueDate: isoDate.optional(),
+  deliveryDate: isoDate.nullish(),
 
   /// WHICH OF THE FOUR. The register is shared; the process is what makes a
   /// transaction a dyeing job rather than a printing one, so it is required

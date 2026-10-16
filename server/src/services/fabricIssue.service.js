@@ -749,6 +749,7 @@ export async function printView(id) {
     documentTitle: CHALLAN_TITLE[issue.purpose] ?? 'FABRIC ISSUE SLIP',
     challanNo: issue.issueNo,
     issueDate: issue.issueDate,
+    deliveryDate: issue.deliveryDate,
     purpose: issue.purpose,
     status: issue.status,
     vendor: issue.vendor
@@ -1037,6 +1038,7 @@ export async function create(input, actor) {
         uom: input.uom ?? locked.uom,
         status: 'IN_PROGRESS',
         remarks: input.remarks ?? null,
+        deliveryDate: input.deliveryDate ? new Date(input.deliveryDate) : null,
         location: from,
         // C5 - the requirement this issue fulfils.
         cuttingChallanLineId: needsChallanLine ? input.cuttingChallanLineId : null,
@@ -1277,6 +1279,9 @@ export async function update(id, input, actorId) {
       ...(input.fabricName !== undefined ? { fabricName: input.fabricName } : {}),
       ...(input.colorCode !== undefined ? { colorCode: input.colorCode } : {}),
       ...(input.remarks !== undefined ? { remarks: input.remarks } : {}),
+      ...(input.deliveryDate !== undefined
+        ? { deliveryDate: input.deliveryDate ? new Date(input.deliveryDate) : null }
+        : {}),
       updatedById: actorId,
     },
     include: LIST_INCLUDE,

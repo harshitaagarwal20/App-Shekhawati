@@ -773,6 +773,7 @@ export async function create(input, actorId) {
         rate: D(input.rate),
         amount,
         remark: input.remark ?? null,
+        deliveryDate: input.deliveryDate ? new Date(input.deliveryDate) : null,
         fabricStage: input.fabricStage ?? 'BEFORE_STITCHING',
         // C3 - resolved above, frozen here. Never re-resolved: a lot at the
         // vendor is judged by the bar it left under.
@@ -940,6 +941,9 @@ export async function update(id, input, actorId) {
       ...(input.pinCode !== undefined ? { pinCode: input.pinCode } : {}),
       ...(input.uom !== undefined ? { uom: input.uom } : {}),
       ...(input.remark !== undefined ? { remark: input.remark } : {}),
+      ...(input.deliveryDate !== undefined
+        ? { deliveryDate: input.deliveryDate ? new Date(input.deliveryDate) : null }
+        : {}),
       ...(input.fabricStage !== undefined ? { fabricStage: input.fabricStage } : {}),
       ...(input.standardShrinkageAllowed !== undefined
         ? { standardShrinkageAllowed: D(input.standardShrinkageAllowed) }
@@ -1682,6 +1686,7 @@ export async function printView(id) {
     processLabel: meta.label,
     jobNo: job.dyeIssueNo,
     issueDate: job.issueDate,
+    deliveryDate: job.deliveryDate,
     status: job.status,
     fabricStage: job.fabricStage,
     vendor: {

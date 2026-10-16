@@ -331,6 +331,7 @@ export function FabricIssueDetail() {
           <DetailGrid>
             <Detail label="Issue No" value={issue.issueNo} mono />
             <Detail label="Date" value={fmtDate(issue.issueDate)} />
+            {issue.deliveryDate && <Detail label="Delivery Date" value={fmtDate(issue.deliveryDate)} />}
             <Detail label="Roll No" value={issue.roll?.rollNo} mono />
             <Detail label="Fabric name" value={issue.fabricName} />
             <Detail label="Colour" value={issue.colorCode} />

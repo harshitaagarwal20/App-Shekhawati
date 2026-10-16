@@ -93,6 +93,7 @@ export default function FabricIssueForm() {
   const [employeeId, setEmployeeId] = useState('');
   const [issuedByName, setIssuedByName] = useState('');
   const [remarks, setRemarks] = useState('');
+  const [deliveryDate, setDeliveryDate] = useState('');
   // Only asked for when the roll's shade or dye lot differs from the one the
   // cutting line was started on. See domain/shade.js on the server.
   const [shadeMixReason, setShadeMixReason] = useState('');
@@ -223,6 +224,7 @@ export default function FabricIssueForm() {
         fabricQtyIssued: String(qty),
         shadeMixReason: shadeMix ? shadeMixReason.trim() : undefined,
         remarks: remarks || null,
+        deliveryDate: deliveryDate || null,
       });
       setConfirming(false);
       navigate(`/fabric-issues/${saved.id}`);
@@ -507,6 +509,10 @@ export default function FabricIssueForm() {
                 </option>
               ))}
             </select>
+          </Field>
+
+          <Field label="Delivery date">
+            <input type="date" value={deliveryDate} min={todayInput()} onChange={(e) => setDeliveryDate(e.target.value)} />
           </Field>
 
           <Field label="Remarks">

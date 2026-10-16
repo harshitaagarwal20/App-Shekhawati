@@ -3190,6 +3190,8 @@ model FabricIssue {
 
   /// Excel: "Date" (Auto)
   issueDate          DateTime      @map("issue_date") @db.Date
+  /// When the fabric is wanted back / the work done.
+  deliveryDate        DateTime?     @map("delivery_date") @db.Date
   /// Excel: "Vendor" - job worker the fabric goes to, when purpose is job work.
   vendorId           String?       @map("vendor_id") @db.Uuid
   vendor             Vendor?       @relation(fields: [vendorId], references: [id], onDelete: SetNull)
@@ -3323,6 +3325,8 @@ model DyeIssue {
 
   /// Excel: "Date" (Auto)
   issueDate    DateTime       @map("issue_date") @db.Date
+  /// When the job worker is to send the fabric back.
+  deliveryDate DateTime?      @map("delivery_date") @db.Date
   /// Excel: "Process" (Manual -> L_Process): Dyeing / Printing / Washing / Finishing
   process      JobWorkProcess
   /// Excel: "Roll No" (Auto-Dropdown -> FabricRoll)

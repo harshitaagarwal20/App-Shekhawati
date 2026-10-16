@@ -36,6 +36,7 @@ import { loadFailed } from '../../services/loadFailures.js';
 const schema = z.object({
   dyeIssueNo: z.string().trim().max(40).optional(),
   issueDate: z.string().min(1, 'Date is required'),
+  deliveryDate: z.string().optional(),
   // Dyeing and printing are what this store sends cloth out for. The server
   // decides what is offered (jobWork.service.js `OFFERED`); this refuses
   // anything else being submitted from a stale form.
@@ -77,6 +78,7 @@ export default function JobWorkForm({ processes = [], onSaved, onCancel }) {
   const form = useZodForm(schema, {
     dyeIssueNo: '',
     issueDate: todayInput(),
+    deliveryDate: '',
     process: 'DYEING',
     vendorId: '',
     fabricIssueId: '',
@@ -225,6 +227,7 @@ export default function JobWorkForm({ processes = [], onSaved, onCancel }) {
       return jwApi.create({
         dyeIssueNo: values.dyeIssueNo || undefined,
         issueDate: values.issueDate,
+        deliveryDate: values.deliveryDate || null,
         process: values.process,
         // C16 - the set. The server derives the header quantity and the lead
         // roll from it, so neither is sent.
@@ -385,6 +388,13 @@ export default function JobWorkForm({ processes = [], onSaved, onCancel }) {
             options={processes.map((p) => ({ value: p.process, label: p.label }))}
           />
           <RHFInput form={form} name="issueDate" label="Date" type="date" required />
+          <RHFInput
+            form={form}
+            name="deliveryDate"
+            label="Delivery Date"
+            type="date"
+            hint="When the fabric is due back from the job worker."
+          />
           <RHFInput
             form={form}
             name="dyeIssueNo"

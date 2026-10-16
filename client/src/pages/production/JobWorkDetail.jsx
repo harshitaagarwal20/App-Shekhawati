@@ -273,6 +273,7 @@ export default function JobWorkDetail() {
             <Detail label="Order No" value={job.order?.orderNo} mono />
             <Detail label="Style No" value={job.style?.styleNo} mono />
             {job.remark && <Detail label="Remark" value={job.remark} className="span-2" />}
+            {job.deliveryDate && <Detail label="Delivery Date" value={fmtDate(job.deliveryDate)} />}
           </DetailGrid>
         </div>
       </div>
