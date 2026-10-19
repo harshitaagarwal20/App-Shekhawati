@@ -407,7 +407,19 @@ async function resolvePurchaseOrder(purchaseOrderId) {
     },
   });
   if (!po) throw ApiError.badRequest('Purchase order does not exist', { field: 'purchaseOrderId' });
+  assertReceivable(po);
+  return po;
+}
 
+/**
+ * Whether a purchase order may take goods. Asked when the receipt is prepared
+ * and again inside the transaction, on the locked row: a PO cancelled or
+ * reopened in between must not still take the delivery.
+ */
+function assertReceivable(po) {
+  if (po.deletedAt) {
+    throw ApiError.badRequest('Purchase order does not exist', { field: 'purchaseOrderId' });
+  }
   if (po.approvalStatus !== 'APPROVED') {
     throw ApiError.conflict(
       `PO ${po.poId} is ${po.approvalStatus.toLowerCase()}. Goods cannot be received against a ` +
@@ -420,7 +432,6 @@ async function resolvePurchaseOrder(purchaseOrderId) {
       field: 'purchaseOrderId',
     });
   }
-  return po;
 }
 
 /** The gate pass the goods physically entered on, when one is named. */
@@ -898,6 +909,12 @@ async function createDocumentInternal(input, actor) {
 
   return prisma.$transaction(
     async (tx) => {
+      // Every PO this delivery moves, locked before anything is read or
+      // written, in one statement and in id order so two multi-line receipts
+      // sharing POs cannot deadlock. See lockAndRefresh.
+      const poIds = [...new Set(prepared.map((p) => p.po.id))];
+      await tx.$executeRaw`SELECT id FROM purchase_orders WHERE id = ANY(${poIds}::uuid[]) ORDER BY id FOR UPDATE`;
+
       const grnNo = input.grnNo?.trim() || (await nextNumber('GRN', { tx }));
       const headerClash = await tx.grnHeader.findUnique({ where: { grnNo }, select: { id: true } });
       if (headerClash) throw ApiError.conflict('This GRN number already exists', { field: 'grnNo' });
@@ -917,7 +934,14 @@ async function createDocumentInternal(input, actor) {
       });
 
       const lineIds = [];
-      for (const [i, ctx] of prepared.entries()) {
+      for (const [i, prep] of prepared.entries()) {
+        let ctx;
+        try {
+          ctx = await lockAndRefresh(tx, prep);
+        } catch (err) {
+          if (prepared.length > 1 && err?.message) err.message = `Line ${i + 1}: ${err.message}`;
+          throw err;
+        }
         lineIds.push(await writeLine(tx, ctx, { header, lineNo: i + 1 }, actor));
       }
       return { header, lineIds };
@@ -979,18 +1003,9 @@ async function prepareLine(input) {
       ? D(input.inventoryRate)
       : D(po.rate);
 
-  const assessment = assessReceipt({
-    receivingQty,
-    orderQty: po.orderQty,
-    inventoryRate,
-    item: po.item,
-    accessoriesItem: po.accessoriesItem,
-    alreadyReceived: po.receivedQty,
-    // C2: the tolerance FROZEN ON THE ORDER, not one re-resolved today. A PO
-    // placed in March and delivered in May is judged by March's rules.
-    receiptTolerancePct: po.receiptTolerancePct,
-    toleranceBasis: po.toleranceBasis,
-  });
+  // A fast refusal only. The judgement that counts is made again inside the
+  // transaction, against the locked PO - see lockAndRefresh.
+  const assessment = assessLine({ input, po, receivingQty, inventoryRate });
 
   // The vendor's bill carries GST. The rate is chosen by whoever keys the
   // receipt - from the "GST Rate" master list, never defaulted here - and the
@@ -1005,19 +1020,6 @@ async function prepareLine(input) {
       })
     : null;
 
-  // A breach is recorded, not refused - the goods are in the yard either way -
-  // unless the caller has not been told about it. `acknowledgeToleranceBreach`
-  // makes the checker say, in the request, that they know.
-  if (assessment.toleranceBreached && !input.acknowledgeToleranceBreach) {
-    throw ApiError.conflict(
-      `Receiving ${receivingQty.toFixed(4)} ${po.uom} takes the total received on ${po.poId} to ` +
-        `${assessment.cumulativeReceived} against an order of ${assessment.orderQty} - ` +
-        `${assessment.cumulativeVariationPctDisplay}% over. ${assessment.toleranceRule} ` +
-        'Confirm the over-receipt to record it anyway.',
-      { field: 'receivingQty', assessment, requiresAcknowledgement: true },
-    );
-  }
-
   const location = input.location ?? DEFAULT_LOCATION;
   const rollsIn = normaliseRolls(input, receivingQty, po);
 
@@ -1028,6 +1030,79 @@ async function prepareLine(input) {
   }
 
   return { input, po, gatePass, receivingQty, inventoryRate, assessment, gst, location, rollsIn };
+}
+
+/**
+ * The cumulative tolerance judgement for one line, against the total received
+ * as `po` holds it.
+ *
+ * A breach is recorded, not refused - the goods are in the yard either way -
+ * unless the caller has not been told about it. `acknowledgeToleranceBreach`
+ * makes the checker say, in the request, that they know.
+ */
+function assessLine({ input, po, receivingQty, inventoryRate }) {
+  const assessment = assessReceipt({
+    receivingQty,
+    orderQty: po.orderQty,
+    inventoryRate,
+    item: po.item,
+    accessoriesItem: po.accessoriesItem,
+    alreadyReceived: po.receivedQty,
+    // C2: the tolerance FROZEN ON THE ORDER, not one re-resolved today. A PO
+    // placed in March and delivered in May is judged by March's rules.
+    receiptTolerancePct: po.receiptTolerancePct,
+    toleranceBasis: po.toleranceBasis,
+  });
+
+  if (assessment.toleranceBreached && !input.acknowledgeToleranceBreach) {
+    throw ApiError.conflict(
+      `Receiving ${receivingQty.toFixed(4)} ${po.uom} takes the total received on ${po.poId} to ` +
+        `${assessment.cumulativeReceived} against an order of ${assessment.orderQty} - ` +
+        `${assessment.cumulativeVariationPctDisplay}% over. ${assessment.toleranceRule} ` +
+        'Confirm the over-receipt to record it anyway.',
+      { field: 'receivingQty', assessment, requiresAcknowledgement: true },
+    );
+  }
+  return assessment;
+}
+
+/**
+ * Re-reads, on the transaction, everything a prepared line judged before the
+ * transaction began, and judges it again.
+ *
+ * prepareLine reads the PO outside any lock. Two receipts against one PO
+ * posted at the same moment both read the same `receivedQty`, both pass the
+ * tolerance on it, and the second write of `receivedQty + receivingQty`
+ * overwrites the first - stock goes up by both while the PO, and the payable
+ * quantity with it, counts only one. The caller locks the PO rows before
+ * calling this, so the figure read here is the one the write below is based
+ * on, and a second receipt waits for the first and is judged on its total.
+ */
+async function lockAndRefresh(tx, ctx) {
+  const fresh = await tx.purchaseOrder.findUnique({
+    where: { id: ctx.po.id },
+    select: { receivedQty: true, approvalStatus: true, status: true, deletedAt: true },
+  });
+  const po = { ...ctx.po, ...fresh };
+  assertReceivable(po);
+
+  // The gate pass this receipt clears may have been cleared by the receipt
+  // that held the lock before this one.
+  const gatePass = ctx.gatePass
+    ? await tx.gatePass.findUnique({ where: { id: ctx.gatePass.id } })
+    : null;
+
+  return {
+    ...ctx,
+    po,
+    gatePass,
+    assessment: assessLine({
+      input: ctx.input,
+      po,
+      receivingQty: ctx.receivingQty,
+      inventoryRate: ctx.inventoryRate,
+    }),
+  };
 }
 
 /**
