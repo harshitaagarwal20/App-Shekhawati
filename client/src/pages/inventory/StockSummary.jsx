@@ -122,7 +122,7 @@ export default function StockSummary() {
           <thead>
             <tr>
               <th>Item Code</th>
-              <th>Description</th>
+              <th>Item</th>
               <th>Category</th>
               <th>Location</th>
               <th>UOM</th>

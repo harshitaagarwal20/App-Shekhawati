@@ -808,19 +808,12 @@ export function Pagination({ meta, page, pageSize, onPage, onPageSize }) {
   const to = Math.min(page * pageSize, meta.total ?? 0);
 
   /*
-   * NOTHING TO PAGE THROUGH, NOTHING TO SHOW.
-   *
-   * A register that fits on one page was still drawing the whole apparatus:
-   * a rows-per-page selector, First, Prev, "Page 1 of 1", Next, Last. On an
-   * empty screen that read as "No records" followed by five controls for
-   * moving between pages that do not exist - and on a phone it is a block of
-   * chrome taller than the emptiness it is explaining.
-   *
-   * The count stays either way. "No records" and "Showing 1-7 of 7" are the
-   * answer to a question somebody asked; the pager is machinery for a problem
-   * they do not have until the list outgrows a page.
+   * THE PAGER SHOWS WHENEVER THERE ARE ROWS - even when they fit on one page,
+   * so the rows-per-page choice and the page position are always where people
+   * expect them. Only an empty register drops it: "No records" followed by
+   * controls for moving between pages that do not exist says nothing.
    */
-  const paged = pageCount > 1;
+  const paged = (meta.total ?? 0) > 0;
 
   return (
     <div className="pagination">

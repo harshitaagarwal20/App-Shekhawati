@@ -228,9 +228,58 @@ export class ApiClientError extends Error {
 }
 
 /** Unwraps `{ success, data }` so callers deal in plain data. */
+/*
+ * ===========================================================================
+ *  DROPDOWN DATA IS CACHED; NOTHING ELSE IS
+ * ===========================================================================
+ *
+ *  Every form fills its pickers from `/…/options` - buyers, vendors, styles,
+ *  orders, items - and used to fetch each one afresh every time it opened.
+ *  Those answers are now kept for five minutes, and two pickers asking the
+ *  same question at once share one request.
+ *
+ *  Only `/options`. Lists, documents, stock and balances are always read
+ *  fresh: a stale stock figure is worse than a slow one. And the cache is
+ *  emptied by ANY write (see the response interceptor) and on sign-out, so a
+ *  buyer added a second ago is in the next dropdown, and one user never sees
+ *  options fetched under another's permissions.
+ * ---------------------------------------------------------------------------
+ */
+const OPTIONS_TTL_MS = 5 * 60_000;
+const optionsCache = new Map(); // key -> { at, promise }
+
+const isOptionsLookup = (config) =>
+  (config.method ?? 'get').toLowerCase() === 'get' && /\/options$/.test(config.url ?? '');
+
+/** Empties the dropdown cache. Called on sign-out; writes do it themselves. */
+export function clearRequestCache() {
+  optionsCache.clear();
+}
+
+api.interceptors.response.use((response) => {
+  if ((response.config.method ?? 'get').toLowerCase() !== 'get') optionsCache.clear();
+  return response;
+});
+
 export async function request(config) {
-  const { data } = await api(config);
-  return data.data;
+  if (!isOptionsLookup(config)) {
+    const { data } = await api(config);
+    return data.data;
+  }
+
+  const key = `${config.url}?${JSON.stringify(config.params ?? {})}`;
+  let hit = optionsCache.get(key);
+  if (!hit || Date.now() - hit.at > OPTIONS_TTL_MS) {
+    const promise = api(config).then(({ data }) => data.data);
+    hit = { at: Date.now(), promise };
+    optionsCache.set(key, hit);
+    // A failure is not an answer worth keeping.
+    promise.catch(() => {
+      if (optionsCache.get(key) === hit) optionsCache.delete(key);
+    });
+  }
+  // A copy each time, so one screen sorting its list cannot reorder another's.
+  return hit.promise.then((value) => JSON.parse(JSON.stringify(value)));
 }
 
 /**

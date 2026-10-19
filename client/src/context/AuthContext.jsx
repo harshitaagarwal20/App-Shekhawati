@@ -10,7 +10,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { auth as authApi } from '../services/erp.js';
-import { setSessionLostHandler, tokenStore } from '../services/api.js';
+import { clearRequestCache, setSessionLostHandler, tokenStore } from '../services/api.js';
 import { forgetDataTransferCatalogues } from '../services/dataTransferCache.js';
 
 const AuthContext = createContext(null);
@@ -40,6 +40,7 @@ export function AuthProvider({ children }) {
      * is its own kind of wrong.
      */
     forgetDataTransferCatalogues();
+    clearRequestCache();
     if (mounted.current) {
       setUser(null);
       setStatus('anonymous');
