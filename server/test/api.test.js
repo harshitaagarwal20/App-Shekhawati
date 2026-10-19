@@ -422,6 +422,39 @@ describe('Masters CRUD', () => {
     assert.equal(res.status, 409);
   });
 
+  test('a second buyer with the same name is refused, whatever its case or spacing', async () => {
+    for (const buyerName of ['Zenith Carry Works', 'ZENITH carry works', '  Zenith   Carry Works ']) {
+      const res = await call('POST', '/api/buyers', {
+        token,
+        body: { buyerCode: `ZCW-${Date.now()}`, buyerName, country: 'USA', status: 'ACTIVE' },
+      });
+      if (res.status === 201) created.buyers.push(res.body.data.id);
+      assert.equal(res.status, 409, `"${buyerName}" must be refused: ${JSON.stringify(res.body)}`);
+      assert.match(res.body.error.message, /Zenith Carry Works.*already exists/);
+    }
+  });
+
+  test('a buyer cannot be renamed onto another buyer, but may keep its own name', async () => {
+    const other = await call('POST', '/api/buyers', {
+      token,
+      body: { buyerCode: `ZRN-${Date.now()}`, buyerName: 'Zenith Rename Test', country: 'USA', status: 'ACTIVE' },
+    });
+    assert.equal(other.status, 201, JSON.stringify(other.body));
+    created.buyers.push(other.body.data.id);
+
+    const clash = await call('PATCH', `/api/buyers/${other.body.data.id}`, {
+      token,
+      body: { buyerName: 'zenith carry works' },
+    });
+    assert.equal(clash.status, 409);
+
+    const same = await call('PATCH', `/api/buyers/${other.body.data.id}`, {
+      token,
+      body: { buyerName: 'ZENITH RENAME TEST' },
+    });
+    assert.equal(same.status, 200, JSON.stringify(same.body));
+  });
+
   test('search, filter, sort and paging all work on a master list', async () => {
     const search = await call('GET', '/api/buyers?search=trade', { token });
     assert.equal(search.status, 200);

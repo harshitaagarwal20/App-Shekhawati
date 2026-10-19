@@ -115,8 +115,46 @@ async function writeAddresses(buyerId, addresses, actorId) {
   ]);
 }
 
+/** "Aussie  Carry PTY " -> "Aussie Carry PTY": the name as it should be stored. */
+const tidyName = (name) => String(name ?? '').trim().replace(/\s+/g, ' ');
+
+/**
+ * One buyer, one name.
+ *
+ * Case and spacing do not make a different buyer: "Aussie Carry Pty" and
+ * "AUSSIE CARRY PTY " print the same on an order and look the same in every
+ * picker, so the second one is a duplicate that splits that buyer's orders
+ * and styles between two records nobody can tell apart. Compared in SQL so a
+ * name already stored with stray spaces is caught too. Deleted buyers do not
+ * count - their name is free to be used again.
+ *
+ * Exported for the bulk importer, which runs it in its checking pass.
+ *
+ * @param {string} buyerName
+ * @param {string|null} [exceptId]  The buyer being edited, which may keep its own name.
+ */
+export async function assertNameFree(buyerName, exceptId = null) {
+  const name = tidyName(buyerName);
+  if (!name) return;
+  const [clash] = await prisma.$queryRaw`
+    SELECT buyer_code AS "buyerCode", buyer_name AS "buyerName"
+      FROM buyers
+     WHERE deleted_at IS NULL
+       AND lower(regexp_replace(trim(buyer_name), '[[:space:]]+', ' ', 'g')) = lower(${name})
+       AND (${exceptId}::uuid IS NULL OR id <> ${exceptId}::uuid)
+     LIMIT 1`;
+  if (clash) {
+    throw ApiError.conflict(
+      `A buyer named "${clash.buyerName}" already exists (code ${clash.buyerCode}).`,
+      { field: 'buyerName' },
+    );
+  }
+}
+
 export async function create(input, actorId) {
   await validateDropdowns(input);
+  input = { ...input, buyerName: tidyName(input.buyerName) };
+  await assertNameFree(input.buyerName);
   // Taken as typed. The code used to be derived from the buyer's initials when
   // left blank, which meant a blank field produced a code nobody chose and
   // nobody recognised on a document. It is a master field the office types.
@@ -141,6 +179,10 @@ export async function create(input, actorId) {
 
 export async function update(id, input, actorId) {
   await validateDropdowns(input);
+  if (input.buyerName !== undefined) {
+    input = { ...input, buyerName: tidyName(input.buyerName) };
+    await assertNameFree(input.buyerName, id);
+  }
   if (input.buyerCode) {
     const clash = await prisma.buyer.findFirst({
       where: { buyerCode: { equals: input.buyerCode.trim(), mode: 'insensitive' }, id: { not: id } },

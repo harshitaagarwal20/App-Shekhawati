@@ -267,7 +267,14 @@ export const MASTER_IMPORTS = {
     identityLabel: 'Buyer Code',
     createSchema: createBuyerSchema,
     updateSchema: updateBuyerSchema,
-    assertDropdowns: buyerService.assertDropdowns,
+    // The name is checked here too, so a file that would add a second buyer
+    // under an existing name is refused before anything is written.
+    assertDropdowns: async (data, { existingId } = {}) => {
+      await buyerService.assertDropdowns(data);
+      if (data.buyerName !== undefined) await buyerService.assertNameFree(data.buyerName, existingId);
+    },
+    // ...and inside the file: two new rows may not share a name either.
+    uniqueInFile: { field: 'buyerName', label: 'Buyer Name' },
     // Buyer codes are unique regardless of case - see buyer.service.js.
     findExisting: findBy('buyer', 'buyerCode', { insensitive: true }),
     create: (data, actorId) => buyerService.create(data, actorId),
@@ -690,6 +697,7 @@ export async function runImport(key, csvText, { mode = 'upsert', dryRun = true, 
 
   const plans = [];
   const seen = new Map(); // identity -> the line that first claimed it
+  const seenUnique = new Map(); // master.uniqueInFile value -> the line that first used it
 
   for (const record of records) {
     const { line } = record;
@@ -727,6 +735,18 @@ export async function runImport(key, csvText, { mode = 'upsert', dryRun = true, 
         report(master.identityLabel, `${identity} is also on row ${first}. One record, one row.`);
       } else {
         seen.set(dupKey, line);
+      }
+    }
+
+    // A field the master keeps unique (a buyer's name), repeated across rows.
+    // Case and spacing are ignored, exactly as the service compares them.
+    if (master.uniqueInFile && (values[master.uniqueInFile.field] ?? '') !== '') {
+      const key = String(values[master.uniqueInFile.field]).trim().replace(/\s+/g, ' ').toLowerCase();
+      const first = seenUnique.get(key);
+      if (first !== undefined) {
+        report(master.uniqueInFile.label, `${values[master.uniqueInFile.field]} is also on row ${first}.`);
+      } else {
+        seenUnique.set(key, line);
       }
     }
 
@@ -775,7 +795,7 @@ export async function runImport(key, csvText, { mode = 'upsert', dryRun = true, 
        * checking pass, rather than being discovered halfway through writing.
        */
       try {
-        await master.assertDropdowns(parsed.data);
+        await master.assertDropdowns(parsed.data, { existingId: existing?.id ?? null });
       } catch (err) {
         report(fieldOf(err), err.message);
       }
