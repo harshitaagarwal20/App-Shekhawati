@@ -5,6 +5,7 @@
 import { createApp } from './app.js';
 import { env } from './config/env.js';
 import prisma from './config/prisma.js';
+import { startPoolWarmer, stopPoolWarmer } from './config/poolWarmer.js';
 import {
   startNotificationDispatcher,
   stopNotificationDispatcher,
@@ -26,11 +27,14 @@ const server = app.listen(env.PORT, () => {
       `  health : http://localhost:${env.PORT}/api/health\n` +
       `  client : ${env.CLIENT_ORIGIN}\n\n`,
   );
+  // Open the database connections now, not on the first user's login.
+  startPoolWarmer();
 });
 
 async function shutdown(signal) {
   process.stdout.write(`\n${signal} received, shutting down...\n`);
   stopNotificationDispatcher();
+  stopPoolWarmer();
   server.close(async () => {
     await prisma.$disconnect();
     process.exit(0);

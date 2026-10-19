@@ -47,7 +47,6 @@
 import prisma, { notDeleted } from '../config/prisma.js';
 import { REGISTRY, pendingSummary } from './approvalEngine.js';
 import { isBelowReorder } from './inventory.service.js';
-import { AUDITED, labelFor, routeFor } from '../config/auditedTables.js';
 import { D, ageDays } from '../utils/figures.js';
 
 /** The soft-delete filter every count below shares. */
@@ -55,21 +54,6 @@ const LIVE = notDeleted;
 
 /** Asia/Kolkata is UTC+05:30, and this application only ever runs in it. */
 const IST_OFFSET_MIN = 330;
-
-/**
- * Midnight, `offsetDays` ago, in the display timezone - as a UTC instant.
- *
- * "Received this week" has to mean working days in Jaipur, not in UTC.
- * Otherwise a receipt booked at 3pm local falls out of the window for anybody
- * reading the screen after 5:30am the following morning, which is most of the
- * factory.
- */
-function startOfLocalDay(offsetDays = 0) {
-  const ist = new Date(Date.now() + IST_OFFSET_MIN * 60000);
-  ist.setUTCHours(0, 0, 0, 0);
-  ist.setUTCDate(ist.getUTCDate() - offsetDays);
-  return new Date(ist.getTime() - IST_OFFSET_MIN * 60000);
-}
 
 // ===========================================================================
 //  THE SHARED-FIGURE CACHE
@@ -491,39 +475,6 @@ export const STAGES = [
   },
 ];
 
-async function buildPipeline(allowedKeys) {
-  if (allowedKeys.length === 0) return null;
-
-  const weekAgo = startOfLocalDay(6);
-  const allowed = STAGES.filter((s) => allowedKeys.includes(s.key));
-
-  return Promise.all(
-    allowed.map(async (stage) => {
-      /**
-       * Two counts, not three.
-       *
-       * There was a third - an unfiltered `count()` per stage for a `total`
-       * the screen never read. Eleven extra full-table counts per dashboard
-       * load, on the screen every user opens first, discarded before the
-       * response was even serialised.
-       */
-      const [open, recent] = await Promise.all([
-        stage.open === null
-          ? Promise.resolve(null)
-          : memo(`stage:${stage.key}:open`, () =>
-              prisma[stage.model].count({ where: { ...LIVE, ...stage.open } }),
-            ),
-        memo(`stage:${stage.key}:recent`, () =>
-          prisma[stage.model].count({
-            where: { ...LIVE, [stage.dateField]: { gte: weekAgo } },
-          }),
-        ),
-      ]);
-      return { key: stage.key, label: stage.label, to: stage.to, open, recent };
-    }),
-  );
-}
-
 // ===========================================================================
 //  TREND  -  the last six months, month by month
 // ===========================================================================
@@ -703,46 +654,6 @@ async function buildStock() {
 }
 
 // ===========================================================================
-//  ACTIVITY
-// ===========================================================================
-
-/**
- * The last few things anybody changed, each with a link to the record.
- *
- * Behind AUDIT.VIEW rather than shown to everyone, for the same reason the
- * Audit screen is: the trail carries the before-and-after of every rate, price
- * and approval in the system, and seeing it is a broader grant than being
- * allowed to use the screens it describes.
- */
-async function buildActivity() {
-  const rows = await prisma.auditLog.findMany({
-    where: { tableName: { in: Object.keys(AUDITED) } },
-    orderBy: { createdAt: 'desc' },
-    take: 8,
-    select: {
-      id: true,
-      tableName: true,
-      recordId: true,
-      action: true,
-      userName: true,
-      createdAt: true,
-    },
-  });
-
-  // `labelFor` and `routeFor` rather than reaching into AUDITED and repeating
-  // what they do - which is what audit.service.js calls, and the third copy of
-  // the null-route handling is one too many.
-  return rows.map((r) => ({
-    id: r.id,
-    action: r.action,
-    label: labelFor(r.tableName),
-    to: routeFor(r.tableName, r.recordId),
-    userName: r.userName ?? 'System',
-    at: r.createdAt,
-  }));
-}
-
-// ===========================================================================
 //  MASTERS
 // ===========================================================================
 
@@ -853,10 +764,13 @@ export async function build(auth) {
       allowed.decidable,
       allowed.approvalQueue ? '/approvals' : null,
     ),
-    buildPipeline(allowed.pipeline),
+    // The pipeline card and the activity feed are no longer drawn, so they
+    // are not built: on a cold connection pool their ~25 queries were most of
+    // the burst that made the first dashboard after login slow.
+    Promise.resolve(null),
     buildTrend(allowed.trend),
     allowed.stock ? memo('stock', buildStock) : Promise.resolve(null),
-    allowed.activity ? memo('activity', buildActivity) : Promise.resolve(null),
+    Promise.resolve(null),
     buildMasters(allowed.masters),
   ]);
 
