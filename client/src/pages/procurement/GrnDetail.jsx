@@ -384,7 +384,6 @@ export default function GrnDetail() {
       />
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-header">Receipt</div>
         <div className="card-body">
           <DetailGrid>
             <Detail label="GRN No" value={grn.grnNo} mono />

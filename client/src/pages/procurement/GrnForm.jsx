@@ -82,7 +82,8 @@ export default function GrnForm({ purchaseOrderId, gatePassId, onSaved, onCancel
     grnNo: '',
     purchaseOrderId: purchaseOrderId ?? '',
     billNo: '',
-    grnDate: todayInput(),
+    // Blank, not today: the date the goods came in is keyed, never assumed.
+    grnDate: '',
     purpose: 'RAW_MATERIAL',
     receivingQty: '',
     inventoryRate: '',
@@ -216,7 +217,7 @@ export default function GrnForm({ purchaseOrderId, gatePassId, onSaved, onCancel
       }
     >
       <div className="form-grid">
-        <FieldGroup title="Receipt">
+        <>
           <RHFRecordSelect
             form={form}
             name="purchaseOrderId"
@@ -231,7 +232,7 @@ export default function GrnForm({ purchaseOrderId, gatePassId, onSaved, onCancel
             hint="Only approved purchase orders with something outstanding."
           />
           <RHFInput form={form} name="billNo" label="Bill No" required hint="The vendor's invoice. One bill, one receipt." />
-          <RHFInput form={form} name="grnDate" label="Date" type="date" required />
+          <RHFInput form={form} name="grnDate" label="Date" type="date" required max={todayInput()} hint="The day the goods came in." />
           <RHFEnumSelect
             form={form}
             name="purpose"
@@ -241,7 +242,7 @@ export default function GrnForm({ purchaseOrderId, gatePassId, onSaved, onCancel
             options={PURPOSES}
           />
           <RHFInput form={form} name="grnNo" label="GRN No" hint="Left blank, the server issues one." />
-        </FieldGroup>
+        </>
 
         <FieldGroup title="Quantities">
           <RHFQty

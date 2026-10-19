@@ -12,6 +12,7 @@ import assert from 'node:assert/strict';
 import { panelCounts, perBag } from '../src/domain/panels.js';
 import { fifoOrder, layersForIn, planConsumption, takeNewest, costOf } from '../src/domain/fifo.js';
 import { cuttingEfficiency, reconcileFabric } from '../src/services/cuttingIssue.service.js';
+import { judgeSample, suggestedSample } from '../src/domain/cutCheck.js';
 
 const TOTE = [
   { lineNo: 1, componentType: 'FRONT_PANEL', name: 'Front Panel', piecesPerBag: 1 },
@@ -160,5 +161,38 @@ describe('FIFO - transfers carry cost; what goes back is the newest', () => {
   test('a receipt with nothing carried opens one layer at its own rate', () => {
     const specs = layersForIn({ qty: 50, rate: 88, entryDate: new Date('2026-09-25') });
     assert.deepEqual(specs.map((s) => [s.qty, s.rate]), [['50.0000', '88.0000']]);
+  });
+});
+
+describe('cut pieces sample check - judged, never picked', () => {
+  test('the sample is 10% rounded up, never more than the lot', () => {
+    assert.equal(suggestedSample(500), 50);
+    assert.equal(suggestedSample(7), 1);
+    assert.equal(suggestedSample(0), 0);
+    assert.equal(suggestedSample(5, 200), 5);
+  });
+
+  test('within the limit the lot passes, less the defective pieces pulled out', () => {
+    const r = judgeSample({ pcsReceived: 500, sampleQty: 50, defectivePcs: 1 });
+    assert.equal(r.status, 'PASSED');
+    assert.equal(r.defectRatePct, '2.000');
+    assert.equal(r.readyPcs, '499');
+  });
+
+  test('over the limit the whole lot fails and nothing is ready', () => {
+    const r = judgeSample({ pcsReceived: 500, sampleQty: 50, defectivePcs: 2 });
+    assert.equal(r.status, 'FAILED');
+    assert.equal(r.defectRatePct, '4.000');
+    assert.equal(r.readyPcs, '0');
+  });
+
+  test('exactly at the limit passes', () => {
+    assert.equal(judgeSample({ pcsReceived: 400, sampleQty: 40, defectivePcs: 1 }).status, 'PASSED');
+  });
+
+  test('impossible counts are refused', () => {
+    assert.throws(() => judgeSample({ pcsReceived: 10, sampleQty: 0, defectivePcs: 0 }), RangeError);
+    assert.throws(() => judgeSample({ pcsReceived: 10, sampleQty: 11, defectivePcs: 0 }), RangeError);
+    assert.throws(() => judgeSample({ pcsReceived: 10, sampleQty: 5, defectivePcs: 6 }), RangeError);
   });
 });

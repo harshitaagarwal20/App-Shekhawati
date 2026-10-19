@@ -40,7 +40,7 @@ import {
   ScanBox,
 } from '../../components/mobile.jsx';
 import { Field, RecordSelect, Spinner, TextArea, TextInput } from '../../components/ui.jsx';
-import { fmtNum, nowLocalInput, todayInput } from '../../utils/format.js';
+import { fmtDateTime, fmtNum, nowLocalInput, todayInput } from '../../utils/format.js';
 import { loadFailed } from '../../services/loadFailures.js';
 
 const TYPES = [
@@ -509,7 +509,7 @@ export default function GatePassForm({ onSaved, onCancel }) {
           shortForm
             ? `A delivery from ${
               vendorOptions?.find((v) => v.id === vendorId)?.vendorName ?? 'this vendor'
-            }, arriving ${movementTime ? new Date(movementTime).toLocaleString() : 'now'}. `
+            }, arriving ${movementTime ? fmtDateTime(movementTime) : 'now'}. `
               + 'The order it answers is matched to it afterwards.'
             : `${fmtNum(qty)} ${resolved?.reference.uom ?? ''} of ${resolved?.reference.item ?? ''} `
               + `${type === 'INWARD' ? 'from' : 'to'} ${resolved?.reference.partyName ?? ''}, `
@@ -525,7 +525,7 @@ export default function GatePassForm({ onSaved, onCancel }) {
               },
               {
                 label: 'Crossed at',
-                value: movementTime ? new Date(movementTime).toLocaleString() : '-',
+                value: movementTime ? fmtDateTime(movementTime) : '-',
               },
               { label: 'Document', value: 'to be allocated' },
               { label: 'Status', value: 'Pending' },
@@ -535,7 +535,7 @@ export default function GatePassForm({ onSaved, onCancel }) {
               { label: 'Purpose', value: purpose.charAt(0) + purpose.slice(1).toLowerCase() },
               {
                 label: 'Crossed at',
-                value: movementTime ? new Date(movementTime).toLocaleString() : '-',
+                value: movementTime ? fmtDateTime(movementTime) : '-',
               },
               { label: 'Qty', value: `${fmtNum(qty)} ${resolved?.reference.uom ?? ''}` },
               {

@@ -22,6 +22,7 @@ import {
   cutPiecesReceipts as cprApi,
   cuttingChallans as ccApi,
   employees as employeesApi,
+  fabricIssues as fiApi,
   orders as ordersApi,
   styles as stylesApi,
 } from '../../services/erp.js';
@@ -30,6 +31,7 @@ import {
   ConfirmDialog,
   EmptyState,
   Field,
+  MasterSelect,
   Modal,
   PageHeader,
   Pagination,
@@ -46,6 +48,19 @@ import { ExportButton } from '../../components/dataTransfer.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
 
 const rowsOf = (r) => (Array.isArray(r) ? r : (r?.rows ?? []));
+
+/**
+ * C6 - the fabric equation's six boxes, received first:
+ *     received = consumed + returned + remnants + wastage + damaged
+ */
+const FABRIC_FIELDS = [
+  ['issuedQty', 'Fabric received on the floor'],
+  ['consumedQty', 'Consumed (cut into panels)'],
+  ['remainderQty', 'Remainder returned to store', 'Goes back on the same roll it came off.'],
+  ['remnantQty', 'Remnants kept', 'End-bits good for a pocket or a sample. Booked as a remnant roll.'],
+  ['wastageQty', 'Wastage', 'Offcuts and rejects. Stated, never inferred.'],
+  ['fabricDamageQty', 'Fabric damaged', 'Damage recorded separately from normal wastage.'],
+];
 
 // ===========================================================================
 //  LIST
@@ -128,6 +143,7 @@ export function CutPiecesReceiptList() {
                 <SortableTh field="pcsReceived" label="Good pcs" className="num" sortBy={list.sortBy} sortDir={list.sortDir} onSort={list.toggleSort} />
                 <th className="num">Rejected</th>
                 <th className="num">Handles</th>
+                <th>Check</th>
               </tr>
             </thead>
             <tbody>
@@ -143,6 +159,7 @@ export function CutPiecesReceiptList() {
                   <td className="num"><strong>{fmtNum(r.pcsReceived)}</strong></td>
                   <td className="num">{fmtNum(r.pcsRejected)}</td>
                   <td className="num">{fmtNum(r.handlesReceived)}</td>
+                  <td><CheckBadge row={r} /></td>
                 </tr>
               ))}
             </tbody>
@@ -184,6 +201,7 @@ export function CutPiecesReceiptDetail() {
   const [loading, setLoading] = useState(true);
   const [banner, setBanner] = useState(null);
   const [editing, setEditing] = useState(false);
+  const [checking, setChecking] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -228,14 +246,21 @@ export function CutPiecesReceiptDetail() {
             <button type="button" className="btn" onClick={() => navigate('/cut-pieces-receipts')}>
               Back to list
             </button>
-            {can('CUT_PIECES_RECEIPT.DELETE') && (
+            {/* Not once its fabric has come off the cutting floor: the ledger
+                entries would be left with no document behind them. */}
+            {can('CUT_PIECES_RECEIPT.DELETE') && !row.stockPostedAt && (
               <button type="button" className="btn btn-danger" onClick={() => setDeleting(true)}>
                 Delete
               </button>
             )}
             {can('CUT_PIECES_RECEIPT.EDIT') && (
-              <button type="button" className="btn btn-primary" onClick={() => setEditing(true)}>
+              <button type="button" className="btn" onClick={() => setEditing(true)}>
                 Edit
+              </button>
+            )}
+            {can('CUT_PIECES_RECEIPT.EDIT') && (
+              <button type="button" className="btn btn-primary" onClick={() => setChecking(true)}>
+                {row.checkStatus === 'PENDING' ? 'Record sample check' : 'Check again'}
               </button>
             )}
           </>
@@ -291,6 +316,10 @@ export function CutPiecesReceiptDetail() {
         </div>
       </div>
 
+      <FabricCard row={row} />
+
+      <CheckCard row={row} />
+
       {Array.isArray(row.panelBreakdown) && row.panelBreakdown.length > 0 && (
         <PanelBreakdown breakdown={row.panelBreakdown} />
       )}
@@ -304,6 +333,28 @@ export function CutPiecesReceiptDetail() {
           onSaved={async () => {
             setEditing(false);
             setBanner({ kind: 'success', text: `${row.receiptNo} updated.` });
+            await load();
+          }}
+        />
+      )}
+
+      {checking && (
+        <CheckModal
+          row={row}
+          onClose={() => setChecking(false)}
+          onSaved={async (saved) => {
+            setChecking(false);
+            setBanner(
+              saved.checkStatus === 'PASSED'
+                ? {
+                    kind: 'success',
+                    text: `${row.receiptNo} passed - ${fmtNum(Number(saved.pcsReceived) - Number(saved.defectivePcs ?? 0))} pieces ready for stitching.`,
+                  }
+                : {
+                    kind: 'error',
+                    text: `${row.receiptNo} failed the sample check. Sort the lot and check it again before it goes to stitching.`,
+                  },
+            );
             await load();
           }}
         />
@@ -356,6 +407,56 @@ export function PanelBreakdown({ breakdown, title = 'Panels counted in' }) {
 }
 
 /** Received from cutting, issued to stitching, and what is left in hand. */
+/**
+ * The cloth these pieces were cut from, and where every metre of it went.
+ * Posted figures are fixed: they are what the stock ledger already says.
+ */
+function FabricCard({ row }) {
+  const uom = row.fabricUom ?? 'Mtrs';
+  const q = (v) => `${fmtNum(v)} ${uom}`;
+  const carries = Number(row.issuedQty) > 0;
+  return (
+    <div className="card" style={{ marginBottom: 16 }}>
+      <div className="card-header">
+        <span>Fabric used</span>
+        {row.stockPostedAt && (
+          <span className="faint" style={{ fontWeight: 400, fontSize: 12 }}>
+            taken off the cutting floor {fmtDateTime(row.stockPostedAt)}
+          </span>
+        )}
+      </div>
+      <div className="card-body">
+        {!carries ? (
+          <p className="muted" style={{ margin: 0 }}>
+            No fabric recorded on this receipt - its cloth was accounted for on another receipt
+            of the same cut, or it was received before fabric moved here.
+            {!row.stockPostedAt && ' Edit the receipt to add it.'}
+          </p>
+        ) : (
+          <DetailGrid>
+            <Detail
+              label="Fabric issue"
+              value={row.fabricIssue?.issueNo}
+              sub={row.fabricIssue?.roll ? `roll ${row.fabricIssue.roll.rollNo}` : undefined}
+              mono
+            />
+            <Detail label="Received on the floor" value={q(row.issuedQty)} />
+            <Detail label="Consumed (cut into panels)" value={q(row.consumedQty)} />
+            <Detail label="Returned to store" value={q(row.remainderQty)} sub="on the same roll" />
+            <Detail
+              label="Remnants kept"
+              value={q(row.remnantQty)}
+              sub={row.remnantRollNo ? `booked as ${row.remnantRollNo}` : undefined}
+            />
+            <Detail label="Wastage" value={q(row.wastageQty)} />
+            <Detail label="Fabric damaged" value={q(row.fabricDamageQty)} />
+          </DetailGrid>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function InHandCard({ summary, title }) {
   if (!summary) return null;
   const inHand = Number(summary.pcsInHand ?? 0);
@@ -368,15 +469,296 @@ function InHandCard({ summary, title }) {
           <Detail label="Good pieces received" value={fmtNum(summary.pcsReceived)} />
           <Detail label="Rejected pieces" value={fmtNum(summary.pcsRejected)} />
           <Detail label="Handles received" value={fmtNum(summary.handlesReceived)} />
-          <Detail label="Issued to stitching" value={fmtNum(summary.pcsIssuedToStitching)} sub="On Cutting Issues" />
+          <Detail label="Issued to stitching" value={fmtNum(summary.pcsIssuedToStitching)} sub="On posted Cutting Issues" />
           <Detail
             label="Pieces in hand"
             value={<strong style={inHand < 0 ? { color: 'var(--danger, #b42318)' } : undefined}>{fmtNum(inHand)}</strong>}
             sub={inHand < 0 ? 'More issued than received - check the counts' : 'Received, not yet issued'}
           />
+          <Detail
+            label="Checked, ready for stitching"
+            value={<strong>{fmtNum(Math.max(0, Number(summary.pcsReadyToIssue ?? 0)))}</strong>}
+            sub="Passed the sample check, defective pieces pulled out"
+          />
+          <Detail
+            label="Waiting for a check"
+            value={fmtNum(summary.pcsPendingCheck)}
+            sub={summary.lotsPendingCheck ? `${summary.lotsPendingCheck} lot(s)` : 'None'}
+          />
+          <Detail
+            label="Failed - sort and re-check"
+            value={fmtNum(summary.pcsFailedCheck)}
+            sub={summary.lotsFailedCheck ? `${summary.lotsFailedCheck} lot(s)` : 'None'}
+          />
+          <Detail label="Defective pieces found" value={fmtNum(summary.pcsDefective)} sub="In sample checks" />
         </DetailGrid>
+        <DefectSummary defects={summary.defects} />
       </div>
     </div>
+  );
+}
+
+/**
+ * Every defect the sample checks found, by panel and type, worst first -
+ * which pieces will give trouble at stitching, before any are sewn.
+ */
+export function DefectSummary({ defects, title = 'Defects found before stitching' }) {
+  if (!defects?.length) return null;
+  return (
+    <>
+      <h4 style={{ margin: '16px 0 8px' }}>{title}</h4>
+      <TableWrap>
+        <table className="data">
+          <thead>
+            <tr>
+              <th>Panel</th>
+              <th>Defect</th>
+              <th className="num">Pieces</th>
+            </tr>
+          </thead>
+          <tbody>
+            {defects.map((d, i) => (
+              <tr key={`${d.panel}-${d.defectType}-${i}`}>
+                <td>{d.panel ?? 'Whole piece'}</td>
+                <td>{d.defectType}</td>
+                <td className="num">{fmtNum(d.qty)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </TableWrap>
+    </>
+  );
+}
+
+// ===========================================================================
+//  SAMPLE CHECK
+// ===========================================================================
+
+const CHECK_BADGE = {
+  PENDING: ['badge-pending', 'To check'],
+  PASSED: ['badge-approved', 'Passed'],
+  FAILED: ['badge-rejected', 'Failed'],
+};
+
+function CheckBadge({ row }) {
+  const [cls, label] = CHECK_BADGE[row.checkStatus] ?? CHECK_BADGE.PENDING;
+  return (
+    <span className={`badge ${cls}`}>
+      {label}
+      {row.checkStatus !== 'PENDING' && row.defectRatePct != null ? ` · ${fmtNum(row.defectRatePct)}%` : ''}
+    </span>
+  );
+}
+
+function CheckCard({ row }) {
+  const ready = Number(row.pcsReceived) - Number(row.defectivePcs ?? 0);
+  return (
+    <div className="card" style={{ marginBottom: 16 }}>
+      <div className="card-header">
+        Sample check before stitching <CheckBadge row={row} />
+      </div>
+      <div className="card-body">
+        {row.checkStatus === 'PENDING' ? (
+          <Alert kind="warning">
+            Not checked yet. None of these {fmtNum(row.pcsReceived)} pieces can go to stitching until a
+            sample has been opened and the defects recorded.
+          </Alert>
+        ) : row.sampleQty == null ? (
+          // Receipts from before checking began were marked PASSED with no sample.
+          <p className="hint" style={{ margin: 0 }}>Received before sample checking began - counted as passed.</p>
+        ) : (
+          <>
+            {row.checkStatus === 'FAILED' && (
+              <Alert kind="error">
+                {fmtNum(row.defectRatePct)}% of the sample was defective, over the {fmtNum(row.acceptLimitPct)}%
+                limit. The whole lot is held: sort it, then check it again.
+              </Alert>
+            )}
+            <DetailGrid>
+              <Detail label="Pieces checked" value={fmtNum(row.sampleQty)} sub={`of ${fmtNum(row.pcsReceived)} received`} />
+              <Detail label="Defective in sample" value={fmtNum(row.defectivePcs)} sub="Pulled out of the lot" />
+              <Detail label="Defect rate" value={`${fmtNum(row.defectRatePct)}%`} sub={`Limit ${fmtNum(row.acceptLimitPct)}%`} />
+              <Detail
+                label="Ready for stitching"
+                value={row.checkStatus === 'PASSED' ? fmtNum(ready) : '0'}
+                sub={row.checkStatus === 'PASSED' ? 'From this lot' : 'Lot failed'}
+              />
+              <Detail label="Checked by" value={row.checkedByName} sub={fmtDateTime(row.checkedAt)} />
+              {row.checkRemarks && <Detail label="Check remarks" value={row.checkRemarks} className="span-2" />}
+            </DetailGrid>
+            <DefectSummary title="Defects found in this lot" defects={row.defects} />
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Mirrors server/src/domain/cutCheck.js; the server judges again on save. */
+const DEFAULT_SAMPLE_PCT = 10;
+const DEFAULT_ACCEPT_LIMIT_PCT = 2.5;
+function suggestedSample(pcs) {
+  const n = Math.floor(Number(pcs) || 0);
+  return n <= 0 ? 0 : Math.min(n, Math.max(1, Math.ceil((n * DEFAULT_SAMPLE_PCT) / 100)));
+}
+
+/**
+ * Record what the checker found. There is no pass/fail box: the result is
+ * shown as it will be worked out, and the server works it out again.
+ */
+function CheckModal({ row, onClose, onSaved }) {
+  const panels = (row.style?.components ?? []).map((c) => ({ name: c.name }));
+  const [sampleQty, setSampleQty] = useState(() =>
+    String(row.sampleQty != null ? Number(row.sampleQty) : suggestedSample(row.pcsReceived)),
+  );
+  const [acceptLimitPct, setAcceptLimitPct] = useState(() =>
+    String(row.acceptLimitPct != null ? Number(row.acceptLimitPct) : DEFAULT_ACCEPT_LIMIT_PCT),
+  );
+  const [defects, setDefects] = useState(() =>
+    (row.defects ?? []).map((d) => ({ panel: d.panel ?? '', defectType: d.defectType, qty: String(Number(d.qty)) })),
+  );
+  const [remarks, setRemarks] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const setLine = (i, patch) => setDefects((ls) => ls.map((l, j) => (j === i ? { ...l, ...patch } : l)));
+  const lines = defects.filter((d) => Number(d.qty) > 0);
+  const defective = lines.reduce((a, d) => a + Number(d.qty), 0);
+  const sample = Number(sampleQty) || 0;
+  const rate = sample > 0 ? (defective / sample) * 100 : 0;
+  const passes = rate <= Number(acceptLimitPct || 0);
+  const problem =
+    sample <= 0
+      ? 'Enter how many pieces were checked.'
+      : sample > Number(row.pcsReceived)
+        ? `Only ${fmtNum(row.pcsReceived)} pieces were received.`
+        : defective > sample
+          ? 'More defective pieces than pieces checked.'
+          : lines.some((d) => !d.defectType)
+            ? 'Choose the defect on every line.'
+            : '';
+
+  async function save() {
+    setBusy(true);
+    setError('');
+    try {
+      const saved = await cprApi.recordCheck(row.id, {
+        sampleQty: String(sample),
+        acceptLimitPct: String(acceptLimitPct || 0),
+        defects: lines.map((d) => ({ panel: d.panel || null, defectType: d.defectType, qty: String(d.qty) })),
+        remarks: remarks || null,
+      });
+      onSaved(saved);
+    } catch (e) {
+      setError(e.message);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal
+      title={`Sample check - ${row.receiptNo}`}
+      size="wide"
+      onClose={onClose}
+      footer={
+        <>
+          <button type="button" className="btn" onClick={onClose}>
+            Cancel
+          </button>
+          <button type="button" className="btn btn-primary" disabled={Boolean(problem) || busy} onClick={save}>
+            {busy ? 'Saving…' : 'Save check'}
+          </button>
+        </>
+      }
+    >
+      {error && <Alert kind="error">{error}</Alert>}
+      <p className="hint" style={{ marginTop: 0 }}>
+        Open {fmtNum(suggestedSample(row.pcsReceived))} pieces ({DEFAULT_SAMPLE_PCT}%) at random from the{' '}
+        {fmtNum(row.pcsReceived)} received. Check every panel and add a line for each defect you find.
+      </p>
+
+      <div className="form-grid">
+        <Field label="Pieces checked" required>
+          <TextInput type="number" min="1" step="1" value={sampleQty} onChange={(e) => setSampleQty(e.target.value)} />
+        </Field>
+        <Field label="Accept limit %" hint="Over this defect rate the whole lot fails.">
+          <TextInput
+            type="number"
+            min="0"
+            step="0.1"
+            value={acceptLimitPct}
+            onChange={(e) => setAcceptLimitPct(e.target.value)}
+          />
+        </Field>
+      </div>
+
+      <h4 style={{ margin: '16px 0 8px' }}>Defects found</h4>
+      {defects.length === 0 && (
+        <p className="hint">No defects? Leave this empty if every piece checked was fine.</p>
+      )}
+      {defects.map((d, i) => (
+        <div key={i} className="form-grid" style={{ alignItems: 'end' }}>
+          <Field label="Panel">
+            {panels.length ? (
+              <RecordSelect
+                value={d.panel}
+                onChange={(e) => setLine(i, { panel: e.target.value })}
+                options={panels}
+                getValue={(p) => p.name}
+                getLabel={(p) => p.name}
+                placeholder="Whole piece"
+              />
+            ) : (
+              <TextInput
+                value={d.panel}
+                onChange={(e) => setLine(i, { panel: e.target.value })}
+                placeholder="Front, back, handle..."
+                maxLength={80}
+              />
+            )}
+          </Field>
+          <Field label="Defect" required>
+            <MasterSelect
+              listCode="CutPieceDefect"
+              value={d.defectType}
+              currentValue={d.defectType}
+              onChange={(e) => setLine(i, { defectType: e.target.value })}
+            />
+          </Field>
+          <Field label="Pieces">
+            <TextInput type="number" min="1" step="1" value={d.qty} onChange={(e) => setLine(i, { qty: e.target.value })} />
+          </Field>
+          <div style={{ paddingBottom: 6 }}>
+            <button type="button" className="btn" onClick={() => setDefects((ls) => ls.filter((_, j) => j !== i))}>
+              Remove
+            </button>
+          </div>
+        </div>
+      ))}
+      <button
+        type="button"
+        className="btn"
+        onClick={() => setDefects((ls) => [...ls, { panel: '', defectType: '', qty: '' }])}
+      >
+        Add defect
+      </button>
+
+      <Field label="Remarks">
+        <TextArea rows={2} value={remarks} onChange={(e) => setRemarks(e.target.value)} />
+      </Field>
+
+      {problem ? (
+        <Alert kind="warning">{problem}</Alert>
+      ) : (
+        <Alert kind={passes ? 'success' : 'error'}>
+          {fmtNum(defective)} defective in {fmtNum(sample)} checked = {rate.toFixed(1)}%.{' '}
+          {passes
+            ? `Passes. ${fmtNum(Number(row.pcsReceived) - defective)} pieces will be ready for stitching.`
+            : `Over the ${acceptLimitPct}% limit - the whole lot will be held until it is sorted and checked again.`}
+        </Alert>
+      )}
+    </Modal>
   );
 }
 
@@ -404,8 +786,18 @@ function ReceiptModal({ existing, onClose, onSaved }) {
     pcsRejected: existing ? String(existing.pcsRejected) : '',
     handlesReceived: existing ? String(existing.handlesReceived) : '',
     remarks: existing?.remarks ?? '',
+    // C6 - the fabric the pieces were cut from. Blank on a new receipt; a
+    // zero on a saved one reads as blank, so a receipt with no fabric stays so.
+    fabricIssueId: existing?.fabricIssueId ?? '',
+    ...Object.fromEntries(
+      FABRIC_FIELDS.map(([k]) => [k, existing && Number(existing[k]) > 0 ? String(existing[k]) : '']),
+    ),
   }));
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
+
+  /** Once posted, the ledger already says where the cloth went: read-only. */
+  const fabricPosted = Boolean(existing?.stockPostedAt);
+  const [fabricIssues, setFabricIssues] = useState([]);
 
   const [summary, setSummary] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -463,12 +855,40 @@ function ReceiptModal({ existing, onClose, onSaved }) {
       .summary({ orderId: form.orderId })
       .then(setSummary)
       .catch(() => setSummary(null));
+    // The fabric issued to the cutting floor for this order - posted only,
+    // since an unposted issue put no cloth there.
+    fiApi
+      .list({ orderId: form.orderId, purpose: 'CUTTING', pageSize: 100 })
+      .then((r) => setFabricIssues(rowsOf(r).filter((i) => i.posted || i.postedAt)))
+      .catch(() => setFabricIssues([]));
   }, [form.orderId]);
+
+  /*
+   * C6 - the equation, checked live so the cutting master sees it balance
+   * before saving. The server checks it again, and a CHECK constraint under
+   * that; this is the courtesy, not the control.
+   */
+  const fabric = (() => {
+    const n = (k) => Number(form[k] || 0);
+    const issued = n('issuedQty');
+    const accounted = FABRIC_FIELDS.slice(1).reduce((a, [k]) => a + n(k), 0);
+    const difference = Number((issued - accounted).toFixed(4));
+    const entered = FABRIC_FIELDS.some(([k]) => form[k] !== '');
+    return {
+      entered,
+      issued,
+      difference,
+      balances: issued > 0 && difference === 0,
+      // Blank is fine; anything entered must balance and name its fabric issue.
+      ok: !entered || (issued > 0 && difference === 0 && Boolean(form.fabricIssueId)),
+    };
+  })();
 
   const hasCount = [form.pcsReceived, form.pcsRejected, perBag ? derivedHandles : form.handlesReceived]
     .some((v) => Number(v) > 0);
   const hasMaster = Boolean(form.cuttingMasterId || form.cuttingMasterName.trim());
-  const ready = form.orderId && hasMaster && hasCount && form.pcsReceived !== '';
+  const ready = form.orderId && hasMaster && hasCount && form.pcsReceived !== '' &&
+    (fabricPosted || fabric.ok);
 
   async function save() {
     setBusy(true);
@@ -485,6 +905,13 @@ function ReceiptModal({ existing, onClose, onSaved }) {
       pcsRejected: String(form.pcsRejected || 0),
       handlesReceived: String(form.handlesReceived || 0),
       remarks: form.remarks || null,
+      // Posted fabric is not sent at all - the server would refuse a change.
+      ...(fabricPosted || !fabric.entered
+        ? {}
+        : {
+            fabricIssueId: form.fabricIssueId || null,
+            ...Object.fromEntries(FABRIC_FIELDS.map(([k]) => [k, String(form[k] || 0)])),
+          }),
     };
     try {
       const saved = editing ? await cprApi.update(existing.id, body) : await cprApi.create(body);
@@ -636,12 +1063,81 @@ function ReceiptModal({ existing, onClose, onSaved }) {
         </Field>
       </div>
 
+      {/* --- C6: the fabric these pieces were cut from ----------------------
+          Everything that came onto the cutting floor has to be accounted for:
+          cut into panels, put back on the rack, kept as remnants, or thrown
+          away. Saving takes it off the cutting floor in the stock ledger. */}
+      <div className="fieldset-title">Fabric used for these pieces</div>
+      {fabricPosted ? (
+        <Alert kind="info">
+          This receipt&apos;s fabric has already been taken off the cutting floor in the stock
+          ledger, so it cannot be changed here. The piece counts above can still be corrected.
+        </Alert>
+      ) : (
+        <>
+          <p className="hint" style={{ marginTop: 0 }}>
+            Leave blank if this lot&apos;s cloth is being accounted for on another receipt of the
+            same cut.
+          </p>
+          <div className="form-grid">
+            <Field
+              label="Fabric issue"
+              required={fabric.entered}
+              hint={
+                !form.orderId
+                  ? 'Choose an order first.'
+                  : fabricIssues.length === 0
+                    ? 'No posted fabric issue to the cutting floor for this order.'
+                    : 'The issue that put this cloth on the cutting floor.'
+              }
+            >
+              <RecordSelect
+                value={form.fabricIssueId}
+                onChange={(e) => set({ fabricIssueId: e.target.value })}
+                options={fabricIssues}
+                disabled={!form.orderId}
+                placeholder="Select the fabric issue..."
+                getValue={(i) => i.id}
+                getLabel={(i) =>
+                  `${i.issueNo} - roll ${i.roll?.rollNo ?? '?'} - ${fmtNum(i.fabricQtyIssued)} ${i.uom ?? ''}`
+                }
+              />
+            </Field>
+            {FABRIC_FIELDS.map(([k, label, hint]) => (
+              <Field key={k} label={label} hint={hint} required={k === 'issuedQty' && fabric.entered}>
+                <TextInput
+                  type="number"
+                  min="0"
+                  step="0.0001"
+                  value={form[k]}
+                  onChange={(e) => set({ [k]: e.target.value })}
+                />
+              </Field>
+            ))}
+          </div>
+          {fabric.entered && (
+            <Alert kind={fabric.balances ? 'success' : 'error'}>
+              {fabric.balances
+                ? `Reconciles: ${fmtNum(fabric.issued)} received is fully accounted for.`
+                : fabric.issued <= 0
+                  ? 'Enter the fabric received on the floor - the other figures are parts of it.'
+                  : `Does not reconcile: ${fmtNum(Math.abs(fabric.difference))} ` +
+                    `${fabric.difference > 0 ? 'unaccounted for - enter the wastage' : 'more than was received'}.`}
+              {fabric.balances && !form.fabricIssueId && ' Choose the fabric issue it came from.'}
+            </Alert>
+          )}
+        </>
+      )}
+
       {summary && (
         <p className="hint">
           So far for this order: <strong>{fmtNum(summary.pcsReceived)}</strong> good pieces received,{' '}
           <strong>{fmtNum(summary.pcsIssuedToStitching)}</strong> issued to stitching,{' '}
           <strong>{fmtNum(summary.pcsInHand)}</strong> in hand
-          {editing ? ' (including this receipt as it was saved).' : '.'}
+          {editing ? ' (including this receipt as it was saved).' : '.'}{' '}
+          {editing
+            ? 'Changing the good pieces clears the sample check - the lot will need checking again.'
+            : 'The pieces go to stitching only after a sample check on this receipt.'}
         </p>
       )}
     </Modal>

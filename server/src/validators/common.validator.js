@@ -106,6 +106,20 @@ const noNulBytes = (schema) =>
     message: 'This text contains a character that cannot be stored. Retype or re-paste it.',
   });
 
+/**
+ * A document number someone may type - an order number, say, which the sheet
+ * allows to be the buyer's own PO number. Letters and digits, with spaces,
+ * hyphens, slashes, dots and underscores between them; no "..", and nothing
+ * that means something to a browser or a file path. It is printed, put in
+ * links and file names, and searched on.
+ */
+const DOC_NO = /^[A-Za-z0-9](?:[A-Za-z0-9 _./-]*[A-Za-z0-9])?$/;
+export const optionalDocNo = (max) =>
+  optionalText(max).refine(
+    (v) => v == null || (DOC_NO.test(v) && !v.includes('..')),
+    'Use letters and digits, with - / . _ or spaces between them',
+  );
+
 export const optionalText = (max) =>
   z
     .union([

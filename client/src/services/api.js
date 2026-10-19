@@ -119,6 +119,21 @@ async function refreshAccessToken() {
   return data.data.accessToken;
 }
 
+/*
+ * When the answer did not come from the application at all.
+ *
+ * A gateway in front of it (Azure's, while the app restarts or a request runs
+ * too long) or the body-size limit replies with an HTML page and no `error`
+ * object, and "Something went wrong" tells the user nothing they can act on.
+ */
+const FALLBACK_MESSAGE = {
+  413: 'That file or request is too large to upload. Try a smaller file.',
+  429: 'Too many requests in a short time. Wait a minute and try again.',
+  502: 'The server is restarting. Wait a minute and try again.',
+  503: 'The server is busy or restarting. Wait a minute and try again.',
+  504: 'The server took too long to answer. Check whether the change was saved before trying again.',
+};
+
 /** Only an expired/invalid token is worth retrying - a revoked session is not. */
 const RETRYABLE = new Set(['TOKEN_EXPIRED', 'TOKEN_INVALID', 'UNAUTHENTICATED']);
 
@@ -183,7 +198,7 @@ api.interceptors.response.use(
 
     return Promise.reject(
       new ApiClientError(
-        response.data?.error?.message ?? 'Something went wrong',
+        response.data?.error?.message ?? FALLBACK_MESSAGE[response.status] ?? 'Something went wrong',
         response.status,
         code,
         response.data?.error?.details,

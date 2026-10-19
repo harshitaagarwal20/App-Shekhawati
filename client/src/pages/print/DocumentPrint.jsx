@@ -990,7 +990,9 @@ function JobWorkBody({ doc }) {
 
 function FabricIssueChallanBody({ doc }) {
   const { line, fabric, po, references } = doc;
-  const spec = fabricSpec(fabric);
+  const rows = doc.rolls?.length
+    ? doc.rolls
+    : [{ lineNo: 1, fabric, qty: line.qty, uom: line.uom }];
   const process = fmtEnum(doc.purpose);
 
   return (
@@ -1026,16 +1028,26 @@ function FabricIssueChallanBody({ doc }) {
           </tr>
         </thead>
         <tbody>
-          <tr>
-            <td className="po-sr">1</td>
-            <td>
-              <strong>{fabric.fabricName ?? 'Fabric'}</strong>
-              {spec && <div className="po-item-note">{spec}</div>}
-            </td>
-            <td className="code">{fabric.rollNo}</td>
-            <td>{line.uom}</td>
-            <td className="num">{fmtNum(line.qty, { decimals: 4 })}</td>
-          </tr>
+          {/* One line per roll. Rolls issued together print on one sheet;
+              each line still names the issue it was posted as. */}
+          {rows.map((r) => {
+            const rowSpec = fabricSpec(r.fabric);
+            return (
+              <tr key={r.lineNo}>
+                <td className="po-sr">{r.lineNo}</td>
+                <td>
+                  <strong>{r.fabric.fabricName ?? 'Fabric'}</strong>
+                  {rowSpec && <div className="po-item-note">{rowSpec}</div>}
+                </td>
+                <td className="code">
+                  {r.fabric.rollNo}
+                  {rows.length > 1 && r.issueNo && <div className="po-item-note">{r.issueNo}</div>}
+                </td>
+                <td>{r.uom}</td>
+                <td className="num">{fmtNum(r.qty, { decimals: 4 })}</td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
 
@@ -1052,7 +1064,10 @@ function FabricIssueChallanBody({ doc }) {
           5,000 + 5,000, and the vendor should see which part this is. */}
       {po && (
         <>
-          <div className="po-terms-title">Against job work PO {po.jobWorkNo}</div>
+          <div className="po-terms-title">
+            Against job work PO {po.jobWorkNo}
+            {po.date && ` dated ${fmtDate(po.date)}`} &middot; challan {po.challanSeq}
+          </div>
           <table className="print-table po-items">
             <thead>
               <tr>

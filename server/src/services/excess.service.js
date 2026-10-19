@@ -50,9 +50,57 @@ import prisma from '../config/prisma.js';
 import { ApiError, ERROR_CODES } from '../utils/ApiError.js';
 import { searchFilter } from '../utils/http.js';
 import { assertNotSelfApproval } from '../domain/makerChecker.js';
+import { tryCategoryOf } from '../domain/itemCategory.js';
 
 const D = (v) => new Prisma.Decimal(v ?? 0);
 const ZERO = D(0);
+
+/**
+ * WHICH DOCUMENTS READ AN EXCESS RULE, AND WHICH OF ITS FIELDS.
+ *
+ * The rules screen used to accept any document type and any field, and five
+ * of the eight seeded rows were read by nothing: the BUYER_ORDER band was a
+ * constant in buyerOrder.service.js, job-work shrinkage moved to its own
+ * master, item-category tolerances moved to the Tolerance Rules screen, and
+ * purchase orders and receipts take only the percentage - so a ceiling or an
+ * approval flag on their rule was never consulted. A screen that lets someone
+ * change a number that changes nothing is worse than no screen.
+ *
+ * This is the list of what is actually read. A rule for anything else is
+ * refused, and the PO and GRN rules refuse a ceiling.
+ */
+export const RULE_CONSUMERS = {
+  BUYER_ORDER: {
+    fields: ['excessPct', 'hardCeilingPct', 'requiresApproval'],
+    use: 'Order excess: granted on entry up to this percentage, past it the Director decides, past the ceiling it is refused.',
+  },
+  CUTTING_ISSUE: {
+    fields: ['excessPct', 'hardCeilingPct', 'requiresApproval'],
+    use: 'Pieces cut past the approved plan.',
+  },
+  PURCHASE_ORDER: {
+    fields: ['excessPct'],
+    use: 'Order tolerance for a category with no row on the Tolerance Rules screen. A PO over it is refused outright.',
+  },
+  GRN: {
+    fields: ['excessPct'],
+    use: 'Receipt tolerance for a category with no row on the Tolerance Rules screen, frozen on the PO. A receipt over it is recorded and flagged as a breach.',
+  },
+};
+
+/** Whether one rule's scope key names what is being asked about. */
+export function ruleKeyMatches(rule, wanted) {
+  if (wanted === null || wanted === undefined) return false;
+  if (rule.scope !== 'ITEM_CATEGORY') return rule.scopeKey === wanted;
+  // "Accessories", "Zipper", "Handle" and "ACCESSORIES" are one commercial
+  // category - compared exactly, a rule keyed "Accessories" silently did not
+  // apply to a zipper. Mapped through the same table every writer uses, and
+  // compared case-insensitively where either side is unmapped.
+  const a = tryCategoryOf(rule.scopeKey);
+  const b = tryCategoryOf(wanted);
+  if (a && b) return a === b;
+  return String(rule.scopeKey).trim().toLowerCase() === String(wanted).trim().toLowerCase();
+}
 
 export const RULE_SORTABLE = ['scope', 'scopeKey', 'excessPct', 'priority', 'createdAt'];
 export const APPROVAL_SORTABLE = ['requestedAt', 'status', 'actualExcessPct', 'overLimitQty'];
@@ -119,11 +167,7 @@ export async function resolveRule({ documentType, orderId, buyerId, itemCategory
     GLOBAL: '',
   };
 
-  const matching = candidates.filter((r) => {
-    const wanted = keyFor[r.scope];
-    if (wanted === null || wanted === undefined) return false;
-    return r.scopeKey === wanted;
-  });
+  const matching = candidates.filter((r) => ruleKeyMatches(r, keyFor[r.scope]));
 
   // Precedence first, then the rule's own priority, then the more specific
   // (document-type-bound) rule over the catch-all one.
@@ -183,7 +227,8 @@ export async function resolveRule({ documentType, orderId, buyerId, itemCategory
  * @param {any} args.actualQty     What is being attempted
  * @param {any} args.permittedPct  The resolved threshold, as a fraction
  * @param {any} [args.hardCeilingPct] Past this, no approval can help
- * @param {boolean} [args.requiresApproval]
+ * @param {boolean} [args.requiresApproval] False: anything up to the ceiling
+ *   passes without an authorisation. The ceiling still refuses.
  * @param {string} [args.uom]
  */
 export function measure({
@@ -215,6 +260,12 @@ export function measure({
   const ceiling = hardCeilingPct === null || hardCeilingPct === undefined ? null : D(hardCeilingPct);
   const beyondCeiling = ceiling !== null && actualExcessPct.greaterThan(ceiling);
 
+  // The ceiling is checked BEFORE the approval flag, on purpose. A rule that
+  // needs no approval waves through everything between its threshold and its
+  // ceiling - reported, not blocked - but the ceiling is the one number that
+  // no setting softens. A rule with no ceiling and no approval is purely
+  // advisory. (Job-work shrinkage, which needs the advisory behaviour, has
+  // its own master and never reaches this function.)
   let verdict;
   if (overLimitQty.isZero()) {
     verdict = VERDICT.WITHIN;
@@ -223,9 +274,6 @@ export function measure({
   } else if (requiresApproval) {
     verdict = VERDICT.NEEDS_APPROVAL;
   } else {
-    // The threshold is advisory: report it, do not block on it. Job-work
-    // shrinkage works this way - an out-of-tolerance return goes to scrutiny
-    // rather than being refused, because the fabric is already back.
     verdict = VERDICT.WITHIN;
   }
 
@@ -557,26 +605,68 @@ export async function listRules(query) {
     ...searchFilter(search, ['scopeKey', 'basis']),
   };
 
-  const [rows, total] = await Promise.all([
+  const now = new Date();
+  const [rows, total, tolerances] = await Promise.all([
     prisma.excessRule.findMany({ where, orderBy, skip, take }),
     prisma.excessRule.count({ where }),
+    // Categories the Tolerance Rules screen answers for today - an
+    // item-category excess rule for a PO or GRN is shadowed by those.
+    prisma.toleranceRule.findMany({
+      where: {
+        isActive: true,
+        deletedAt: null,
+        effectiveFrom: { lte: now },
+        OR: [{ effectiveTo: null }, { effectiveTo: { gte: now } }],
+      },
+      select: { category: true },
+    }),
   ]);
+  const toleranceCategories = new Set(tolerances.map((t) => t.category));
 
-  return { rows: rows.map(projectRule), total, page, pageSize };
+  return { rows: rows.map((r) => projectRule(r, toleranceCategories)), total, page, pageSize };
 }
 
-function projectRule(r) {
+/**
+ * Why a rule changes nothing, or null when it is in effect. Shown on the rules
+ * screen beside the row, so a number nobody reads is not mistaken for policy.
+ */
+export function notInEffectReason(r, toleranceCategories = new Set()) {
+  const docType = r.documentType ?? (r.scope === 'DOCUMENT_TYPE' ? r.scopeKey : null);
+  if (docType && !RULE_CONSUMERS[docType]) {
+    return `Nothing reads excess rules for ${docType.replace(/_/g, ' ').toLowerCase()}.` +
+      (docType === 'DYE_ISSUE' ? ' Job-work shrinkage is set on the Shrinkage Rules screen.' : '');
+  }
+  if (r.scope === 'ITEM_CATEGORY') {
+    const category = tryCategoryOf(r.scopeKey);
+    const forPurchasing = !r.documentType || ['PURCHASE_ORDER', 'GRN'].includes(r.documentType);
+    if (!forPurchasing) return 'Only purchase orders and receipts are judged by item category.';
+    if (category && toleranceCategories.has(category)) {
+      return `The Tolerance Rules screen has a ${category.toLowerCase()} row, and it wins over this one.`;
+    }
+  }
+  return null;
+}
+
+function projectRule(r, toleranceCategories) {
+  const reason = notInEffectReason(r, toleranceCategories);
   return {
     ...r,
     excessPctDisplay: D(r.excessPct).mul(100).toDecimalPlaces(2).toFixed(2),
     hardCeilingPctDisplay:
       r.hardCeilingPct === null ? null : D(r.hardCeilingPct).mul(100).toDecimalPlaces(2).toFixed(2),
     precedenceRank: SCOPE_PRECEDENCE.indexOf(r.scope),
+    /** Which of this rule's figures anything actually reads. */
+    fieldsInEffect: r.documentType
+      ? (RULE_CONSUMERS[r.documentType]?.fields ?? [])
+      : ['excessPct', 'hardCeilingPct', 'requiresApproval'],
+    inEffect: reason === null,
+    notInEffectReason: reason,
   };
 }
 
 export async function createRule(input, actorId) {
   assertRuleShape(input);
+  assertRuleIsRead(input);
 
   const clash = await prisma.excessRule.findFirst({
     where: {
@@ -623,6 +713,9 @@ export async function updateRule(id, input, actorId) {
   if (!rule) throw ApiError.notFound('Excess rule');
 
   assertRuleShape({ ...rule, ...input });
+  if (input.hardCeilingPct !== undefined && input.hardCeilingPct !== null) {
+    assertCeilingIsRead(rule.documentType);
+  }
 
   return projectRule(
     await prisma.excessRule.update({
@@ -699,6 +792,46 @@ function assertRuleShape(input) {
   }
 }
 
+/** Refuses a new rule that nothing would ever read. */
+function assertRuleIsRead(input) {
+  if (input.scope === 'ITEM_CATEGORY') {
+    throw ApiError.badRequest(
+      'Tolerances per item category are set on the Tolerance Rules screen, which purchase ' +
+        'orders and receipts read first. An item-category excess rule would be shadowed by it.',
+      { field: 'scope' },
+    );
+  }
+  for (const [field, value] of [
+    ['documentType', input.documentType],
+    ['scopeKey', input.scope === 'DOCUMENT_TYPE' ? input.scopeKey : null],
+  ]) {
+    if (value && !RULE_CONSUMERS[value]) {
+      throw ApiError.badRequest(
+        `Nothing reads excess rules for ${value.replace(/_/g, ' ').toLowerCase()}. ` +
+          `Rules can be set for: ${Object.keys(RULE_CONSUMERS).join(', ')}, or for all of them.`,
+        { field, allowed: Object.keys(RULE_CONSUMERS) },
+      );
+    }
+  }
+  if (input.hardCeilingPct !== undefined && input.hardCeilingPct !== null) {
+    assertCeilingIsRead(input.documentType);
+  }
+}
+
+/**
+ * Purchase orders and receipts read only the percentage - a PO over it is
+ * refused, a receipt over it is flagged as a breach - so a ceiling is never read.
+ */
+function assertCeilingIsRead(documentType) {
+  if (documentType && !RULE_CONSUMERS[documentType]?.fields.includes('hardCeilingPct')) {
+    throw ApiError.badRequest(
+      `A ${documentType.replace(/_/g, ' ').toLowerCase()} is judged on the percentage alone, ` +
+        'so a hard ceiling on this rule would never be read. Leave it empty.',
+      { field: 'hardCeilingPct' },
+    );
+  }
+}
+
 // ===========================================================================
 //  QUERIES
 // ===========================================================================
@@ -761,8 +894,9 @@ export function scopes() {
     keyMeaning: {
       ORDER: 'A buyer order id. The narrowest scope, and the one that always wins.',
       BUYER: 'A buyer id. Applies to every order that buyer places.',
-      ITEM_CATEGORY: 'An L_ItemCategory value, e.g. "Accessories".',
-      DOCUMENT_TYPE: 'A DocumentType name, e.g. "PURCHASE_ORDER".',
+      ITEM_CATEGORY:
+        'Kept only for older rules. Item-category tolerances are set on the Tolerance Rules screen.',
+      DOCUMENT_TYPE: `A DocumentType name: ${Object.keys(RULE_CONSUMERS).join(', ')}.`,
       GLOBAL: 'No key. The fallback that applies when nothing more specific matches.',
     }[scope],
   }));

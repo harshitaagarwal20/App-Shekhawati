@@ -316,6 +316,23 @@ export const masterLists = [
     ],
   },
   {
+    code: 'CutPieceDefect',
+    name: 'Cut Piece Defect',
+    description: 'Cut Pieces Receipt - sample check defect types (L_CutPieceDefect)',
+    values: [
+      'Hole',
+      'Stain',
+      'Shade Variation',
+      'Weaving Fault',
+      'Mis-cut / Wrong Shape',
+      'Wrong Size',
+      'Notch Missing',
+      'Fraying Edge',
+      'Print Defect',
+      'Wrong Grain',
+    ],
+  },
+  {
     code: 'PaymentTerms',
     name: 'Payment Terms',
     description: 'Buyer Master - Payment Terms (L_PaymentTerms)',

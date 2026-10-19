@@ -22,14 +22,12 @@ import { parseCsvRecords, toCsv as writeCsv } from '../src/utils/csv.js';
 const readRepoFile = (rel) =>
   readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
 
-/** The fourteen reports the brief asks for, by key. */
+/** Every report in the catalogue, by key. */
 const EXPECTED = [
   'order-status',
   // Added with buyer order pricing: the value of the orders on hand.
   'order-book',
   'planning-status',
-  'pending-quotations',
-  'pending-po-approvals',
   'po-status',
   'pending-grns',
   'inventory',
@@ -44,6 +42,10 @@ const EXPECTED = [
   'cutting-efficiency',
   // Stock on hand, valued first-in first-out, layer by layer.
   'stock-valuation',
+  // Inventory analysis: stock by supplier, supplier yield, inward inspection.
+  'supplier-stock',
+  'supplier-yield',
+  'inward-inspection',
 ];
 
 /** Modules that do not exist in this system, and must not gain a report. */
@@ -163,10 +165,11 @@ describe('Reports - the catalogue is filtered by permission', () => {
   });
 
   test('a user sees exactly the reports their permissions cover', () => {
-    // Somebody who can only see purchase orders gets the two PO reports and
-    // nothing else.
+    // Somebody who can only see purchase orders gets the PO report and
+    // nothing else. (Pending PO approvals was removed: the Approvals queue
+    // already lists them.)
     const visible = catalogue((code) => code === 'PURCHASE_ORDER.VIEW').map((r) => r.key);
-    assert.deepEqual(visible.sort(), ['pending-po-approvals', 'po-status']);
+    assert.deepEqual(visible.sort(), ['po-status']);
   });
 
   test('the catalogue carries the columns, so one screen can render any report', () => {

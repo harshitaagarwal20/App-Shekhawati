@@ -247,6 +247,17 @@ export const NAV_GROUPS = [
         label: 'Inventory',
         permission: ['INVENTORY.VIEW', 'STOCK_LEDGER.VIEW', 'FABRIC_ROLL.VIEW'],
       },
+      /*
+       * Also a card on the Inventory hub, but it is a different question - not
+       * "what is in the store" but "whose fabric, how good is it" - and people
+       * looking for it did not think to open Inventory first.
+       */
+      {
+        to: '/inventory/analysis',
+        label: 'Inventory Analysis',
+        permission: ['INVENTORY.VIEW', 'FABRIC_ROLL.VIEW'],
+        hint: 'Stock by supplier, yield, inward inspection',
+      },
       { to: '/fabric-issues', label: 'Fabric Issue', permission: 'FABRIC_ISSUE.VIEW', hint: 'Send fabric out of the store' },
     ],
   },

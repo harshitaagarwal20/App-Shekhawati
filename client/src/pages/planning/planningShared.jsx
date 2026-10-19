@@ -1,4 +1,4 @@
-import { fmtDate, fmtPctFromFraction } from '../../utils/format.js';
+import { fmtDate, fmtDateTime, fmtPctFromFraction } from '../../utils/format.js';
 import TableWrap from '../../components/TableWrap.jsx';
 /**
  * Formatting and labels shared by the Planning screens.
@@ -72,6 +72,128 @@ export function CeilingNote({ allocation }) {
     <Note kind="info">
       This order asks for no excess, so the plan may allot up to its order quantity of{' '}
       <strong>{fmtQty(allocation.permittedQty)}</strong> pieces.
+    </Note>
+  );
+}
+
+/**
+ * FABRIC ON HAND for the style being planned - GET /plannings/fabric-stock.
+ *
+ * Every figure is the server's. Rolls are this style's when they were received
+ * against a PO line for this order and style, the same link the Fabric Issue
+ * roll picker uses. Nothing here is reserved for the plan.
+ */
+export function FabricStockPanel({ stock }) {
+  const uom = stock.uom ?? '';
+  const own = stock.forThisStyle;
+  const rows = own?.byColour ?? [];
+  const pending = stock.onOrder;
+  const elsewhere = stock.elsewhereInColour;
+
+  return (
+    <div style={{ marginTop: 18 }}>
+      <div className="fieldset-title">
+        Fabric on hand
+        <span className="faint"> &mdash; {stock.styleNo}, in {uom}</span>
+      </div>
+
+      {rows.length === 0 ? (
+        <p className="faint" style={{ fontSize: 13 }}>
+          No fabric bought for this style is in stock yet.
+        </p>
+      ) : (
+        <TableWrap>
+          <table className="data">
+            <thead>
+              <tr>
+                <th>Colour</th>
+                <th className="num">Available to issue</th>
+                <th className="num">On hold</th>
+                <th className="num">At job worker / cutting floor</th>
+                <th className="num">Rolls</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.colorCode ?? ''}>
+                  <td>{r.colorCode ?? <span className="faint">No colour</span>}</td>
+                  <td className="num"><strong>{fmtQty(r.availableQty)}</strong></td>
+                  <td className="num">{fmtQty(r.heldQty)}</td>
+                  <td className="num">{fmtQty(r.inProcessQty)}</td>
+                  <td className="num">{r.rollCount}</td>
+                </tr>
+              ))}
+              {rows.length > 1 && (
+                <tr>
+                  <td><strong>Total</strong></td>
+                  <td className="num"><strong>{fmtQty(own.availableQty)}</strong></td>
+                  <td className="num">{fmtQty(own.heldQty)}</td>
+                  <td className="num">{fmtQty(own.inProcessQty)}</td>
+                  <td className="num">{own.rollCount}</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </TableWrap>
+      )}
+
+      <ul className="faint" style={{ fontSize: 12, margin: '6px 0 0', paddingLeft: 18 }}>
+        {pending?.poCount > 0 && (
+          <li>
+            Still to arrive: <strong>{fmtQty(pending.pendingQty)} {uom}</strong> on {pending.poCount} open
+            PO{pending.poCount === 1 ? '' : 's'}
+            {pending.awaitingApprovalCount > 0 && ` (${pending.awaitingApprovalCount} awaiting approval)`}.
+          </li>
+        )}
+        {elsewhere && Number(elsewhere.availableQty) > 0 && (
+          <li>
+            Also in the store in {stock.colorCode}, bought for other orders or in bulk:{' '}
+            <strong>{fmtQty(elsewhere.availableQty)} {uom}</strong> ({elsewhere.rollCount} roll
+            {elsewhere.rollCount === 1 ? '' : 's'}).
+          </li>
+        )}
+        {stock.otherUnitRollCount > 0 && (
+          <li>
+            {stock.otherUnitRollCount} roll{stock.otherUnitRollCount === 1 ? ' is' : 's are'} held in a unit
+            other than {uom} and {stock.otherUnitRollCount === 1 ? 'is' : 'are'} not counted above.
+          </li>
+        )}
+        <li>Stock as of {fmtDateTime(stock.asOf)}. Nothing is reserved for this plan.</li>
+      </ul>
+    </div>
+  );
+}
+
+/**
+ * Whether the store covers the fabric a cutting plan will draw - the preview's
+ * `fabricCover`, worked out by the server against the same stock as the panel.
+ */
+export function FabricCoverNote({ cover, stock }) {
+  if (!cover) return null;
+  const uom = cover.uom ?? '';
+
+  if (cover.covered) {
+    return (
+      <Note kind="info">
+        This plan draws <strong>{fmtQty(cover.neededQty)} {uom}</strong> of fabric, and{' '}
+        {fmtQty(cover.availableQty)} {uom} bought for this style is available to issue.
+      </Note>
+    );
+  }
+
+  const inProcess = Number(stock?.forThisStyle?.inProcessQty ?? 0);
+  const pending = stock?.onOrder;
+  const elsewhere = stock?.elsewhereInColour;
+  return (
+    <Note kind="warning">
+      This plan draws <strong>{fmtQty(cover.neededQty)} {uom}</strong> of fabric, but only{' '}
+      {fmtQty(cover.availableQty)} {uom} bought for this style is available to issue &mdash;{' '}
+      <strong>short by {fmtQty(cover.shortQty)} {uom}</strong>.
+      {inProcess > 0 && ` ${fmtQty(inProcess)} ${uom} is at a job worker or on the cutting floor.`}
+      {pending?.poCount > 0 && ` ${fmtQty(pending.pendingQty)} ${uom} is still to arrive on open POs.`}
+      {elsewhere && Number(elsewhere.availableQty) > 0
+        && ` ${fmtQty(elsewhere.availableQty)} ${uom} in ${stock.colorCode} is in the store for other orders.`}
+      {' '}The plan can still be saved.
     </Note>
   );
 }

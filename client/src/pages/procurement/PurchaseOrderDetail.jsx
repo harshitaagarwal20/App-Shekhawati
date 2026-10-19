@@ -224,7 +224,6 @@ export default function PurchaseOrderDetail() {
       />
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-header">Purchase Order</div>
         <div className="stat">
           <div className="label">Workflow</div>
           <div className="value" style={{ fontSize: 18 }}>
@@ -237,7 +236,6 @@ export default function PurchaseOrderDetail() {
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-header">Purchase order</div>
         <div className="card-body">
           <DetailGrid>
             <Detail label="PO ID" value={po.poId} mono />

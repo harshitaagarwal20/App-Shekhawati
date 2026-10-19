@@ -20,9 +20,10 @@ import {
   TextArea,
   TextInput,
 } from '../../components/ui.jsx';
-import { CeilingNote, UnitAllocationTable, fmtQty } from './planningShared.jsx';
+import { CeilingNote, FabricCoverNote, FabricStockPanel, UnitAllocationTable, fmtQty } from './planningShared.jsx';
 import { loadFailed, reportLoadFailure } from '../../services/loadFailures.js';
 import TableWrap from '../../components/TableWrap.jsx';
+import { todayInput } from '../../utils/format.js';
 
 /**
  * What the one allotment column is called, per department.
@@ -62,7 +63,8 @@ const LINE_STATUS_OPTIONS = [
   { value: 'ON_HOLD', label: 'On Hold' },
 ];
 
-const today = () => new Date().toISOString().slice(0, 10);
+// Kolkata's calendar date, not UTC's - before 05:30 IST those differ by a day.
+const today = todayInput;
 const asDateInput = (v) => (v ? String(v).slice(0, 10) : '');
 
 const blankLine = () => ({
@@ -160,6 +162,7 @@ export default function PlanningForm({ plan, onSaved, onCancel }) {
 
   const [orderOptions, setOrderOptions] = useState(null);
   const [orderInfo, setOrderInfo] = useState(null);
+  const [fabricStock, setFabricStock] = useState(null);
   const [preview, setPreview] = useState(null);
   const [previewing, setPreviewing] = useState(false);
   const [serverError, setServerError] = useState('');
@@ -200,6 +203,28 @@ export default function PlanningForm({ plan, onSaved, onCancel }) {
       cancelled = true;
     };
   }, [header.orderId, isNew, plan?.id]);
+
+  // What the store holds for the chosen style - read once the style is picked,
+  // because the planning flow starts from what fabric there is.
+  useEffect(() => {
+    if (!header.orderId || !header.orderLineId) {
+      setFabricStock(null);
+      return undefined;
+    }
+    let cancelled = false;
+    setFabricStock(null);
+    planningsApi
+      .fabricStock({ orderId: header.orderId, orderLineId: header.orderLineId })
+      .then((r) => { if (!cancelled) setFabricStock(r); })
+      .catch((err) => {
+        if (cancelled) return;
+        reportLoadFailure('the fabric stock', err);
+        setFabricStock(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [header.orderId, header.orderLineId]);
 
   /** The line the planner has chosen, with its own ceiling. */
   /*
@@ -415,8 +440,6 @@ export default function PlanningForm({ plan, onSaved, onCancel }) {
         {preview?.violation && <Alert kind="error">{preview.violation}</Alert>}
 
         <div className="form-grid">
-          <div className="fieldset-title">Plan header</div>
-
           <Field
             label="Order No"
             required
@@ -568,6 +591,9 @@ export default function PlanningForm({ plan, onSaved, onCancel }) {
           </p>
         )}
 
+        {/* What the store holds for this style, before anything is allotted. */}
+        {fabricStock && <FabricStockPanel stock={fabricStock} />}
+
         {/* --- The allotment grid: Excel "Planning" ------------------------ */}
         {/* A CUTTING PLAN ALLOTS FABRIC.
 
@@ -689,6 +715,7 @@ export default function PlanningForm({ plan, onSaved, onCancel }) {
               Allocation <span className="faint">&mdash; calculated by the server</span>
             </div>
             <CeilingNote allocation={allocation} />
+            {isCutting && <FabricCoverNote cover={preview.fabricCover} stock={fabricStock} />}
             {preview.unitAllocation?.length > 0 && (
               <>
                 <div className="fieldset-title" style={{ marginTop: 12 }}>

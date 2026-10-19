@@ -7,6 +7,7 @@ import {
   createCutPiecesReceiptSchema,
   cutPiecesReceiptListQuery,
   cutPiecesSummaryQuery,
+  recordCutCheckSchema,
   updateCutPiecesReceiptSchema,
 } from '../validators/cutPiecesReceipt.validator.js';
 
@@ -28,6 +29,14 @@ router.patch(
   can('CUT_PIECES_RECEIPT.EDIT'),
   validate({ params: idParam, body: updateCutPiecesReceiptSchema }),
   c.update,
+);
+
+/** The sample check before stitching. Pass or fail is worked out, not sent. */
+router.post(
+  '/:id/check',
+  can('CUT_PIECES_RECEIPT.EDIT'),
+  validate({ params: idParam, body: recordCutCheckSchema }),
+  c.recordCheck,
 );
 
 router.delete('/:id', can('CUT_PIECES_RECEIPT.DELETE'), validate({ params: idParam }), c.remove);

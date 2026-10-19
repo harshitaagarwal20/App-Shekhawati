@@ -203,20 +203,22 @@ describe('authentication', () => {
     assert.equal(after.body.error.code, 'SESSION_REVOKED');
   });
 
-  test('a user flagged mustChangePassword is blocked from the rest of the API', async () => {
+  // Forced first password change is RETIRED: users are created with
+  // mustChangePassword = false and the API no longer blocks on the flag. A flag
+  // left over on an old account must not lock that user out.
+  test('a leftover mustChangePassword flag does not block the API', async () => {
     await prisma.user.updateMany({ where: { username: 'merch' }, data: { mustChangePassword: true } });
-    const login = await call('POST', '/api/auth/login', {
-      body: { username: 'merch', password: USER_PASSWORD },
-    });
-    assert.equal(login.status, 200);
-    assert.equal(login.body.data.user.mustChangePassword, true);
+    try {
+      const login = await call('POST', '/api/auth/login', {
+        body: { username: 'merch', password: USER_PASSWORD },
+      });
+      assert.equal(login.status, 200);
 
-    const blocked = await call('GET', '/api/buyers', { token: login.body.data.accessToken });
-    assert.equal(blocked.status, 403);
-    assert.equal(blocked.body.error.code, 'PASSWORD_CHANGE_REQUIRED');
-
-    // ...but /auth/me stays reachable so the client can render the change form.
-    assert.equal((await call('GET', '/api/auth/me', { token: login.body.data.accessToken })).status, 200);
+      const res = await call('GET', '/api/buyers', { token: login.body.data.accessToken });
+      assert.equal(res.status, 200, JSON.stringify(res.body));
+    } finally {
+      await prisma.user.updateMany({ where: { username: 'merch' }, data: { mustChangePassword: false } });
+    }
   });
 
   test('a deactivated user cannot use an already-issued token', async () => {
@@ -345,7 +347,7 @@ describe('List Master drives every dropdown', () => {
       body: { vendorName: 'Bad Category Vendor', category: 'Not A Real Category' },
     });
     assert.equal(status, 400);
-    assert.match(body.error.message, /VendorCategory/);
+    assert.match(body.error.message, /not one of the Vendor Category values/);
   });
 
   test('a system list cannot be deleted', async () => {
@@ -390,6 +392,17 @@ describe('Masters CRUD', () => {
     assert.equal(res.status, 201);
     created.buyers.push(res.body.data.id);
     assert.equal(res.body.data.buyerCode, 'ZCW#');
+  });
+
+  test('a second buyer with the same name is refused, whatever its case or spacing', async () => {
+    // Pickers show the name: two "Zenith Carry Works" cannot be told apart.
+    const res = await call('POST', '/api/buyers', {
+      token,
+      body: { buyerCode: 'ZCW2', buyerName: '  zenith   CARRY works ', country: 'USA', status: 'ACTIVE' },
+    });
+    if (res.status === 201) created.buyers.push(res.body.data.id);
+    assert.equal(res.status, 409, JSON.stringify(res.body));
+    assert.equal(res.body.error.details.field, 'buyerName');
   });
 
   test('a buyer without a code is refused, not given one', async () => {
@@ -573,7 +586,8 @@ describe('user administration', () => {
     }
   });
 
-  test('a new user is always forced to change the password an admin set', async () => {
+  // Forced first password change is retired - see above.
+  test('a new user is created ready to use, with no forced password change', async () => {
     const username = `test.user.${Date.now()}`;
     const res = await call('POST', '/api/users', {
       token,
@@ -586,7 +600,7 @@ describe('user administration', () => {
     });
     assert.equal(res.status, 201, JSON.stringify(res.body));
     createdUserId = res.body.data.id;
-    assert.equal(res.body.data.mustChangePassword, true);
+    assert.equal(res.body.data.mustChangePassword, false);
     assert.deepEqual(res.body.data.roleCodes, ['QC']);
   });
 

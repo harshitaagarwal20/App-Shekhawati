@@ -175,7 +175,6 @@ export default function OrderDetail() {
 
       {/* --- Order details ------------------------------------------------- */}
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-header">Order</div>
         <div className="card-body">
           <div className="form-grid">
             <Detail label="Order No" value={order.orderNo} mono />

@@ -525,6 +525,91 @@ async function buildPipeline(allowedKeys) {
 }
 
 // ===========================================================================
+//  TREND  -  the last six months, month by month
+// ===========================================================================
+
+/**
+ * Documents booked per month at four points of the pipeline: the order coming
+ * in, the material being bought, the material arriving, and the cloth going to
+ * stitching. Read together they show whether the factory is keeping pace with
+ * its orders - which no count of what is open today can say.
+ *
+ * Each series is a pipeline stage and is gated by that stage's permission, so
+ * a storeman sees receipts and nothing about orders.
+ *
+ * Months are calendar months in the display timezone, oldest first, and every
+ * month is present - a month with nothing booked is a 0, not a gap the chart
+ * would draw straight across.
+ */
+export const TREND_STAGES = ['orders', 'purchaseOrders', 'grns', 'cuttingIssues'];
+const TREND_MONTHS = 6;
+
+/** "2026-10" for an instant, in the display timezone. */
+function monthKey(date) {
+  const ist = new Date(new Date(date).getTime() + IST_OFFSET_MIN * 60000);
+  return `${ist.getUTCFullYear()}-${String(ist.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+/** The last TREND_MONTHS months, oldest first, with the instant each starts. */
+function trendMonths() {
+  const now = new Date(Date.now() + IST_OFFSET_MIN * 60000);
+  const months = [];
+  for (let i = TREND_MONTHS - 1; i >= 0; i -= 1) {
+    const first = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+    months.push({
+      key: `${first.getUTCFullYear()}-${String(first.getUTCMonth() + 1).padStart(2, '0')}`,
+      label: first.toLocaleString('en-IN', { month: 'short', timeZone: 'UTC' }),
+      start: new Date(first.getTime() - IST_OFFSET_MIN * 60000),
+    });
+  }
+  return months;
+}
+
+async function buildTrend(allowedKeys) {
+  if (allowedKeys.length === 0) return null;
+
+  const months = trendMonths();
+  const since = months[0].start;
+  const stages = STAGES.filter((s) => allowedKeys.includes(s.key));
+
+  const series = await Promise.all(
+    stages.map(async (stage) => {
+      // Only the date column crosses the wire; six months of one register is
+      // a few thousand dates at most.
+      const rows = await memo(`trend:${stage.key}:${months[0].key}`, () =>
+        prisma[stage.model].findMany({
+          where: { ...LIVE, [stage.dateField]: { gte: since } },
+          select: { [stage.dateField]: true },
+        }),
+      );
+      const byMonth = new Map(months.map((m) => [m.key, 0]));
+      for (const row of rows) {
+        const k = monthKey(row[stage.dateField]);
+        if (byMonth.has(k)) byMonth.set(k, byMonth.get(k) + 1);
+      }
+      const counts = months.map((m) => byMonth.get(m.key));
+      return {
+        key: stage.key,
+        label: stage.label,
+        to: stage.to,
+        counts,
+        /** Over the whole window, so the legend can say it without adding up. */
+        total: counts.reduce((a, b) => a + b, 0),
+        /** The busiest month's count, so the screen can scale without a max(). */
+        peak: Math.max(...counts),
+      };
+    }),
+  );
+
+  return {
+    months: months.map(({ key, label }) => ({ key, label })),
+    series,
+    /** One scale for every series - the chart has one y-axis. */
+    peak: Math.max(0, ...series.map((s) => s.peak)),
+  };
+}
+
+// ===========================================================================
 //  STOCK
 // ===========================================================================
 
@@ -538,11 +623,14 @@ async function buildPipeline(allowedKeys) {
  * the comparison would quietly become a second one.
  */
 async function buildStock() {
+  // FABRIC ONLY. The dashboard's stock cards are about cloth: accessories,
+  // packaging and stationery are not counted in the value or the shortfalls.
+  const fabric = { deletedAt: null, category: 'FABRIC' };
   const [totals, candidates, rollsOnHand, heldRolls] = await Promise.all([
     // Value is a database aggregate - no row bodies cross the wire to be added
     // up in Node.
     prisma.stockBalance.aggregate({
-      where: { item: { deletedAt: null } },
+      where: { item: fabric },
       _sum: { value: true },
     }),
     // Only rows that could possibly be below a level. An item with no reorder
@@ -550,7 +638,7 @@ async function buildStock() {
     // isBelowReorder() - so reading the rest to reject them is wasted work,
     // and in practice most items have never had one set.
     prisma.stockBalance.findMany({
-      where: { item: { deletedAt: null, reorderLevel: { gt: 0 } } },
+      where: { item: { ...fabric, reorderLevel: { gt: 0 } } },
       select: {
         qty: true,
         item: {
@@ -734,6 +822,10 @@ export function sectionsFor(has) {
      */
     approvalQueue: has('REPORT.VIEW'),
     pipeline: STAGES.filter((s) => has(s.permission)).map((s) => s.key),
+    /** The month-by-month series: the same stages, gated the same way. */
+    trend: STAGES.filter((s) => TREND_STAGES.includes(s.key) && has(s.permission)).map(
+      (s) => s.key,
+    ),
     stock: has('INVENTORY.VIEW'),
     activity: has('AUDIT.VIEW'),
     masters: MASTER_COUNTS.filter((m) => has(m.permission)).map((m) => m.key),
@@ -754,7 +846,7 @@ export function sectionsFor(has) {
 export async function build(auth) {
   const allowed = sectionsFor((code) => auth.has(code));
 
-  const [attention, approvals, pipeline, stock, activity, masters] = await Promise.all([
+  const [attention, approvals, pipeline, trend, stock, activity, masters] = await Promise.all([
     buildAttention(allowed.attention),
     buildApprovals(
       allowed.approvals,
@@ -762,6 +854,7 @@ export async function build(auth) {
       allowed.approvalQueue ? '/approvals' : null,
     ),
     buildPipeline(allowed.pipeline),
+    buildTrend(allowed.trend),
     allowed.stock ? memo('stock', buildStock) : Promise.resolve(null),
     allowed.activity ? memo('activity', buildActivity) : Promise.resolve(null),
     buildMasters(allowed.masters),
@@ -771,6 +864,7 @@ export async function build(auth) {
     attention,
     approvals,
     pipeline,
+    trend,
     stock,
     activity,
     masters,

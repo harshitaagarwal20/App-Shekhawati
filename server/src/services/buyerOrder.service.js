@@ -26,8 +26,9 @@ import prisma from '../config/prisma.js';
 import { ApiError } from '../utils/ApiError.js';
 import { OPTIONS_LIMIT, searchFilter } from '../utils/http.js';
 import { assertValueInList } from './masterList.service.js';
-import { nextNumber } from './documentNumber.service.js';
+import { advancePast, nextFreeNumber } from './documentNumber.service.js';
 import * as engine from './approvalEngine.js';
+import * as excessRules from './excess.service.js';
 // C9 - the one requirement multiplication, shared with Planning, the PO ceiling
 // and the Cutting Challan.
 import { computeRequirement } from '../domain/requirement.js';
@@ -217,20 +218,52 @@ async function refreshOrderValue(orderId, actorId, client = prisma) {
  *  had only one possible answer, and the orders that genuinely needed reading
  *  sat among them.
  *
- *  Up to and including 2% is now granted on entry. Above it, nothing changes:
- *  the excess is PENDING, the ceiling does not move, and the Director decides.
+ *  Up to and including the band is granted on entry. Above it, nothing
+ *  changes: the excess is PENDING, the ceiling does not move, and the Director
+ *  decides. Past the rule's hard ceiling it is refused outright - no signature
+ *  can allow it, so the merchandiser is told now rather than after a wait.
  *
- *  INCLUSIVE of 2.00% - "up to 2% is allowed" is how the office says it, and a
- *  band that refused exactly 2.00% would be the one number people test first.
+ *  INCLUSIVE of the band - "up to 2% is allowed" is how the office says it, and
+ *  a band that refused exactly 2.00% would be the one number people test first.
+ *
+ *  THE BAND IS THE BUYER_ORDER EXCESS RULE, not a constant. It was hard-coded
+ *  at 2% here while the Excess Rules screen showed a BUYER_ORDER rule that
+ *  nothing read - so editing it, or giving one buyer a wider band, changed
+ *  nothing. It now resolves like every other excess threshold: an ORDER rule,
+ *  then a BUYER rule, then the BUYER_ORDER document rule, then GLOBAL.
  * ---------------------------------------------------------------------------
  */
-export const AUTO_APPROVED_EXCESS_PCT = D('0.02');
 
 /** How the automatic grant signs itself in the trail. */
 const AUTO_APPROVAL_BY = 'Automatic (within tolerance)';
 
 /** For messages: "2.00". */
-const TOLERANCE_TEXT = AUTO_APPROVED_EXCESS_PCT.mul(100).toFixed(2);
+const pctText = (fraction) => D(fraction).mul(100).toFixed(2);
+
+/**
+ * The excess policy for an order: the band granted on entry, the hard ceiling
+ * and whether anything between the two needs the Director.
+ *
+ * @param {{orderId?: string, buyerId?: string}} scope
+ */
+export async function excessPolicy({ orderId, buyerId } = {}) {
+  const { rule, resolution } = await excessRules.resolveRule({
+    documentType: 'BUYER_ORDER',
+    orderId,
+    buyerId,
+  });
+  return {
+    autoApprovedPct: D(rule.excessPct),
+    hardCeilingPct: rule.hardCeilingPct === null ? null : D(rule.hardCeilingPct),
+    requiresApproval: rule.requiresApproval,
+    resolution,
+  };
+}
+
+/** Whether an excess this size goes to the Director - and so needs a case made. */
+function needsDecision(excessPct, policy) {
+  return policy.requiresApproval && excessPct.greaterThan(policy.autoApprovedPct);
+}
 
 /**
  * What happens to an excess the moment it is entered or changed.
@@ -239,17 +272,40 @@ const TOLERANCE_TEXT = AUTO_APPROVED_EXCESS_PCT.mul(100).toFixed(2);
  * ask this rather than testing `greaterThan(0)` three times - which is how
  * the three paths came to disagree the first time.
  *
- * @returns {{status: string, approvedPct: object, automatic: boolean}}
+ * @returns {{status: string, approvedPct: object, automatic: boolean, note?: string}}
  */
-function excessOnEntry(excessPct) {
+function excessOnEntry(excessPct, policy) {
   if (!excessPct.greaterThan(0)) {
     return { status: 'NOT_REQUIRED', approvedPct: ZERO, automatic: false };
   }
-  if (excessPct.lessThanOrEqualTo(AUTO_APPROVED_EXCESS_PCT)) {
+  if (policy.hardCeilingPct !== null && excessPct.greaterThan(policy.hardCeilingPct)) {
+    throw ApiError.badRequest(
+      `An excess of ${pctText(excessPct)}% is past the ${pctText(policy.hardCeilingPct)}% ceiling ` +
+        'the excess rules allow on an order. No approval can permit it - reduce the excess, or ' +
+        'have the rule changed on the Excess Rules screen.',
+      { field: 'excessPct', ceilingPct: policy.hardCeilingPct.toFixed(6) },
+    );
+  }
+  if (!needsDecision(excessPct, policy)) {
     // Granted in full - the ceiling moves now, with no signature.
-    return { status: 'APPROVED', approvedPct: excessPct, automatic: true };
+    return {
+      status: 'APPROVED',
+      approvedPct: excessPct,
+      automatic: true,
+      note: policy.requiresApproval
+        ? `is within the ${pctText(policy.autoApprovedPct)}% tolerance`
+        : 'is under the ceiling, and the excess rule for this order needs no approval',
+    };
   }
   return { status: 'PENDING', approvedPct: ZERO, automatic: false };
+}
+
+function justificationRequired(policy) {
+  return ApiError.badRequest(
+    `An excess above ${pctText(policy.autoApprovedPct)}% needs a justification - it goes to the ` +
+      'Director for approval.',
+    { field: 'excessJustification' },
+  );
 }
 
 /**
@@ -778,6 +834,12 @@ function editability(order, usage) {
  * taken before the buyer's paperwork arrived - one is drawn from the
  * BUYER_ORDER sequence.
  */
+/** Whether an order - live or deleted, the number is unique either way - holds it. */
+async function orderNoTaken(orderNo, exceptId = null) {
+  const row = await prisma.buyerOrder.findUnique({ where: { orderNo }, select: { id: true } });
+  return Boolean(row) && row.id !== exceptId;
+}
+
 export async function create(input, actorId) {
   await validateDropdowns(input);
 
@@ -787,20 +849,25 @@ export async function create(input, actorId) {
   const { buyer, style } = await resolveBuyerAndStyle(input.buyerId, leadStyleId);
   const lines = await resolveLines(input, buyer);
 
-  const orderNo = input.orderNo?.trim() || (await nextNumber('BUYER_ORDER'));
-  const clash = await prisma.buyerOrder.findUnique({ where: { orderNo }, select: { id: true } });
-  if (clash) throw ApiError.conflict('This order number already exists', { field: 'orderNo' });
+  // A typed number that is already taken is refused; a drawn one never is -
+  // the draw skips any number somebody typed ahead of the counter. And a typed
+  // number in the sequence's own format moves the counter past it, so nobody
+  // else is offered it.
+  const typedNo = input.orderNo?.trim() || null;
+  const orderNo = typedNo || (await nextFreeNumber('BUYER_ORDER', orderNoTaken));
+  if (typedNo && (await orderNoTaken(typedNo))) {
+    throw ApiError.conflict('This order number already exists', { field: 'orderNo' });
+  }
+  if (typedNo) await advancePast('BUYER_ORDER', typedNo);
 
   const excessPct = D(input.excessPct ?? 0);
-  const excess = excessOnEntry(excessPct);
+  const policy = await excessPolicy({ buyerId: buyer.id });
+  const excess = excessOnEntry(excessPct, policy);
 
   // Only an excess that needs a DECISION needs a case made for it. Inside the
   // tolerance there is nobody to persuade.
   if (excess.status === 'PENDING' && !input.excessJustification) {
-    throw ApiError.badRequest(
-      `An excess above ${TOLERANCE_TEXT}% needs a justification - it goes to the Director for approval.`,
-      { field: 'excessJustification' },
-    );
+    throw justificationRequired(policy);
   }
 
   // C13 - both header figures are derived from the lines. Within the tolerance
@@ -877,9 +944,7 @@ export async function create(input, actorId) {
       toStatus: 'APPROVED',
       actorId,
       actorName: AUTO_APPROVAL_BY,
-      remarks:
-        `Excess of ${excessPct.mul(100).toFixed(2)}% is within the ${TOLERANCE_TEXT}% ` +
-        'tolerance and was approved automatically.',
+      remarks: `Excess of ${pctText(excessPct)}% ${excess.note} and was approved automatically.`,
     });
   }
 
@@ -983,10 +1048,12 @@ export async function update(id, input, actorId) {
   let excessApprovedById = existing.excessApprovedById;
   let excessRejectionReason = existing.excessRejectionReason;
 
+  const policy = await excessPolicy({ orderId: id, buyerId });
+
   if (quantityMoved) {
     // The figures move together or not at all - the same band that decides a
     // new order decides a changed one.
-    const excess = excessOnEntry(excessPct);
+    const excess = excessOnEntry(excessPct, policy);
     excessApprovalStatus = excess.status;
     excessApprovedPct = excess.approvedPct;
     excessApprovedAt = excess.automatic ? new Date() : null;
@@ -995,14 +1062,9 @@ export async function update(id, input, actorId) {
     excessRejectionReason = null;
   }
 
-  if (excessPct.greaterThan(AUTO_APPROVED_EXCESS_PCT)) {
+  if (needsDecision(excessPct, policy)) {
     const justification = input.excessJustification ?? existing.excessJustification;
-    if (!justification) {
-      throw ApiError.badRequest(
-        `An excess above ${TOLERANCE_TEXT}% needs a justification - it goes to the Director for approval.`,
-        { field: 'excessJustification' },
-      );
-    }
+    if (!justification) throw justificationRequired(policy);
   }
 
   const effectiveQty = calculateEffectiveQty(orderQty, excessApprovedPct);
@@ -1012,10 +1074,19 @@ export async function update(id, input, actorId) {
     input.buyerDeliveryDate !== undefined ? input.buyerDeliveryDate : existing.buyerDeliveryDate,
   );
 
+  // A blank number keeps the one the order has; a different one must be free.
+  const newOrderNo = input.orderNo && input.orderNo !== existing.orderNo ? input.orderNo : null;
+  if (newOrderNo) {
+    if (await orderNoTaken(newOrderNo, id)) {
+      throw ApiError.conflict('This order number already exists', { field: 'orderNo' });
+    }
+    await advancePast('BUYER_ORDER', newOrderNo);
+  }
+
   const order = await prisma.buyerOrder.update({
     where: { id },
     data: {
-      ...(input.orderNo !== undefined ? { orderNo: input.orderNo } : {}),
+      ...(newOrderNo ? { orderNo: newOrderNo } : {}),
       ...(input.orderDate !== undefined ? { orderDate: new Date(input.orderDate) } : {}),
       ...(input.itemDescription !== undefined ? { itemDescription: input.itemDescription } : {}),
       ...(input.buyerId !== undefined ? { buyerId } : {}),
@@ -1234,12 +1305,14 @@ export async function amend(id, input, actorId) {
     throw ApiError.badRequest('An amendment must change something');
   }
 
-  const excess = excessOnEntry(excessPct);
+  const policy = await excessPolicy({
+    orderId: id,
+    buyerId: input.buyerId ?? existing.buyerId,
+  });
+  const excess = excessOnEntry(excessPct, policy);
 
   if (excess.status === 'PENDING' && !(input.excessJustification ?? existing.excessJustification)) {
-    throw ApiError.badRequest(`An excess above ${TOLERANCE_TEXT}% needs a justification`, {
-      field: 'excessJustification',
-    });
+    throw justificationRequired(policy);
   }
 
   const excessApprovalStatus = excess.status;

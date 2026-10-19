@@ -388,7 +388,6 @@ export function CuttingIssueDetail() {
       )}
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-header">Challan</div>
         <div className="card-body">
           <DetailGrid>
             <Detail label="Challan No" value={c.challanNo} mono />

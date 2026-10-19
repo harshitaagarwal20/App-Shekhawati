@@ -76,8 +76,11 @@ export async function list(query) {
     ...(dateFrom || dateTo
       ? {
           createdAt: {
-            ...(dateFrom ? { gte: new Date(dateFrom) } : {}),
-            ...(dateTo ? { lte: new Date(`${dateTo}T23:59:59.999Z`) } : {}),
+            // `createdAt` is a timestamp, so the day has to be the Indian day:
+            // UTC midnight is 05:30 here, and would drop the small hours of
+            // the first day and take in those of the day after the last.
+            ...(dateFrom ? { gte: new Date(`${dateFrom}T00:00:00.000+05:30`) } : {}),
+            ...(dateTo ? { lte: new Date(`${dateTo}T23:59:59.999+05:30`) } : {}),
           },
         }
       : {}),

@@ -52,6 +52,7 @@ import { fmtDate, fmtEnum, fmtNum, todayInput } from '../../utils/format.js';
 import { loadFailed } from '../../services/loadFailures.js';
 import { ExportButton } from '../../components/dataTransfer.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
+import IssueFabricModal from './IssueFabricModal.jsx';
 
 /** A stable key per row: keying on the array index makes React re-use the
  *  wrong input when a row is removed, which loses what the user was typing. */
@@ -574,6 +575,8 @@ export function CuttingChallanDetail() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
   const [closing, setClosing] = useState(null);
+  /** The line fabric is being issued against - see IssueFabricModal. */
+  const [issuing, setIssuing] = useState(null);
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState('');
 
@@ -713,6 +716,17 @@ export function CuttingChallanDetail() {
                 <td className="num">{l.fulfilledPct}%</td>
                 <td>{fmtEnum(l.status)}</td>
                 <td>
+                  {/* Issued here, on the challan, with the rolls for this
+                      line already picked - see IssueFabricModal. */}
+                  {row.approved && l.open && l.category === 'FABRIC' && can('FABRIC_ISSUE.CREATE') && (
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-primary"
+                      onClick={() => setIssuing(l)}
+                    >
+                      Issue fabric
+                    </button>
+                  )}{' '}
                   {state === 'APPROVED' && l.open && canApprove && (
                     <button type="button" className="btn btn-sm" onClick={() => setClosing({ lineId: l.id })}>
                       Close short
@@ -753,6 +767,18 @@ export function CuttingChallanDetail() {
             </table>
           </TableWrap>
         </>
+      )}
+
+      {issuing && (
+        <IssueFabricModal
+          challan={row}
+          line={issuing}
+          onClose={() => setIssuing(null)}
+          onIssued={() => {
+            setIssuing(null);
+            load();
+          }}
+        />
       )}
 
       {closing && (

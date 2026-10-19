@@ -29,6 +29,7 @@ import { searchFilter } from '../utils/http.js';
 import { nextNumber } from './documentNumber.service.js';
 import { costSheet as computeSheet, costLine, marginAtPrice } from '../domain/costing.js';
 import { assertNotSelfApproval } from '../domain/makerChecker.js';
+import { istDate } from '../utils/dates.js';
 
 const D = (v) => new Prisma.Decimal(v ?? 0);
 const blank = (v) => v === undefined || v === null || v === '';
@@ -48,7 +49,7 @@ const INCLUDE = {
 //  RATES - where a suggested price comes from
 // ===========================================================================
 
-const fmt = (d) => (d ? new Date(d).toISOString().slice(0, 10).split('-').reverse().join('-') : '');
+const fmt = (d) => istDate(d);
 
 /**
  * The last price the company actually agreed for this material.

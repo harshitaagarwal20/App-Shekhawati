@@ -7,6 +7,7 @@ import { idParam, uuid } from '../validators/common.validator.js';
 import {
   approvePlanSchema,
   createPlanSchema,
+  fabricStockQuery,
   lineParams,
   orderAllocationQuery,
   planListQuery,
@@ -38,6 +39,17 @@ router.get(
   can('PLANNING.VIEW'),
   validate({ params: orderIdParam, query: orderAllocationQuery }),
   c.orderAllocation,
+);
+
+/**
+ * The fabric a style has on hand, at job workers and still to arrive. Read when
+ * the style is picked: the planning flow starts with what is in the store.
+ */
+router.get(
+  '/fabric-stock',
+  can('PLANNING.VIEW'),
+  validate({ query: fabricStockQuery }),
+  c.fabricStock,
 );
 
 /** Checks an unsaved grid through exactly the code path the save uses. */

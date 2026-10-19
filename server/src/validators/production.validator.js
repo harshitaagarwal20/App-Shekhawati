@@ -87,6 +87,8 @@ export const fabricIssueListQuery = listQuery.extend({
   employeeId: uuid.optional(),
   dateFrom: isoDate.optional(),
   dateTo: isoDate.optional(),
+  /// The rolls posted together under one batch number (FIB-0001).
+  batchNo: z.string().trim().max(40).optional(),
 });
 
 export const createFabricIssueSchema = z.object({
@@ -94,8 +96,6 @@ export const createFabricIssueSchema = z.object({
   issueNo: optionalText(40),
   /// Excel: "Date" (Auto) - defaults to today.
   issueDate: isoDate.optional(),
-  /// Optional due date for the work/fabric return.
-  deliveryDate: isoDate.nullish(),
 
   /// Excel: "Roll No" -> FabricRoll. The whole issue hangs off this.
   rollId: uuid,
@@ -139,9 +139,33 @@ export const createFabricIssueSchema = z.object({
    * refused - and it is stored on the issue. See domain/shade.js.
    */
   shadeMixReason: optionalText(1000),
+  /// When the fabric is wanted back / the work done. Optional.
+  deliveryDate: isoDate.nullish(),
   /// Excel: "Remarks" (Text)
   remarks: optionalText(2000),
 });
+
+/**
+ * Several rolls issued in one go.
+ *
+ * Everything but the roll and its quantity is shared - one order, one purpose,
+ * one challan line or job worker, one issuer. Each roll still becomes its own
+ * issue; see `createBatch()`. The roll's attributes are always copied from the
+ * roll, so the per-issue overrides are not offered here.
+ */
+export const createFabricIssueBatchSchema = createFabricIssueSchema
+  .omit({ issueNo: true, rollId: true, fabricQtyIssued: true, fabricName: true, colorCode: true, uom: true })
+  .extend({
+    rolls: z
+      .array(
+        z.object({
+          rollId: uuid,
+          fabricQtyIssued: decimal('Issue quantity', { min: 0, allowZero: false }),
+        }),
+      )
+      .min(2, 'A batch is two rolls or more - issue a single roll on its own.')
+      .max(30, 'At most 30 rolls in one batch.'),
+  });
 
 /**
  * Editing an issue.
@@ -175,6 +199,9 @@ export const previewFabricIssueSchema = z.object({
   /// When given, the preview also says whether this roll matches the shade
   /// and dye lot the line was started on.
   cuttingChallanLineId: uuid.nullish(),
+  /// In a batch, the rolls posting ahead of this one, in order - they count as
+  /// already on the line for the shade check.
+  batchRollIds: z.array(uuid).max(30).optional(),
 });
 
 /** The roll picker: one call, everything a phone needs to render a list. */
@@ -209,7 +236,6 @@ const jobWorkBody = z.object({
   /// Job number, per process: DY-001 for dyeing, PJ-001 for printing.
   dyeIssueNo: optionalText(40),
   issueDate: isoDate.optional(),
-  deliveryDate: isoDate.nullish(),
 
   /// WHICH OF THE FOUR. The register is shared; the process is what makes a
   /// transaction a dyeing job rather than a printing one, so it is required
@@ -270,6 +296,8 @@ const jobWorkBody = z.object({
   fabricIssueId: uuid.nullish(),
   orderId: uuid.nullish(),
   styleId: uuid.nullish(),
+  /// When the job worker is to send the fabric back. Optional.
+  deliveryDate: isoDate.nullish(),
   remark: optionalText(2000),
 });
 

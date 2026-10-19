@@ -42,6 +42,7 @@ import { assertValueInList } from './masterList.service.js';
 import { nextNumber } from './documentNumber.service.js';
 import { assertNotSelfApproval } from '../domain/makerChecker.js';
 import { requirementFor } from '../domain/requirement.js';
+import { DEFAULT_LOCATION, IN_PROCESS_LOCATIONS } from './inventory.service.js';
 
 export const SORTABLE = [
   'planNo',
@@ -1028,6 +1029,11 @@ export async function submit(id, { submittedTo, remarks }, actor) {
         approvalNo,
         submittedDate: new Date(),
         orderId: plan.orderId,
+        // The round is a version OF a style on a container (C7). Without the
+        // style it can be approved but never become current - the database
+        // refuses a current version that names no style - and a cutting
+        // challan can only be raised against the current one.
+        styleId: plan.styleId,
         containerNo: plan.containerNo,
         preparedBy: actor.fullName,
         submittedTo: recipient,
@@ -1205,9 +1211,35 @@ export async function approve(id, { remarks }, actor) {
     }
 
     if (open) {
+      /*
+       * C7 - THE APPROVED ROUND BECOMES THE CURRENT VERSION, AS IT DOES FROM
+       * THE PLAN APPROVAL SCREEN.
+       *
+       * This door used to approve and lock the round but leave it non-current,
+       * so a plan approved here could never be cut against: the cutting
+       * challan refused it as "superseded". The predecessor for the same style
+       * and container is demoted in the same transaction, which
+       * `plan_approvals_one_current_approved` requires.
+       */
+      const styleId = open.styleId ?? plan.styleId;
+      await tx.planApproval.updateMany({
+        where: {
+          id: { not: open.id },
+          deletedAt: null,
+          isCurrent: true,
+          approvalStatus: 'APPROVED',
+          styleId,
+          containerNo: open.containerNo,
+        },
+        data: { isCurrent: false, demotedAt: decidedAt, demotedById: actor.userId ?? null },
+      });
       await tx.planApproval.update({
         where: { id: open.id },
         data: {
+          styleId,
+          isCurrent: true,
+          demotedAt: null,
+          demotedById: null,
           approvalStatus: 'APPROVED',
           workflowState: 'APPROVED',
           approvedDate: decidedAt,
@@ -1472,6 +1504,215 @@ async function recordHistory(plan, action, { fromStatus, toStatus, actorId, acto
   });
 }
 
+// ===========================================================================
+//  FABRIC ON HAND - the first step of the planning flow
+// ===========================================================================
+//
+//  The planning flowchart opens with "assessment of fabric and raw material
+//  availability", and until this the screen never read stock at all: a planner
+//  could allot ten thousand pieces to cutting with no idea whether the cloth
+//  was on the rack, at the dyer, or not yet bought.
+//
+//  WHICH ROLLS ARE THIS STYLE'S. A roll belongs to the PO line it was received
+//  against (roll -> GRN -> PO line), and a PO line names its buyer order and
+//  its style. That is the same link the Fabric Issue roll picker uses for
+//  "bought for this order", so the two screens count the same cloth.
+//
+//  NOT A RESERVATION. Nothing here holds stock for a plan. Two cutting plans
+//  drawn up today against the same rolls both see them, because both are
+//  true until somebody actually issues the fabric - and the issue is where
+//  `postMovement()` refuses an over-draw. This panel informs; it does not
+//  decide, and it does not refuse a plan.
+//
+//  NO COLOUR FILTER ON THIS STYLE'S ROLLS. Cloth bought greige for dyeing
+//  carries the greige colour until the dyer returns it, so filtering on the
+//  order line's colour would hide exactly the fabric that is on its way to
+//  becoming it. The rolls are broken down by colour instead, and the planner
+//  reads which is which.
+
+/** Case and stray spaces do not make two units or two colours. */
+const sameText = (a, b) => String(a ?? '').trim().toLowerCase() === String(b ?? '').trim().toLowerCase();
+
+/**
+ * Where a roll's balance stands for a planner. Pure.
+ *
+ * In process wins over held: a roll at the dye house cannot be issued whether
+ * or not it is also on hold, and saying "at a job worker" is the more useful
+ * of the two facts. `isHeld` is the same test the roll picker applies.
+ */
+export function rollStockBucket(roll) {
+  if (IN_PROCESS_LOCATIONS.has(roll.location ?? DEFAULT_LOCATION)) return 'inProcess';
+  if (roll.isHeld) return 'held';
+  return 'available';
+}
+
+/**
+ * Sums a set of rolls into what a planner needs to know. Pure.
+ *
+ * @param {Array}  rolls     In-stock rolls, each with `grn.purchaseOrder.{orderId, styleId}`
+ * @param {object} subject   { orderId, styleId, colorCode, uom } - the order line being planned
+ */
+export function summariseFabricStock(rolls, { orderId, styleId, colorCode, uom }) {
+  const blank = () => ({ availableQty: ZERO, heldQty: ZERO, inProcessQty: ZERO, rollCount: 0 });
+  const add = (into, bucket, qty) => {
+    into[`${bucket}Qty`] = into[`${bucket}Qty`].plus(qty);
+    into.rollCount += 1;
+  };
+  const fixed = (t) => ({
+    availableQty: t.availableQty.toFixed(4),
+    heldQty: t.heldQty.toFixed(4),
+    inProcessQty: t.inProcessQty.toFixed(4),
+    rollCount: t.rollCount,
+  });
+
+  const total = blank();
+  const byColour = new Map();
+  const elsewhere = { availableQty: ZERO, rollCount: 0 };
+  /** Rolls of this style held in a unit the estimate is not in - counted, never added. */
+  let otherUnitRollCount = 0;
+
+  for (const r of rolls) {
+    const po = r.grn?.purchaseOrder;
+    const forThisStyle = Boolean(po) && po.orderId === orderId && (!po.styleId || po.styleId === styleId);
+    const bucket = rollStockBucket(r);
+    const qty = D(r.balanceQty);
+
+    if (!forThisStyle) {
+      /*
+       * Bought for another order, in bulk, or loaded as opening stock - but the
+       * colour this line is made in. Substituting across orders is normal on
+       * the floor, so it is worth knowing about; only what could be issued
+       * today is offered, because cloth at a dyer for someone else's order is
+       * not a substitute for anything.
+       */
+      if (colorCode && sameText(r.colorCode, colorCode) && sameText(r.uom, uom) && bucket === 'available') {
+        elsewhere.availableQty = elsewhere.availableQty.plus(qty);
+        elsewhere.rollCount += 1;
+      }
+      continue;
+    }
+
+    if (!sameText(r.uom, uom)) {
+      otherUnitRollCount += 1;
+      continue;
+    }
+
+    add(total, bucket, qty);
+    const colourKey = r.colorCode || '';
+    if (!byColour.has(colourKey)) byColour.set(colourKey, blank());
+    add(byColour.get(colourKey), bucket, qty);
+  }
+
+  return {
+    uom,
+    forThisStyle: {
+      ...fixed(total),
+      byColour: [...byColour.entries()]
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([c, t]) => ({ colorCode: c || null, ...fixed(t) })),
+    },
+    /** Null when the order line names no colour, so there is nothing to match. */
+    elsewhereInColour: colorCode
+      ? { availableQty: elsewhere.availableQty.toFixed(4), rollCount: elsewhere.rollCount }
+      : null,
+    otherUnitRollCount,
+  };
+}
+
+/**
+ * What is still to arrive on this style's open fabric POs. Pure.
+ *
+ * Received beyond the ordered quantity is not negative pending - an
+ * over-delivery on one PO does not make another one arrive sooner.
+ */
+export function summarisePendingFabric(purchaseOrders, uom) {
+  const open = purchaseOrders.filter(
+    (p) => sameText(p.uom, uom) && D(p.orderQty).greaterThan(D(p.receivedQty)),
+  );
+  return {
+    pendingQty: open.reduce((a, p) => a.plus(D(p.orderQty).minus(D(p.receivedQty))), ZERO).toFixed(4),
+    poCount: open.length,
+    /** Of those, how many the Director has not yet approved. */
+    awaitingApprovalCount: open.filter((p) => p.approvalStatus === 'PENDING').length,
+  };
+}
+
+/**
+ * Whether the fabric in the store covers what a cutting plan will draw. Pure.
+ *
+ * Only the cloth available for issue counts. Fabric at a dyer or on the
+ * cutting floor is shown alongside, but a plan cannot be cut from it today.
+ */
+export function fabricCover(neededQty, stock) {
+  const need = D(neededQty);
+  const have = D(stock.forThisStyle.availableQty);
+  const short = need.minus(have);
+  return {
+    neededQty: need.toFixed(4),
+    availableQty: have.toFixed(4),
+    shortQty: short.greaterThan(0) ? short.toFixed(4) : ZERO.toFixed(4),
+    covered: !short.greaterThan(0),
+    uom: stock.uom,
+  };
+}
+
+/** Reads the rolls and POs for one order line and summarises them. */
+async function fabricStockFor(orderId, line) {
+  const styleId = line.style?.id ?? null;
+  // The unit the BOM estimate is stated in, so stock and need are one unit.
+  const uom = line.style?.avgUtilizationUom ?? 'Mtrs';
+
+  const [rolls, purchaseOrders] = await Promise.all([
+    prisma.fabricRoll.findMany({
+      where: {
+        deletedAt: null,
+        writtenOffAt: null,
+        balanceQty: { gt: 0 },
+        stage: { notIn: ['CONSUMED', 'REJECTED'] },
+        OR: [
+          { grn: { purchaseOrder: { orderId } } },
+          ...(line.colorCode ? [{ colorCode: { equals: line.colorCode, mode: 'insensitive' } }] : []),
+        ],
+      },
+      select: {
+        balanceQty: true,
+        uom: true,
+        colorCode: true,
+        location: true,
+        isHeld: true,
+        grn: { select: { purchaseOrder: { select: { orderId: true, styleId: true } } } },
+      },
+    }),
+    prisma.purchaseOrder.findMany({
+      where: {
+        orderId,
+        deletedAt: null,
+        category: 'FABRIC',
+        // A rejected or cancelled PO brings nothing; a completed one has
+        // already brought all it will, including one that was closed short.
+        approvalStatus: { not: 'REJECTED' },
+        status: { notIn: ['CANCELLED', 'COMPLETED'] },
+        OR: [{ styleId: null }, ...(styleId ? [{ styleId }] : [])],
+      },
+      select: { orderQty: true, receivedQty: true, uom: true, approvalStatus: true },
+    }),
+  ]);
+
+  return {
+    styleNo: line.style?.styleNo ?? null,
+    colorCode: line.colorCode ?? null,
+    ...summariseFabricStock(rolls, { orderId, styleId, colorCode: line.colorCode, uom }),
+    onOrder: summarisePendingFabric(purchaseOrders, uom),
+    asOf: new Date().toISOString(),
+  };
+}
+
+/** The Planning form's "Fabric on hand" panel, for one style of an order. */
+export async function fabricStock({ orderId, orderLineId }) {
+  const { order, line } = await resolvePlanSubject(orderId, orderLineId, { forWrite: false });
+  return fabricStockFor(order.id, line);
+}
+
 /**
  * What an order permits, and what has already been planned against it.
  *
@@ -1618,6 +1859,12 @@ export async function previewAllocation({ orderId, orderLineId, planDepartment, 
     violation = err.message;
   }
 
+  // Whether the store can cover the cloth those pieces will draw. Only asked
+  // once there is an estimate to measure; `fabricNote` says why when there is not.
+  const cover = planDepartment === 'CUTTING' && plannedFabricQty.greaterThan(0)
+    ? fabricCover(plannedFabricQty, await fabricStockFor(order.id, line))
+    : null;
+
   return {
     orderNo: order.orderNo,
     orderLineId: line.id,
@@ -1630,6 +1877,8 @@ export async function previewAllocation({ orderId, orderLineId, planDepartment, 
     fabricUom: estimated.find((l) => l.fabricUom)?.fabricUom ?? null,
     /** Why there is no estimate, when there is none. */
     fabricNote,
+    /** The estimate against the store. Null unless a cutting plan has one. */
+    fabricCover: cover,
     /**
      * The rows as they would be saved, so the form can show each line's own
      * fabric rather than a per-unit total spread across its rows.

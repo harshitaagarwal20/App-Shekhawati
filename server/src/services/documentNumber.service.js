@@ -49,6 +49,59 @@ export async function nextNumber(documentType, { scopeKey = '', tx } = {}) {
   return `${seq.prefix}${seq.prefix ? seq.separator : ''}${padded}${seq.suffix}`;
 }
 
+/**
+ * Reserves the next number that no document already holds.
+ *
+ * `taken(no)` says whether a number is in use. A number somebody typed by hand
+ * can sit ahead of the counter; drawing it again would refuse the next person
+ * to save, for a number they never typed. Gives up after a run of collisions
+ * rather than spinning.
+ */
+export async function nextFreeNumber(documentType, taken, opts = {}) {
+  for (let i = 0; i < 50; i += 1) {
+    const no = await nextNumber(documentType, opts);
+    if (!(await taken(no))) return no;
+  }
+  throw ApiError.conflict(
+    `Could not find a free ${documentType} number - the numbering needs looking at`,
+    { documentType },
+  );
+}
+
+/**
+ * Moves the counter past a number that was typed by hand.
+ *
+ * When the typed number is in the sequence's own format - SO-00034 for a
+ * BUYER_ORDER sequence at 33 - the counter is moved on so the system never
+ * offers it to anyone else. A number in any other format is left alone: it
+ * cannot collide with what the sequence produces.
+ */
+export async function advancePast(documentType, typed, { scopeKey = '', tx } = {}) {
+  const client = tx ?? prisma;
+  const seq = await client.documentSequence.findUnique({
+    where: { documentType_scopeKey: { documentType, scopeKey } },
+  });
+  if (!seq || !typed) return;
+
+  const head = `${seq.prefix}${seq.prefix ? seq.separator : ''}`;
+  const value = String(typed);
+  if (!value.startsWith(head) || !value.endsWith(seq.suffix)) return;
+  const digits = value.slice(head.length, value.length - seq.suffix.length);
+  if (!/^\d+$/.test(digits)) return;
+
+  const n = Number(digits);
+  // next_number is an INT column.
+  if (!Number.isSafeInteger(n) || n >= 2147483647) return;
+  await client.$executeRaw`
+    UPDATE document_sequences
+       SET next_number = ${n + 1},
+           updated_at  = NOW()
+     WHERE document_type = ${documentType}::"DocumentType"
+       AND scope_key = ${scopeKey}
+       AND next_number <= ${n}
+  `;
+}
+
 /** Reads the next number without consuming it, for a "will be numbered" hint. */
 export async function peekNumber(documentType, { scopeKey = '' } = {}) {
   const seq = await prisma.documentSequence.findUnique({

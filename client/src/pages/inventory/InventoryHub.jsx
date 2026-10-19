@@ -45,15 +45,16 @@ import HubChoice, { useHubChoice } from '../../components/HubChoice.jsx';
 import StockSummary from './StockSummary.jsx';
 import StockLedgerPage from './StockLedgerPage.jsx';
 import RollList from './RollList.jsx';
+import InventoryAnalysis from './InventoryAnalysis.jsx';
 
 const STOCK = 'stock';
 const MOVEMENT = 'movement';
 const ROLLS = 'rolls';
+const ANALYSIS = 'analysis';
 
 /*
  * `label` is the panel's heading and matches the heading of the screen it
- * opens, so what you land on is plainly what you asked for. `blurb` is the one
- * line that separates it from its neighbours.
+ * opens, so what you land on is plainly what you asked for.
  *
  * The summary is first because it answers the question people arrive with -
  * how much is there - and the other two are both ways of asking how it came to
@@ -63,20 +64,22 @@ const VIEWS = [
   {
     value: STOCK,
     label: 'Stock on Hand',
-    blurb: 'What is in the store now, per item, with its value.',
     permission: 'INVENTORY.VIEW',
   },
   {
     value: MOVEMENT,
     label: 'Stock Movement',
-    blurb: 'Every receipt and issue that made those balances.',
     permission: 'STOCK_LEDGER.VIEW',
   },
   {
     value: ROLLS,
     label: 'Fabric Rolls',
-    blurb: 'Fabric counted roll by roll, and the stage each has reached.',
     permission: 'FABRIC_ROLL.VIEW',
+  },
+  {
+    value: ANALYSIS,
+    label: 'Inventory Analysis',
+    permission: ['INVENTORY.VIEW', 'FABRIC_ROLL.VIEW'],
   },
 ];
 
@@ -107,5 +110,6 @@ export default function InventoryHub() {
    */
   if (chosen.value === MOVEMENT) return <StockLedgerPage />;
   if (chosen.value === ROLLS) return <RollList />;
+  if (chosen.value === ANALYSIS) return <InventoryAnalysis />;
   return <StockSummary />;
 }

@@ -1566,11 +1566,38 @@ export async function getDocument(headerId) {
   const order = header.orderId
     ? await prisma.buyerOrder.findUnique({ where: { id: header.orderId }, select: { id: true, orderNo: true } })
     : null;
-  const lines = header.lines.map(project);
-  const history = await prisma.approvalHistory.findMany({
-    where: { documentType: 'PURCHASE_ORDER', documentId: { in: header.lines.map((l) => l.id) } },
-    orderBy: { actedAt: 'asc' },
-  });
+  const lineIds = header.lines.map((l) => l.id);
+  const [history, grns] = await Promise.all([
+    prisma.approvalHistory.findMany({
+      where: { documentType: 'PURCHASE_ORDER', documentId: { in: lineIds } },
+      orderBy: { actedAt: 'asc' },
+    }),
+    /*
+     * What came in against each line - so the PO says not only how much has
+     * arrived but on which receipts. A reversed receipt is listed and marked:
+     * it no longer counts towards `receivedQty`, but it happened.
+     */
+    prisma.grn.findMany({
+      where: { purchaseOrderId: { in: lineIds }, deletedAt: null },
+      orderBy: [{ grnDate: 'asc' }, { grnNo: 'asc' }],
+      select: {
+        id: true,
+        headerId: true,
+        grnNo: true,
+        grnDate: true,
+        billNo: true,
+        purchaseOrderId: true,
+        receivingQty: true,
+        uom: true,
+        reversedAt: true,
+      },
+    }),
+  ]);
+  const receiptsByLine = new Map(lineIds.map((id) => [id, []]));
+  for (const g of grns) {
+    receiptsByLine.get(g.purchaseOrderId)?.push({ ...g, reversed: Boolean(g.reversedAt) });
+  }
+  const lines = header.lines.map((l) => ({ ...project(l), receipts: receiptsByLine.get(l.id) ?? [] }));
   const live = lines.filter((l) => l.approvalStatus !== 'REJECTED' && l.status !== 'CANCELLED');
   return {
     ...header,

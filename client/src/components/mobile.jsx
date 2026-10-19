@@ -198,19 +198,22 @@ export function QtyStepper({
   hint,
   disabled,
   compact = false,
+  // Several steppers on one screen each need their own, or every label
+  // focuses the first input.
+  id = 'qty-stepper-input',
 }) {
   const over = available !== undefined && available !== null && Number(value) > Number(available);
 
   return (
     <div className={`qty-stepper ${compact ? 'qty-stepper-compact' : ''} ${error || over ? 'qty-error' : ''}`}>
-      <label className="qty-label" htmlFor="qty-stepper-input">
+      <label className="qty-label" htmlFor={id}>
         {label}
         {uom && <span className="qty-uom">{uom}</span>}
       </label>
 
       <div className="qty-row">
         <input
-          id="qty-stepper-input"
+          id={id}
           className="qty-input"
           type="number"
           inputMode="decimal"
@@ -391,5 +394,58 @@ export function FloorFact({ label, value, sub, tone = '' }) {
       <div className="floor-fact-value">{value ?? '-'}</div>
       {sub && <div className="floor-fact-sub">{sub}</div>}
     </div>
+  );
+}
+
+/**
+ * One step of a shop-floor form, either open or folded away.
+ *
+ * ===========================================================================
+ *  WHY THE STEPS COLLAPSE
+ * ===========================================================================
+ *
+ *  Every step used to stay expanded once it was done, so the page only ever
+ *  grew: by the time somebody reached "how much" they were scrolling past a
+ *  full roll list and a full order list to get to a number box, on a screen
+ *  that is used standing at a rack. Nothing said which step you were on, and
+ *  changing the roll meant scrolling back up through both lists to find it.
+ *
+ *  A finished step now folds to a single line carrying its answer, and the one
+ *  being worked on is the only thing open. The line stays clickable, because
+ *  the commonest correction on this screen is "wrong roll" and it should cost
+ *  one tap rather than a scroll.
+ */
+export function FloorStep({ index, title, summary, open, done, onReopen, children }) {
+  if (!open && done) {
+    return (
+      <button type="button" className="floor-step is-done" onClick={onReopen}>
+        <span className="floor-step-no">{index}</span>
+        <span className="floor-step-body">
+          <span className="floor-step-title">{title}</span>
+          <span className="floor-step-summary">{summary}</span>
+        </span>
+        <span className="floor-step-change">Change</span>
+      </button>
+    );
+  }
+
+  if (!open) {
+    return (
+      <div className="floor-step is-waiting" aria-disabled="true">
+        <span className="floor-step-no">{index}</span>
+        <span className="floor-step-body">
+          <span className="floor-step-title">{title}</span>
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <section className="floor-step-open">
+      <div className="fieldset-title">
+        {index} &middot; {title}
+      </div>
+      {children}
+    </section>
   );
 }

@@ -7,15 +7,35 @@
  *
  * A storeman standing at a rack, one hand on a roll. Four taps and a number:
  *
- *   1  pick the roll        — scanned, or tapped from a list that already shows
- *                             the fabric, the colour and the balance
+ *   1  pick the roll(s)     — scanned, or tapped from a list that already shows
+ *                             the fabric, the colour and the balance. Tap more
+ *                             than one to issue several rolls at once.
  *   2  pick the order       — a short list, not a search
  *   3  pick the purpose     — big buttons, because purpose routes the roll
- *   4  type the quantity    — one numeric field, with a Max button
+ *   4  type the quantity    — one numeric field per roll, with a Max button
  *
  * Everything else - the fabric name, the colour, the UOM, the style - is copied
  * from the roll and the order. Nothing is transcribed.
  *
+ * ---------------------------------------------------------------------------
+ *  SEVERAL ROLLS AT ONCE
+ *
+ *  The store sends three or four rolls to the cutting floor at a time. Picked
+ *  together, they share the order, purpose, challan line, job worker and
+ *  issuer, and post in ONE transaction under a batch number (FIB-0001): each
+ *  roll becomes its own issue, and either all of them post or none do. One
+ *  roll posts exactly as it always did.
+ * ---------------------------------------------------------------------------
+ *  OPENED FROM A CUTTING CHALLAN (old links only)
+ *
+ *  Cutting issues are now made on the challan itself - see
+ *  pages/cutting/IssueFabricModal.jsx - and Cutting is not offered as a
+ *  purpose below. A bookmarked link of the old form still lands here with
+ *  ?order=<id>&challanLine=<id>. The order, the purpose (Cutting) and the line
+ *  are filled in, and the rolls to cover what is still outstanding are picked
+ *  by suggestRolls() - one colour, one shade, this order's rolls first. The
+ *  screen opens on the quantities; the storeman checks the rolls against the
+ *  rack and confirms. Nothing posts by itself.
  * ---------------------------------------------------------------------------
  *  REQUESTED QUANTITY ≤ AVAILABLE STOCK, CHECKED BY THE SERVER
  *
@@ -30,8 +50,8 @@
  * ---------------------------------------------------------------------------
  */
 
-import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   cuttingChallans as ccApi,
   employees as employeesApi,
@@ -46,10 +66,12 @@ import {
   PickerCard,
   PickerList,
   QtyStepper,
+  FloorStep,
 } from '../../components/mobile.jsx';
 import { Field, PageHeader, TextArea } from '../../components/ui.jsx';
 import { fmtEnum, fmtNum, todayInput } from '../../utils/format.js';
 import { loadFailed } from '../../services/loadFailures.js';
+import { suggestRolls } from '../../utils/rollSuggest.js';
 
 /**
  * The purposes, as big buttons.
@@ -70,14 +92,26 @@ import { loadFailed } from '../../services/loadFailures.js';
  * offered, not what the enum permits.
  */
 const PURPOSES = [
-  { value: 'CUTTING', label: 'Cutting', hint: 'to the cutting floor' },
+  /*
+   * NO "CUTTING" HERE. Fabric for the cutting floor is issued on the cutting
+   * challan itself (IssueFabricModal), against the line it fulfils - the
+   * challan already knows the order, the purpose and the line. This screen is
+   * for fabric going OUT to a job worker, and for returns.
+   */
   { value: 'DYEING', label: 'Dyeing', hint: 'out to a dyeing unit' },
   { value: 'PRINTING', label: 'Printing', hint: 'out to a printing unit' },
   { value: 'RETURN', label: 'Return', hint: 'back to the store' },
 ];
 
+/** The server's batch limit - see MAX_BATCH_ROLLS in fabricIssue.service.js. */
+const MAX_ROLLS = 30;
+
 export default function FabricIssueForm() {
   const navigate = useNavigate();
+
+  // Opened from a cutting challan line - see "OPENED FROM A CUTTING CHALLAN".
+  const [params] = useSearchParams();
+  const fromLineId = params.get('challanLine') || '';
 
   const [rolls, setRolls] = useState([]);
   const [rollsLoading, setRollsLoading] = useState(true);
@@ -85,16 +119,19 @@ export default function FabricIssueForm() {
   const [employees, setEmployees] = useState([]);
   const [vendors, setVendors] = useState([]);
 
-  const [rollId, setRollId] = useState('');
-  const [orderId, setOrderId] = useState('');
-  const [purpose, setPurpose] = useState('');
-  const [qty, setQty] = useState('');
+  // The rolls being issued, in the order they were picked - which is the
+  // order they post in, and so the order the shade check judges them in.
+  const [rollIds, setRollIds] = useState([]);
+  // Quantity per roll, keyed by roll id.
+  const [qtys, setQtys] = useState({});
+  const [orderId, setOrderId] = useState(() => (fromLineId && params.get('order')) || '');
+  const [purpose, setPurpose] = useState(fromLineId ? 'CUTTING' : '');
   const [vendorId, setVendorId] = useState('');
   const [employeeId, setEmployeeId] = useState('');
   const [issuedByName, setIssuedByName] = useState('');
   const [remarks, setRemarks] = useState('');
   const [deliveryDate, setDeliveryDate] = useState('');
-  // Only asked for when the roll's shade or dye lot differs from the one the
+  // Only asked for when a roll's shade or dye lot differs from the one the
   // cutting line was started on. See domain/shade.js on the server.
   const [shadeMixReason, setShadeMixReason] = useState('');
 
@@ -110,7 +147,13 @@ export default function FabricIssueForm() {
    * posting would refuse.
    */
   const [challanLines, setChallanLines] = useState([]);
-  const [challanLineId, setChallanLineId] = useState('');
+  const [challanLinesLoaded, setChallanLinesLoaded] = useState(false);
+  const [challanLineId, setChallanLineId] = useState(fromLineId);
+
+  // What was picked for the challan line, shown above the steps. Made once:
+  // a storeman who then changes the rolls must not have them put back.
+  const [suggestion, setSuggestion] = useState(null);
+  const suggested = useRef(false);
 
   /**
    * C5 - the cutting floor draws against a challan; a job worker does not.
@@ -134,17 +177,30 @@ export default function FabricIssueForm() {
    */
   const [step, setStep] = useState(1);
 
-  const [preview, setPreview] = useState(null);
+  // One preview per roll, keyed by roll id.
+  const [previews, setPreviews] = useState({});
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
+  /*
+   * The rolls are fetched for the order, so each says whether it was bought
+   * for it - the "other order" badge, and the suggestion's first preference.
+   * The list itself is never narrowed to the order.
+   */
   useEffect(() => {
+    let live = true;
     fiApi
-      .rolls()
-      .then(setRolls)
+      .rolls(orderId ? { orderId } : undefined)
+      .then((r) => live && setRolls(r))
       .catch(loadFailed(setRolls, 'rolls'))
-      .finally(() => setRollsLoading(false));
+      .finally(() => live && setRollsLoading(false));
+    return () => {
+      live = false;
+    };
+  }, [orderId]);
+
+  useEffect(() => {
     ordersApi.options().then(setOrders).catch(loadFailed(setOrders, 'orders'));
     employeesApi.options().then(setEmployees).catch(loadFailed(setEmployees, 'employees'));
   }, []);
@@ -162,26 +218,50 @@ export default function FabricIssueForm() {
       .catch(loadFailed(setVendors, 'vendors'));
   }, [purpose]);
 
-  /** "Can I issue this much off this roll?" — answered by the server. */
+  /** Tapping a roll adds it to the issue, or takes it back off. */
+  function toggleRoll(id) {
+    setRollIds((ids) => {
+      if (ids.includes(id)) return ids.filter((x) => x !== id);
+      if (ids.length >= MAX_ROLLS) return ids;
+      return [...ids, id];
+    });
+    setQtys(({ [id]: _dropped, ...rest }) => rest);
+  }
+
+  /** A scan only ever adds - scanning the same label twice must not undo it. */
+  function addRoll(id) {
+    setRollIds((ids) => (ids.includes(id) || ids.length >= MAX_ROLLS ? ids : [...ids, id]));
+  }
+
+  /**
+   * "Can I issue this much off each roll?" — answered by the server.
+   *
+   * Each roll is told which rolls of the batch post ahead of it, so the shade
+   * verdict is the one the posting will reach.
+   */
   const runPreview = useCallback(async () => {
-    if (!rollId) {
-      setPreview(null);
+    if (!rollIds.length) {
+      setPreviews({});
       return;
     }
     try {
-      setPreview(
-        await fiApi.preview({
-          rollId,
-          fabricQtyIssued: qty === '' ? undefined : String(qty),
-          purpose: purpose || undefined,
-          cuttingChallanLineId: needsChallanLine && challanLineId ? challanLineId : undefined,
-        }),
+      const results = await Promise.all(
+        rollIds.map((id, i) =>
+          fiApi.preview({
+            rollId: id,
+            fabricQtyIssued: qtys[id] === undefined || qtys[id] === '' ? undefined : String(qtys[id]),
+            purpose: purpose || undefined,
+            cuttingChallanLineId: needsChallanLine && challanLineId ? challanLineId : undefined,
+            batchRollIds: i > 0 ? rollIds.slice(0, i) : undefined,
+          }),
+        ),
       );
+      setPreviews(Object.fromEntries(rollIds.map((id, i) => [id, results[i]])));
     } catch (e) {
-      setPreview(null);
+      setPreviews({});
       setError(e.message);
     }
-  }, [rollId, qty, purpose, needsChallanLine, challanLineId]);
+  }, [rollIds, qtys, purpose, needsChallanLine, challanLineId]);
 
   useEffect(() => {
     const id = setTimeout(runPreview, 250);
@@ -204,30 +284,75 @@ export default function FabricIssueForm() {
     ccApi
       .issuableLines({ orderId })
       .then((r) => setChallanLines(r?.rows ?? []))
-      .catch(loadFailed(setChallanLines, 'challan lines'));
+      .catch(loadFailed(setChallanLines, 'challan lines'))
+      .finally(() => setChallanLinesLoaded(true));
   }, [needsChallanLine, orderId]);
+
+  /** Opened from a challan line: pick the rolls for it, once both lists are in. */
+  useEffect(() => {
+    if (!fromLineId || suggested.current || rollsLoading || !challanLinesLoaded) return;
+    suggested.current = true;
+    const line = challanLines.find((l) => l.id === fromLineId);
+    if (!line) {
+      // Filled, closed or no longer approved since the challan was opened.
+      setChallanLineId('');
+      setSuggestion({ missing: true });
+      return;
+    }
+    const s = suggestRolls(rolls, line, MAX_ROLLS);
+    setSuggestion({ line, ...s });
+    if (s.picks.length) {
+      setRollIds(s.picks.map((p) => p.id));
+      setQtys(Object.fromEntries(s.picks.map((p) => [p.id, String(p.qty)])));
+      setStep(4);
+    }
+  }, [fromLineId, rollsLoading, challanLinesLoaded, challanLines, rolls]);
+
+  const many = rollIds.length > 1;
+  const picked = rollIds.map((id) => rolls.find((r) => r.id === id)).filter(Boolean);
+  const order = orders.find((o) => o.id === orderId);
+  const firstPreview = previews[rollIds[0]];
+  const needsVendor = firstPreview?.needsJobWorker;
+  const uoms = [...new Set(picked.map((r) => r.uom))];
+  const uomLabel = uoms.length === 1 ? uoms[0] : '';
+  const totalQty = rollIds.reduce((sum, id) => sum + Number(qtys[id] || 0), 0);
+  const totalBalance = picked.reduce((sum, r) => sum + Number(r.balanceQty || 0), 0);
 
   async function post() {
     setBusy(true);
     setError('');
+    const shared = {
+      issueDate: todayInput(),
+      purpose,
+      orderId,
+      // C5 - sent only where a challan actually governs the issue.
+      cuttingChallanLineId: needsChallanLine ? challanLineId : undefined,
+      vendorId: vendorId || null,
+      issuedByEmployeeId: employeeId || null,
+      issuedByName: issuedByName || null,
+      shadeMixReason: shadeMix ? shadeMixReason.trim() : undefined,
+      deliveryDate: deliveryDate || null,
+      remarks: remarks || null,
+    };
     try {
-      const saved = await fiApi.create({
-        issueDate: todayInput(),
-        rollId,
-        purpose,
-        orderId,
-        // C5 - sent only where a challan actually governs the issue.
-        cuttingChallanLineId: needsChallanLine ? challanLineId : undefined,
-        vendorId: vendorId || null,
-        issuedByEmployeeId: employeeId || null,
-        issuedByName: issuedByName || null,
-        fabricQtyIssued: String(qty),
-        shadeMixReason: shadeMix ? shadeMixReason.trim() : undefined,
-        remarks: remarks || null,
-        deliveryDate: deliveryDate || null,
-      });
+      let firstId;
+      if (many) {
+        const batch = await fiApi.createBatch({
+          ...shared,
+          rolls: rollIds.map((id) => ({ rollId: id, fabricQtyIssued: String(qtys[id]) })),
+        });
+        firstId = batch.issues[0].id;
+      } else {
+        const saved = await fiApi.create({
+          ...shared,
+          rollId: rollIds[0],
+          fabricQtyIssued: String(qtys[rollIds[0]]),
+        });
+        firstId = saved.id;
+      }
       setConfirming(false);
-      navigate(`/fabric-issues/${saved.id}`);
+      // A batch opens on its first issue, which lists the rest and prints them all.
+      navigate(`/fabric-issues/${firstId}`);
     } catch (e) {
       setError(e.message);
       setBusy(false);
@@ -235,19 +360,17 @@ export default function FabricIssueForm() {
     }
   }
 
-  const roll = preview?.roll;
-  const order = orders.find((o) => o.id === orderId);
-  const availability = preview?.availability;
-  const needsVendor = preview?.needsJobWorker;
-
   /*
    * Step 3 is done when the purpose AND anything the purpose drags in with it
    * are answered - a cutting issue needs its challan line, a job work issue
    * needs the unit it is going to. Without this the Continue button would let
    * somebody past a half-answered step and fail at the very end instead.
    */
-  // The shade verdict for this roll against the chosen cutting line.
-  const shadeMix = needsChallanLine && preview?.shade && !preview.shade.ok;
+  // The shade verdicts for these rolls against the chosen cutting line.
+  const shadeMisses = needsChallanLine
+    ? rollIds.map((id) => previews[id]?.shade).filter((s) => s && !s.ok)
+    : [];
+  const shadeMix = shadeMisses.length > 0;
   const shadeReasonOk = !shadeMix || shadeMixReason.trim().length >= 10;
 
   const stepThreeDone =
@@ -256,14 +379,34 @@ export default function FabricIssueForm() {
     (!needsChallanLine || Boolean(challanLineId)) &&
     (!needsVendor || Boolean(vendorId));
 
+  const short = rollIds.filter((id) => previews[id]?.availability && !previews[id].availability.permitted);
+  const allQtys = rollIds.length > 0 && rollIds.every((id) => Number(qtys[id]) > 0);
+  const allPermitted = rollIds.every((id) => previews[id]?.availability?.permitted);
+
   const ready =
-    Boolean(rollId && orderId && purpose) &&
-    Number(qty) > 0 &&
-    availability?.permitted &&
+    rollIds.length > 0 &&
+    Boolean(orderId && purpose) &&
+    allQtys &&
+    allPermitted &&
     (!needsVendor || vendorId) &&
     (!needsChallanLine || challanLineId) &&
     shadeReasonOk &&
     (employeeId || issuedByName.trim());
+
+  /** Why a roll's quantity cannot be issued, in the storeman's terms. */
+  const shortMessage = (availability) =>
+    !availability.withinRoll
+      ? `Roll ${availability.rollNo} only has ${availability.rollBalance} ${availability.uom} left.`
+      : `Only ${availability.ledgerAvailable} ${availability.uom} of this fabric is in stock at ${availability.location}.`;
+
+  const rollSummary = !picked.length
+    ? ''
+    : many
+      ? `${picked.length} rolls · ${picked.map((r) => r.rollNo).join(', ')} · ${fmtNum(totalBalance)} ${uomLabel} on them`
+      : `${picked[0].rollNo} · ${[picked[0].fabricName, picked[0].colorCode].filter(Boolean).join(' · ')} · ${fmtNum(picked[0].balanceQty)} ${picked[0].uom} left`;
+
+  const purposeLabel = PURPOSES.find((p) => p.value === purpose)?.label;
+  const vendorName = vendors.find((v) => v.id === vendorId)?.vendorName;
 
   return (
     <div className="floor-page">
@@ -282,35 +425,52 @@ export default function FabricIssueForm() {
         </FloorAlert>
       )}
 
-      {/* --- 1. The roll --------------------------------------------------- */}
-      <Step
+      {suggestion?.missing && (
+        <FloorAlert kind="error" title="That challan line is no longer open" onDismiss={() => setSuggestion(null)}>
+          It has been filled, closed or taken out of approval. Choose the requirement in step 3.
+        </FloorAlert>
+      )}
+      {suggestion?.line && (
+        <FloorAlert
+          kind={suggestion.shortQty > 0 ? 'error' : 'info'}
+          title={'For ' + suggestion.line.challanNo + ' line ' + suggestion.line.lineNo}
+          onDismiss={() => setSuggestion(null)}
+        >
+          {suggestion.picks.length
+            ? suggestion.picks.length + (suggestion.picks.length > 1 ? ' rolls' : ' roll') + ' picked for ' +
+              fmtNum(suggestion.suggestedQty) + ' of the ' + fmtNum(suggestion.line.outstandingQty) + ' ' +
+              suggestion.line.uom + ' outstanding. Check them against the rack before issuing.'
+            : 'No ' + (suggestion.line.colorCode ?? '') + ' roll in ' + suggestion.line.uom +
+              ' has any balance - pick one in step 1.'}
+          {suggestion.picks.length > 0 && suggestion.shortQty > 0 && (
+            <div>
+              Short by {fmtNum(suggestion.shortQty)} {suggestion.line.uom} - add rolls in step 1, or issue what
+              there is.
+            </div>
+          )}
+        </FloorAlert>
+      )}
+
+      {/* --- 1. The roll(s) ------------------------------------------------ */}
+      <FloorStep
         index={1}
-        title="Which roll"
+        title="Which rolls"
         open={step === 1}
-        done={Boolean(rollId)}
+        done={rollIds.length > 0}
         onReopen={() => setStep(1)}
-        summary={
-          roll
-            ? `${roll.rollNo} · ${[roll.fabricName, roll.colorCode].filter(Boolean).join(' · ')} · ${fmtNum(roll.balanceQty)} ${roll.uom} left`
-            : ''
-        }
+        summary={rollSummary}
       >
       <PickerList
         items={rolls}
         loading={rollsLoading}
-        selectedId={rollId}
-        onSelect={(id) => {
-          setRollId(id);
-          setQty('');
-          setStep(2);
-        }}
+        onSelect={addRoll}
         searchPlaceholder="Scan or search a roll number, colour or fabric..."
         searchKeys={['rollNo', 'fabricName', 'colorCode', 'gsm', 'orderNo', 'poId']}
         emptyMessage="No rolls with any balance left."
-        render={(r, { selected, select }) => (
+        render={(r) => (
           <PickerCard
-            selected={selected}
-            onSelect={select}
+            selected={rollIds.includes(r.id)}
+            onSelect={() => toggleRoll(r.id)}
             title={r.rollNo}
             badge={r.forThisOrder === false && orderId ? 'other order' : undefined}
             subtitle={[r.fabricName, r.colorCode, r.gsm].filter(Boolean).join(' · ')}
@@ -318,6 +478,9 @@ export default function FabricIssueForm() {
               fmtEnum(r.stage),
               r.location,
               r.orderNo ? `for ${r.orderNo}` : null,
+              r.shade || r.dyeLot
+                ? [r.shade && `shade ${r.shade}`, r.dyeLot && `lot ${r.dyeLot}`].filter(Boolean).join(', ')
+                : null,
             ]
               .filter(Boolean)
               .join(' · ')}
@@ -332,10 +495,22 @@ export default function FabricIssueForm() {
           />
         )}
       />
-      </Step>
+      {/* Tapping no longer moves on by itself: a second and third roll are
+          picked from the same list, so the storeman says when they are done. */}
+      {rollIds.length > 0 && (
+        <div className="floor-actions">
+          <BigButton onClick={() => setStep(2)}>
+            Continue with {rollIds.length} roll{many ? 's' : ''}
+          </BigButton>
+        </div>
+      )}
+      {rollIds.length >= MAX_ROLLS && (
+        <FloorAlert kind="info">{MAX_ROLLS} rolls is the most one issue can carry.</FloorAlert>
+      )}
+      </FloorStep>
 
       {/* --- 2. The order -------------------------------------------------- */}
-      <Step
+      <FloorStep
         index={2}
         title="Which order"
         open={step === 2}
@@ -371,17 +546,21 @@ export default function FabricIssueForm() {
               />
             )}
           />
-      </Step>
+      </FloorStep>
 
       {/* --- 3. The purpose ------------------------------------------------ */}
-      <Step
+      <FloorStep
         index={3}
         title="What for"
         open={step === 3}
         done={Boolean(purpose)}
         onReopen={() => setStep(3)}
-        summary={PURPOSES.find((p) => p.value === purpose)?.label ?? ''}
+        summary={purposeLabel ?? ''}
       >
+          <p className="hint" style={{ margin: '0 0 8px' }}>
+            Fabric for cutting is issued from its{' '}
+            <Link to="/cutting-challans">cutting challan</Link>, against the line it fulfils.
+          </p>
           <div className="picker-scroll" style={{ maxHeight: 'none' }}>
             {PURPOSES.map((p) => (
               <PickerCard
@@ -394,10 +573,11 @@ export default function FabricIssueForm() {
             ))}
           </div>
 
-          {preview?.willMoveTo && purpose && (
+          {firstPreview?.willMoveTo && purpose && (
             <FloorAlert kind="info">
-              After this issue the roll will be at <strong>{preview.willMoveTo}</strong>, at stage{' '}
-              <strong>{fmtEnum(preview.willBecomeStage)}</strong>.
+              After this issue {many ? 'the rolls' : 'the roll'} will be at{' '}
+              <strong>{firstPreview.willMoveTo}</strong>, at stage{' '}
+              <strong>{fmtEnum(firstPreview.willBecomeStage)}</strong>.
             </FloorAlert>
           )}
 
@@ -424,8 +604,14 @@ export default function FabricIssueForm() {
 
           {shadeMix && (
             <FloorAlert kind="error" title="Different shade or dye lot">
-              {preview.shade.message}
-              <Field label="Reason for mixing" required hint="At least 10 characters. Stored on the issue.">
+              {shadeMisses.map((s, i) => (
+                <div key={i}>{s.message}</div>
+              ))}
+              <Field
+                label="Reason for mixing"
+                required
+                hint={`At least 10 characters. Stored on ${shadeMisses.length > 1 ? 'each issue that mixes' : 'the issue'}.`}
+              >
                 <TextArea
                   rows={2}
                   value={shadeMixReason}
@@ -457,41 +643,73 @@ export default function FabricIssueForm() {
               </BigButton>
             </div>
           )}
-      </Step>
+      </FloorStep>
 
       {/* --- 4. The quantity ----------------------------------------------- */}
-      <Step
+      <FloorStep
         index={4}
         title="How much"
         open={step === 4}
-        done={Boolean(qty) && Number(qty) > 0}
+        done={allQtys}
         onReopen={() => setStep(4)}
-        summary={qty ? `${fmtNum(qty)} ${roll?.uom ?? ''}` : ''}
+        summary={allQtys ? `${fmtNum(totalQty)} ${uomLabel}${many ? ` off ${rollIds.length} rolls` : ''}` : ''}
       >
-          <QtyStepper
-            value={qty}
-            onChange={setQty}
-            uom={roll?.uom}
-            label="Fabric Qty Issued"
-            available={availability?.maxIssuable}
-            max={availability?.maxIssuable}
-            error={
-              availability && !availability.permitted
-                ? !availability.withinRoll
-                  ? `Roll ${availability.rollNo} only has ${availability.rollBalance} ${availability.uom} left.`
-                  : `Only ${availability.ledgerAvailable} ${availability.uom} of this fabric is in stock at ${availability.location}.`
-                : undefined
-            }
-          />
+          {/* The commonest batch is "all of each roll" - one tap for that. */}
+          {many && (
+            <div className="floor-actions">
+              <BigButton
+                kind="ghost"
+                onClick={() =>
+                  setQtys(
+                    Object.fromEntries(
+                      rollIds.map((id) => [id, String(previews[id]?.availability?.maxIssuable ?? qtys[id] ?? '')]),
+                    ),
+                  )
+                }
+              >
+                Max on every roll
+              </BigButton>
+            </div>
+          )}
 
-          {availability && !availability.permitted && (
+          {rollIds.map((id) => {
+            const availability = previews[id]?.availability;
+            const r = picked.find((x) => x.id === id);
+            return (
+              <QtyStepper
+                key={id}
+                id={`qty-${id}`}
+                value={qtys[id] ?? ''}
+                onChange={(v) => setQtys((q) => ({ ...q, [id]: v }))}
+                uom={r?.uom}
+                label={many ? `Roll ${r?.rollNo ?? ''}` : 'Fabric Qty Issued'}
+                compact={many}
+                available={availability?.maxIssuable}
+                max={availability?.maxIssuable}
+                error={availability && !availability.permitted ? shortMessage(availability) : undefined}
+              />
+            );
+          })}
+
+          {short.length > 0 && (
             <FloorAlert kind="error" title="Not enough stock">
-              Short by{' '}
-              {!availability.withinRoll ? availability.rollShort : availability.ledgerShort}{' '}
-              {availability.uom}. The server checks the roll's own balance and the stock ledger, and
-              this fails on{' '}
-              {!availability.withinRoll ? 'the roll' : 'the ledger'}.
+              {short.map((id) => {
+                const a = previews[id].availability;
+                return (
+                  <div key={id}>
+                    Roll {a.rollNo}: short by {!a.withinRoll ? a.rollShort : a.ledgerShort} {a.uom}, on{' '}
+                    {!a.withinRoll ? 'the roll' : 'the ledger'}.
+                  </div>
+                );
+              })}
+              The server checks each roll&apos;s own balance and the stock ledger.
             </FloorAlert>
+          )}
+
+          {many && allQtys && (
+            <div className="muted" style={{ textAlign: 'right' }}>
+              Total <strong>{fmtNum(totalQty)}</strong> {uomLabel}
+            </div>
           )}
 
           <Field label="Issued by" required>
@@ -512,7 +730,12 @@ export default function FabricIssueForm() {
           </Field>
 
           <Field label="Delivery date">
-            <input type="date" value={deliveryDate} min={todayInput()} onChange={(e) => setDeliveryDate(e.target.value)} />
+            <input
+              type="date"
+              value={deliveryDate}
+              min={todayInput()}
+              onChange={(e) => setDeliveryDate(e.target.value)}
+            />
           </Field>
 
           <Field label="Remarks">
@@ -527,30 +750,51 @@ export default function FabricIssueForm() {
               Issue fabric
             </BigButton>
           </div>
-      </Step>
+      </FloorStep>
 
       {/* --- 5. Confirm. The fabric leaves the rack. ----------------------- */}
       <ConfirmSheet
         open={confirming}
-        title="Issue this fabric?"
+        title={many ? `Issue these ${rollIds.length} rolls?` : 'Issue this fabric?'}
         summary={
-          `${fmtNum(qty)} ${roll?.uom ?? ''} off roll ${roll?.rollNo ?? ''} for ` +
-          `${purpose.toLowerCase()}, against ${orders.find((o) => o.id === orderId)?.orderNo ?? ''}.`
+          many
+            ? `${fmtNum(totalQty)} ${uomLabel} off ${rollIds.length} rolls for ${purpose.toLowerCase()}, ` +
+              `against ${order?.orderNo ?? ''}. All of them post together, or none do.`
+            : `${fmtNum(totalQty)} ${picked[0]?.uom ?? ''} off roll ${picked[0]?.rollNo ?? ''} for ` +
+              `${purpose.toLowerCase()}, against ${order?.orderNo ?? ''}.`
         }
-        lines={[
-          { label: 'Roll', value: roll?.rollNo },
-          { label: 'Fabric', value: [roll?.fabricName, roll?.colorCode].filter(Boolean).join(' · ') },
-          { label: 'Quantity', value: `${fmtNum(qty)} ${roll?.uom ?? ''}` },
-          {
-            label: 'Left on the roll',
-            value: `${fmtNum(Number(roll?.balanceQty ?? 0) - Number(qty || 0))} ${roll?.uom ?? ''}`,
-          },
-          { label: 'Purpose', value: PURPOSES.find((p) => p.value === purpose)?.label },
-          ...(vendorId
-            ? [{ label: 'Going to', value: vendors.find((v) => v.id === vendorId)?.vendorName }]
-            : []),
-        ]}
-        warning="This writes a stock ledger OUT in the same transaction. The fabric leaves the store."
+        lines={
+          many
+            ? [
+                ...picked.map((r) => ({
+                  label: r.rollNo,
+                  value:
+                    `${fmtNum(qtys[r.id])} ${r.uom} · ` +
+                    `${fmtNum(Number(r.balanceQty ?? 0) - Number(qtys[r.id] || 0))} left`,
+                })),
+                { label: 'Purpose', value: purposeLabel },
+                ...(vendorId ? [{ label: 'Going to', value: vendorName }] : []),
+              ]
+            : [
+                { label: 'Roll', value: picked[0]?.rollNo },
+                {
+                  label: 'Fabric',
+                  value: [picked[0]?.fabricName, picked[0]?.colorCode].filter(Boolean).join(' · '),
+                },
+                { label: 'Quantity', value: `${fmtNum(totalQty)} ${picked[0]?.uom ?? ''}` },
+                {
+                  label: 'Left on the roll',
+                  value: `${fmtNum(Number(picked[0]?.balanceQty ?? 0) - totalQty)} ${picked[0]?.uom ?? ''}`,
+                },
+                { label: 'Purpose', value: purposeLabel },
+                ...(vendorId ? [{ label: 'Going to', value: vendorName }] : []),
+              ]
+        }
+        warning={
+          many
+            ? 'This writes a stock ledger OUT for every roll in one transaction. The fabric leaves the store.'
+            : 'This writes a stock ledger OUT in the same transaction. The fabric leaves the store.'
+        }
         confirmLabel="Issue"
         onConfirm={post}
         onCancel={() => setConfirming(false)}
@@ -559,57 +803,3 @@ export default function FabricIssueForm() {
     </div>
   );
 }
-
-/**
- * One step of the issue, either open or folded away.
- *
- * ===========================================================================
- *  WHY THE STEPS COLLAPSE
- * ===========================================================================
- *
- *  Every step used to stay expanded once it was done, so the page only ever
- *  grew: by the time somebody reached "how much" they were scrolling past a
- *  full roll list and a full order list to get to a number box, on a screen
- *  that is used standing at a rack. Nothing said which step you were on, and
- *  changing the roll meant scrolling back up through both lists to find it.
- *
- *  A finished step now folds to a single line carrying its answer, and the one
- *  being worked on is the only thing open. The line stays clickable, because
- *  the commonest correction on this screen is "wrong roll" and it should cost
- *  one tap rather than a scroll.
- */
-function Step({ index, title, summary, open, done, onReopen, children }) {
-  if (!open && done) {
-    return (
-      <button type="button" className="floor-step is-done" onClick={onReopen}>
-        <span className="floor-step-no">{index}</span>
-        <span className="floor-step-body">
-          <span className="floor-step-title">{title}</span>
-          <span className="floor-step-summary">{summary}</span>
-        </span>
-        <span className="floor-step-change">Change</span>
-      </button>
-    );
-  }
-
-  if (!open) {
-    return (
-      <div className="floor-step is-waiting" aria-disabled="true">
-        <span className="floor-step-no">{index}</span>
-        <span className="floor-step-body">
-          <span className="floor-step-title">{title}</span>
-        </span>
-      </div>
-    );
-  }
-
-  return (
-    <section className="floor-step-open">
-      <div className="fieldset-title">
-        {index} &middot; {title}
-      </div>
-      {children}
-    </section>
-  );
-}
-

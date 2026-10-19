@@ -236,6 +236,32 @@ enum RollStage {
   REJECTED
 }
 
+/// Inward inspection of a fabric roll, done in the store after the GRN.
+///
+/// A record of what the inspector found, not a gate: a PENDING or FAILED roll
+/// can still be issued. A FAILED roll that should not be used goes to a Fabric
+/// Scrutiny, where the Director decides - this status never holds a roll.
+///
+/// NULL on a roll (not one of these values) means inspection was never asked
+/// of it: opening stock, remnants, and rolls received before this existed.
+enum InspectionStatus {
+  PENDING
+  PASSED
+  FAILED
+}
+
+/// The sample check on a lot of cut pieces, before it may go to stitching.
+///
+/// Unlike InspectionStatus this IS a gate: only PASSED pieces count as ready,
+/// and a Cutting Issue cannot send more than are ready. PASSED or FAILED is
+/// decided by the defect rate against the limit (domain/cutCheck.js), never
+/// picked by the checker.
+enum CutCheckStatus {
+  PENDING
+  PASSED
+  FAILED
+}
+
 /// The explicit workflow position of an approvable document.
 ///
 /// Every approvable document in this system moves through the SAME states, so
@@ -2907,6 +2933,29 @@ model FabricRoll {
   shadeMarkedAt     DateTime? @map("shade_marked_at") @db.Timestamptz(3)
   shadeMarkedByName String?   @map("shade_marked_by_name") @db.VarChar(120)
 
+  // --- INWARD INSPECTION ----------------------------------------------------
+  //
+  //  The store's check on a roll after the GRN: is the length what the bill
+  //  says, are the width and GSM what was ordered, and how much of it is
+  //  faulty. Set PENDING on every roll a GRN creates; see InspectionStatus.
+  //
+  //  The measured figures are optional because an inspector who only looked
+  //  for faults has not measured anything, and a blank is truer than a copy of
+  //  the billed figure.
+
+  inspectionStatus    InspectionStatus? @map("inspection_status")
+  /// Length found on the inspection table. Against `receivedQty` it is the
+  /// supplier's short-length on this roll.
+  inspectedQty        Decimal?          @map("inspected_qty") @db.Decimal(18, 4)
+  inspectedWidth      Decimal?          @map("inspected_width") @db.Decimal(10, 2)
+  inspectedGsm        Decimal?          @map("inspected_gsm") @db.Decimal(10, 2)
+  /// Length the inspector marked faulty - holes, slubs, stains, shade bars.
+  inspectionDefectQty Decimal?          @map("inspection_defect_qty") @db.Decimal(18, 4)
+  inspectionRemarks   String?           @map("inspection_remarks") @db.Text
+  inspectedAt         DateTime?         @map("inspected_at") @db.Timestamptz(3)
+  inspectedById       String?           @map("inspected_by_id") @db.Uuid
+  inspectedByName     String?           @map("inspected_by_name") @db.VarChar(120)
+
   /// F-04 - THE ROLL RECORD WAS WRITTEN OFF BY A GRN REVERSAL.
   ///
   /// Distinct from `deletedAt`, and the distinction is the whole point.
@@ -2964,6 +3013,7 @@ model FabricRoll {
   @@index([colorCode])
   @@index([shade])
   @@index([dyeLot])
+  @@index([inspectionStatus])
   @@index([deletedAt])
   @@index([writtenOffAt])
   @@index([parentRollId])
@@ -3190,8 +3240,6 @@ model FabricIssue {
 
   /// Excel: "Date" (Auto)
   issueDate          DateTime      @map("issue_date") @db.Date
-  /// When the fabric is wanted back / the work done.
-  deliveryDate        DateTime?     @map("delivery_date") @db.Date
   /// Excel: "Vendor" - job worker the fabric goes to, when purpose is job work.
   vendorId           String?       @map("vendor_id") @db.Uuid
   vendor             Vendor?       @relation(fields: [vendorId], references: [id], onDelete: SetNull)
@@ -3275,8 +3323,23 @@ model FabricIssue {
   /// is refused. Null on every issue that matched.
   shadeMixReason String? @map("shade_mix_reason") @db.Text
 
+  /// ROLLS ISSUED TOGETHER - FIB-0001.
+  ///
+  /// A storeman taking four rolls to the cutting floor posts them in one go.
+  /// Each roll is still its own issue, with its own number, ledger legs and
+  /// downstream cutting issues; this is what ties them back together so the
+  /// list can show the group and the challan can print all of them on one
+  /// sheet. Null on an issue posted on its own.
+  batchNo String? @map("batch_no") @db.VarChar(40)
+
+  /// When the fabric is wanted back from the job worker, or the cutting done.
+  /// Printed on the challan, so a batch shares it like the date and remarks.
+  deliveryDate DateTime? @map("delivery_date") @db.Date
+
   dyeIssues     DyeIssue[]     @relation("JobWorkFirstIssue")
   cuttingIssues CuttingIssue[]
+  /// The receipts that accounted for this issue's cloth on the cutting floor.
+  cutPiecesReceipts CutPiecesReceipt[]
 
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   createdById String?   @map("created_by_id") @db.Uuid
@@ -3294,6 +3357,7 @@ model FabricIssue {
   @@index([status])
   @@index([inventoryItemId])
   @@index([cuttingChallanLineId])
+  @@index([batchNo])
   @@index([deletedAt])
   @@map("fabric_issues")
 }
@@ -3325,8 +3389,6 @@ model DyeIssue {
 
   /// Excel: "Date" (Auto)
   issueDate    DateTime       @map("issue_date") @db.Date
-  /// When the job worker is to send the fabric back.
-  deliveryDate DateTime?      @map("delivery_date") @db.Date
   /// Excel: "Process" (Manual -> L_Process): Dyeing / Printing / Washing / Finishing
   process      JobWorkProcess
   /// Excel: "Roll No" (Auto-Dropdown -> FabricRoll)
@@ -3386,6 +3448,8 @@ model DyeIssue {
   amount       Decimal        @db.Decimal(18, 2)
   /// Excel: "Remark" (Text)
   remark       String?        @db.Text
+  /// When the job worker is to send the fabric back. Printed on the order.
+  deliveryDate DateTime?      @map("delivery_date") @db.Date
 
   /// Excel: "Fabric Stage" - whether the fabric goes out before or after
   /// stitching. The Printing sheet carries this column; the same distinction
@@ -4447,6 +4511,57 @@ model CutPiecesReceipt {
 
   remarks String? @db.Text
 
+  // --- SAMPLE CHECK, BEFORE STITCHING ----------------------------------------
+  //
+  //  A defect found at the stitching machine costs a bag; found here it costs
+  //  a panel. The checker opens `sampleQty` pieces and records every defect
+  //  (the `defects` lines); the rate against `acceptLimitPct` decides the lot.
+  //  Only a PASSED lot counts as ready for stitching, less the defective
+  //  pieces pulled out of it. Changing the good-piece count resets the check.
+
+  checkStatus    CutCheckStatus @default(PENDING) @map("check_status")
+  /// Pieces opened and checked.
+  sampleQty      Decimal?       @map("sample_qty") @db.Decimal(18, 4)
+  /// Pieces found defective in the sample - the sum of the defect lines.
+  /// Pulled out of the lot; they never go to stitching.
+  defectivePcs   Decimal?       @map("defective_pcs") @db.Decimal(18, 4)
+  /// defectivePcs / sampleQty x 100. Derived.
+  defectRatePct  Decimal?       @map("defect_rate_pct") @db.Decimal(9, 3)
+  /// The limit the lot was judged against, frozen with the result.
+  acceptLimitPct Decimal?       @map("accept_limit_pct") @db.Decimal(9, 3)
+  checkedAt      DateTime?      @map("checked_at") @db.Timestamptz(3)
+  checkedById    String?        @map("checked_by_id") @db.Uuid
+  checkedByName  String?        @map("checked_by_name") @db.VarChar(120)
+  checkRemarks   String?        @map("check_remarks") @db.Text
+
+  defects CutPieceDefect[]
+
+  // --- C6: THE FABRIC THE PIECES WERE CUT FROM ------------------------------
+  //
+  //  Moved here from the Cutting Issue: the cutting floor reports its output
+  //  when it hands the pieces over, so this is where the cloth is accounted
+  //  for and taken off the cutting floor in the ledger.
+  //
+  //      issued = consumed + remainder + remnants + wastage + fabric damage
+  //
+  //  All zero on a receipt that carries no fabric - a lot whose cloth was
+  //  accounted for on another receipt of the same cut.
+
+  /// The fabric issue that put this cloth on the cutting floor.
+  fabricIssueId   String?      @map("fabric_issue_id") @db.Uuid
+  fabricIssue     FabricIssue? @relation(fields: [fabricIssueId], references: [id], onDelete: Restrict)
+  fabricUom       String       @default("Mtrs") @map("fabric_uom") @db.VarChar(20)
+  issuedQty       Decimal      @default(0) @map("issued_qty") @db.Decimal(18, 4)
+  consumedQty     Decimal      @default(0) @map("consumed_qty") @db.Decimal(18, 4)
+  remainderQty    Decimal      @default(0) @map("remainder_qty") @db.Decimal(18, 4)
+  remnantQty      Decimal      @default(0) @map("remnant_qty") @db.Decimal(18, 4)
+  wastageQty      Decimal      @default(0) @map("wastage_qty") @db.Decimal(18, 4)
+  fabricDamageQty Decimal      @default(0) @map("fabric_damage_qty") @db.Decimal(18, 4)
+  /// Non-null is the proof the ledger moved. From then on the fabric figures
+  /// are fixed and the receipt cannot be deleted.
+  stockPostedAt   DateTime?    @map("stock_posted_at") @db.Timestamptz(3)
+  remnantRollNo   String?      @map("remnant_roll_no") @db.VarChar(40)
+
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   createdById String?   @map("created_by_id") @db.Uuid
   updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
@@ -4454,13 +4569,47 @@ model CutPiecesReceipt {
   deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
   deletedById String?   @map("deleted_by_id") @db.Uuid
 
+  @@index([fabricIssueId])
   @@index([orderId])
   @@index([styleId])
   @@index([cuttingChallanId])
   @@index([cuttingMasterId])
   @@index([receiptDate])
+  @@index([checkStatus])
   @@index([deletedAt])
   @@map("cut_pieces_receipts")
+}
+
+/// One defect found in the sample check of a cut-pieces lot: which panel,
+/// what was wrong with it, and how many pieces.
+///
+/// This is the answer to "which pieces will give trouble at stitching":
+/// grouped by panel and type over an order, it says "Front panel - Hole - 6"
+/// before a single bag is sewn. Replaced wholesale each time the check is
+/// recorded; the audit trail keeps earlier checks.
+model CutPieceDefect {
+  id        String           @id @default(uuid()) @db.Uuid
+  receiptId String           @map("receipt_id") @db.Uuid
+  receipt   CutPiecesReceipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+
+  lineNo Int @map("line_no")
+
+  /// The style panel the defect is on - "Front panel", "Handle". Typed from
+  /// the style's panel list; free text for a style that has none.
+  panel      String? @db.VarChar(80)
+  /// L_CutPieceDefect - "Hole", "Mis-cut", "Notch missing".
+  defectType String  @map("defect_type") @db.VarChar(80)
+  /// Pieces with this defect.
+  qty        Decimal @db.Decimal(18, 4)
+  remarks    String? @db.Text
+
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdById String?  @map("created_by_id") @db.Uuid
+
+  @@unique([receiptId, lineNo])
+  @@index([receiptId])
+  @@index([defectType])
+  @@map("cut_piece_defects")
 }
 
 // ===========================================================================

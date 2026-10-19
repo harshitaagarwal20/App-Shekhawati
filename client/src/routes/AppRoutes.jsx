@@ -49,6 +49,7 @@ const GrnReversalDetail = lazy(() => import('../pages/procurement/GrnReversalDet
 const InventoryHub = lazy(() => import('../pages/inventory/InventoryHub.jsx'));
 const OpeningStockPage = lazy(() => import('../pages/inventory/OpeningStockPage.jsx'));
 const StockSummary = lazy(() => import('../pages/inventory/StockSummary.jsx'));
+const InventoryAnalysis = lazy(() => import('../pages/inventory/InventoryAnalysis.jsx'));
 const StockLedgerPage = lazy(() => import('../pages/inventory/StockLedgerPage.jsx'));
 const RollList = lazy(() => import('../pages/inventory/RollList.jsx'));
 const RollDetail = lazy(() => import('../pages/inventory/RollDetail.jsx'));
@@ -255,6 +256,16 @@ export default function AppRoutes() {
             )}
           />
           <Route path="/inventory/stock" element={guarded('INVENTORY.VIEW', <StockSummary />)} />
+          {/* Either permission: QC holds only FABRIC_ROLL.VIEW and gets the
+              inspection view; the screen offers the views the role may run. */}
+          <Route
+            path="/inventory/analysis"
+            element={(
+              <RequirePermission permissions={['INVENTORY.VIEW', 'FABRIC_ROLL.VIEW']}>
+                <InventoryAnalysis />
+              </RequirePermission>
+            )}
+          />
           <Route
             path="/inventory/stock/ledger"
             element={guarded('STOCK_LEDGER.VIEW', <StockLedgerPage />)}

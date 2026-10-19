@@ -108,3 +108,8 @@ export const orderAllocation = asyncHandler(async (req, res) =>
 export const previewAllocation = asyncHandler(async (req, res) =>
   ok(res, await service.previewAllocation(req.body)),
 );
+
+/** What fabric is on hand, at a job worker and still to arrive for one style. */
+export const fabricStock = asyncHandler(async (req, res) =>
+  ok(res, await service.fabricStock(req.query)),
+);

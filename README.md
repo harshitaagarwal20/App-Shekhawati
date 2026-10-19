@@ -313,8 +313,8 @@ the planner nothing — and `amount = qty x rate`, in decimal arithmetic that do
 not drift.
 
 `npm test` boots the real Express app on an ephemeral port and drives it over
-HTTP, covering login, token rotation and reuse detection, logout revocation, the
-forced password change, RBAC refusals, List Master-driven dropdowns, CRUD across
+HTTP, covering login, token rotation and reuse detection, logout revocation,
+RBAC refusals, List Master-driven dropdowns, CRUD across
 all four record masters, and the whole buyer-order flow — including a case that
 posts a tampered `effectiveQty` and asserts the server ignores it.
 
@@ -322,9 +322,9 @@ posts a tampered `effectiveQty` and asserts the server ignores it.
 
 ## Seed accounts
 
-All seeded users are created with `mustChangePassword = true` — the API blocks
-everything except the password-change endpoint until they set their own.
-Passwords come from `server/.env`.
+Passwords come from `server/.env`. There is no forced first password change —
+it was retired, and accounts are created ready to use — so tell each person to
+set their own from **Change Password** as soon as they have signed in.
 
 | Username | Role | Person in the workbook |
 |---|---|---|

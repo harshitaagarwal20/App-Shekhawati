@@ -45,6 +45,7 @@ import { OPTIONS_LIMIT, searchFilter } from '../utils/http.js';
 import { assertValueInList } from './masterList.service.js';
 import { nextNumber, peekNumber } from './documentNumber.service.js';
 import { assertNotSelfApproval } from '../domain/makerChecker.js';
+import { istDate } from '../utils/dates.js';
 
 export const SORTABLE = [
   'approvalNo',
@@ -176,7 +177,7 @@ export function lockState(approval) {
       locked: true,
       reason:
         `Version ${approval.round} was approved on ` +
-        `${approval.approvedDate ? new Date(approval.approvedDate).toISOString().slice(0, 10) : 'record'}. ` +
+        `${approval.approvedDate ? istDate(approval.approvedDate) : 'record'}. ` +
         'An approved plan is immutable - cutting can already have been issued against it. ' +
         'Raise a new version instead.',
     };

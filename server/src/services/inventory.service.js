@@ -259,6 +259,20 @@ export function describeItem(source) {
 }
 
 /**
+ * The item as the office names it: category and sub-category ("Fabric 16 oz"),
+ * or the accessory for an accessory line - without the content, GSM, count
+ * and colour the long description strings together, and without the item
+ * code. Reports that use it show colour in a column of its own beside it, so
+ * two colours of one fabric still read as two rows.
+ */
+export function itemShortName(item) {
+  if (!item) return null;
+  const detail =
+    item.subCategory || [item.accessoriesItem, item.accessoryType].filter(Boolean).join(' ');
+  return [item.itemCategory ?? item.item, detail].filter(Boolean).join(' ') || item.description || null;
+}
+
+/**
  * A roll's own fabric name - item and sub-category, nothing a roll already
  * has its own column for.
  *
@@ -831,6 +845,9 @@ export async function createRoll(tx, roll, actorId) {
       dyeLot: normaliseShade(roll.dyeLot),
       shadeMarkedAt: roll.shade || roll.dyeLot ? new Date() : null,
       shadeMarkedByName: roll.shade || roll.dyeLot ? roll.shadeMarkedByName ?? null : null,
+      // Only a GRN asks for inspection. Opening stock was on the rack before
+      // this system and is not re-inspected by being loaded into it.
+      inspectionStatus: roll.inspectionStatus ?? null,
       remarks: roll.remarks ?? null,
       createdById: actorId ?? null,
       updatedById: actorId ?? null,
@@ -877,6 +894,88 @@ export async function markRollShade(id, { shade, dyeLot, remarks }, actor) {
       updatedById: actor.userId ?? null,
     },
   });
+}
+
+/**
+ * Records the inward inspection of a roll: passed or failed, and what was
+ * measured.
+ *
+ * Deliberately moves nothing. The roll keeps its stage, its hold and its
+ * balance - a failed roll that should not be cut goes to a Fabric Scrutiny,
+ * where the Director decides. Recording it again overwrites the last result;
+ * the audit log keeps every earlier one.
+ */
+export async function inspectRoll(id, input, actor) {
+  const roll = await prisma.fabricRoll.findFirst({ where: { id, deletedAt: null } });
+  if (!roll) throw ApiError.notFound('Fabric roll');
+  return prisma.fabricRoll.update({
+    where: { id },
+    data: inspectionData(roll, input, actor),
+  });
+}
+
+/**
+ * The same result over several rolls - a GRN's worth passed in one go.
+ *
+ * One pass or fail per roll, nothing all-or-nothing: a roll that cannot take
+ * the result is reported and the rest are still recorded. Measurements are
+ * per roll, so a batch carries only the status and a remark.
+ */
+export async function inspectRollBatch({ rollIds, status, remarks }, actor) {
+  const rolls = await prisma.fabricRoll.findMany({
+    where: { id: { in: rollIds }, deletedAt: null },
+  });
+  const byId = new Map(rolls.map((r) => [r.id, r]));
+
+  const inspected = [];
+  const failed = [];
+  for (const rollId of rollIds) {
+    const roll = byId.get(rollId);
+    if (!roll) {
+      failed.push({ rollId, rollNo: null, message: 'Roll not found.' });
+      continue;
+    }
+    try {
+      await prisma.fabricRoll.update({
+        where: { id: rollId },
+        data: inspectionData(roll, { status, remarks }, actor),
+      });
+      inspected.push({ rollId, rollNo: roll.rollNo });
+    } catch (e) {
+      failed.push({ rollId, rollNo: roll.rollNo, message: e.message });
+    }
+  }
+  return { inspected, failed };
+}
+
+function inspectionData(roll, { status, inspectedQty, inspectedWidth, inspectedGsm, defectQty, remarks }, actor) {
+  const optional = (v) => (v === undefined || v === null || v === '' ? null : D(v));
+  const measured = optional(inspectedQty);
+  const defect = optional(defectQty);
+
+  // Faulty length is part of the roll, so it cannot exceed the roll - the
+  // measured length where there is one, otherwise what the bill said.
+  const ceiling = measured ?? D(roll.receivedQty);
+  if (defect && defect.greaterThan(ceiling)) {
+    throw ApiError.badRequest(
+      `Roll ${roll.rollNo} is ${ceiling.toFixed(2)} ${roll.uom}; ` +
+        `${defect.toFixed(2)} cannot be faulty.`,
+      { field: 'defectQty' },
+    );
+  }
+
+  return {
+    inspectionStatus: status,
+    inspectedQty: measured,
+    inspectedWidth: optional(inspectedWidth),
+    inspectedGsm: optional(inspectedGsm),
+    inspectionDefectQty: defect,
+    inspectionRemarks: remarks?.trim() || null,
+    inspectedAt: new Date(),
+    inspectedById: actor.userId ?? null,
+    inspectedByName: actor.fullName ?? null,
+    updatedById: actor.userId ?? null,
+  };
 }
 
 /**
@@ -1235,6 +1334,7 @@ export async function listRolls(query) {
   const {
     page, pageSize, skip, take, orderBy, search, includeDeleted,
     stage, location, vendorId, grnId, itemId, colorCode, inStockOnly, isHeld, shade, dyeLot,
+    inspectionStatus,
   } = query;
 
   const where = {
@@ -1248,6 +1348,7 @@ export async function listRolls(query) {
     ...(shade ? { shade: normaliseShade(shade) } : {}),
     ...(dyeLot ? { dyeLot: normaliseShade(dyeLot) } : {}),
     ...(isHeld !== undefined ? { isHeld } : {}),
+    ...(inspectionStatus ? { inspectionStatus } : {}),
     ...(inStockOnly ? { balanceQty: { gt: 0 } } : {}),
     ...searchFilter(search, ROLL_SEARCH),
   };

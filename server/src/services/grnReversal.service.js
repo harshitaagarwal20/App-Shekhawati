@@ -71,6 +71,7 @@ import { searchFilter } from '../utils/http.js';
 import { nextNumber, peekNumber } from './documentNumber.service.js';
 import * as engine from './approvalEngine.js';
 import { availableQty, postMovement, recomputeBalance } from './inventory.service.js';
+import { istDate } from '../utils/dates.js';
 
 export const SORTABLE = ['reversalNo', 'reversalDate', 'reversedQty', 'workflowState', 'createdAt'];
 
@@ -184,7 +185,7 @@ async function blockersFor(db, grn, { ignoreReversalId } = {}) {
 
   if (grn.reversedAt) {
     blockers.push(
-      `${grn.grnNo} was already reversed on ${grn.reversedAt.toISOString().slice(0, 10)}` +
+      `${grn.grnNo} was already reversed on ${istDate(grn.reversedAt)}` +
         (grn.reversedByName ? ` by ${grn.reversedByName}` : '') +
         '. A receipt is reversed once.',
     );

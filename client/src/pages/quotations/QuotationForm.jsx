@@ -26,8 +26,10 @@ import {
 } from '../../components/ui.jsx';
 import { loadFailed } from '../../services/loadFailures.js';
 import { focusFirstError } from '../../components/form.jsx';
+import { todayInput } from '../../utils/format.js';
 
-const today = () => new Date().toISOString().slice(0, 10);
+// Kolkata's calendar date, not UTC's - before 05:30 IST those differ by a day.
+const today = todayInput;
 const asDateInput = (v) => (v ? String(v).slice(0, 10) : '');
 
 export default function QuotationForm({ quotation, onSaved, onCancel }) {
@@ -183,8 +185,6 @@ export default function QuotationForm({ quotation, onSaved, onCancel }) {
         )}
 
         <div className="form-grid">
-          <div className="fieldset-title">Quotation</div>
-
           <Field
             label="Quotation No"
             error={fieldErrors.quotationNo}

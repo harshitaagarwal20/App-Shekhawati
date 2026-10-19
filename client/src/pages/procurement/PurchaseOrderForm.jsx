@@ -322,7 +322,7 @@ export default function PurchaseOrderForm({ purchaseOrder, onSaved, onCancel }) 
       )}
 
       <div className="form-grid">
-        <FieldGroup title="Purchase order">
+        <>
           <RHFInput
             form={form}
             name="poId"
@@ -397,7 +397,7 @@ export default function PurchaseOrderForm({ purchaseOrder, onSaved, onCancel }) 
               hint="As per style caps the quantity at the BOM requirement plus the tolerance. Bulk is exempt — deliberately, and it is recorded as a choice."
             />
           )}
-        </FieldGroup>
+        </>
 
         <FieldGroup title="What is being bought">
           <RHFMasterSelect form={form} name="item" label="Item" listCode="ItemCategory" required />

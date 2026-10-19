@@ -28,6 +28,10 @@ export const update = asyncHandler(async (req, res) =>
   ok(res, await service.update(req.params.id, req.body, actor(req))),
 );
 
+export const recordCheck = asyncHandler(async (req, res) =>
+  ok(res, await service.recordCheck(req.params.id, req.body, actor(req))),
+);
+
 export const remove = asyncHandler(async (req, res) =>
   ok(res, await service.remove(req.params.id, req.auth.userId)),
 );

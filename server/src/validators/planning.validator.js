@@ -158,6 +158,12 @@ export const orderAllocationQuery = z.object({
   excludePlanId: uuid.optional(),
 });
 
+/** The fabric on hand for one style of an order - the "Fabric on hand" panel. */
+export const fabricStockQuery = z.object({
+  orderId: uuid,
+  orderLineId: uuid,
+});
+
 /**
  * Checks an unsaved grid against the order ceiling. Same code path as the save,
  * so the answer the planner sees while typing is the answer they will get.

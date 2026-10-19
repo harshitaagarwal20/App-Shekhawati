@@ -58,13 +58,11 @@ const VIEWS = [
   {
     value: QUEUE,
     label: 'Awaiting Decision',
-    blurb: 'Everything waiting on a signature, across every module.',
     permission: 'REPORT.VIEW',
   },
   {
     value: PLANS,
     label: 'Plan Approvals',
-    blurb: 'The plan versions themselves, their rounds and rectifications.',
     permission: 'PLAN_APPROVAL.VIEW',
   },
 ];

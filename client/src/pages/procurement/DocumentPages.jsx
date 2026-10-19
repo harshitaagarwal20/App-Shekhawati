@@ -45,10 +45,11 @@ import {
   VarietySelect,
 } from '../../components/ui.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
-import { fmtDate, fmtDateTime } from '../../utils/format.js';
+import { fmtDate, fmtDateTime, todayInput } from '../../utils/format.js';
 import { loadFailed } from '../../services/loadFailures.js';
 
-const today = () => new Date().toISOString().slice(0, 10);
+// Kolkata's calendar date, not UTC's - before 05:30 IST those differ by a day.
+const today = todayInput;
 const money = (v) =>
   v === null || v === undefined || v === '' || Number.isNaN(Number(v))
     ? '-'
@@ -56,6 +57,16 @@ const money = (v) =>
 const qty = (v) => (v === null || v === undefined ? '-' : Number(v).toLocaleString('en-IN', { maximumFractionDigits: 4 }));
 const isAccessory = (l) => l.item === 'Accessories' || Boolean(l.accessoriesItem);
 const isStationery = (l) => l.item === 'Stationery';
+/**
+ * The item as it was picked on the PO - category and sub-category ("Fabric
+ * 10 oz"), or the accessory for an accessory line - without the colour, GSM
+ * and content the stock item's long description strings together. Colour has
+ * its own column wherever this is used.
+ */
+const itemName = (l) =>
+  [l.item, l.subCategory || [l.accessoriesItem, l.accessoryType].filter(Boolean).join(' ')]
+    .filter(Boolean)
+    .join(' ') || '-';
 const describe = (l) =>
   [l.item, l.subCategory, l.accessoriesItem, l.accessoryType, l.size ? `Size ${l.size}` : null, l.colorCode]
     .filter(Boolean)
@@ -235,7 +246,6 @@ export function PoDocumentForm() {
       <Alert kind="error">{error}</Alert>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-header">Document</div>
         <div className="card-body">
           <div className="form-grid">
             <Field label="Vendor" required>
@@ -473,7 +483,8 @@ export function PoDocumentDetail() {
           <table className="data">
             <thead>
               <tr>
-                <th>Line</th><th>Material</th><th>UOM</th><th className="num">Ordered</th><th className="num">Received</th>
+                <th>Line</th><th>Item</th><th>Colour</th><th>UOM</th>
+                <th className="num">Ordered</th><th className="num">Received</th><th className="num">Pending</th>
                 <th className="num">Rate</th><th className="num">Amount</th><th>Order</th><th>Container</th><th>Approval</th><th>Status</th>
               </tr>
             </thead>
@@ -481,10 +492,27 @@ export function PoDocumentDetail() {
               {doc.lines.map((l) => (
                 <tr key={l.id} className="clickable" onClick={() => navigate(`/purchase-orders/${l.id}`)}>
                   <td className="code">{l.poId}</td>
-                  <td>{describe(l)}</td>
+                  <td><strong>{itemName(l)}</strong></td>
+                  <td>{[l.colorCode, l.size ? `Size ${l.size}` : null].filter(Boolean).join(' · ') || '-'}</td>
                   <td>{l.uom}</td>
                   <td className="num">{qty(l.orderQty)}</td>
-                  <td className="num">{qty(l.receivedQty)}</td>
+                  <td className="num">
+                    {qty(l.receivedQty)}
+                    {Number(l.receivedQty) > 0 && (
+                      <div className="faint">{Math.round(Number(l.receivedPct) * 100)}%</div>
+                    )}
+                  </td>
+                  <td className="num">
+                    {l.fullyReceived ? (
+                      Number(l.overReceivedQty) > 0 ? (
+                        <span className="badge badge-pending">+{qty(l.overReceivedQty)} over</span>
+                      ) : (
+                        <span className="badge badge-approved">received</span>
+                      )
+                    ) : (
+                      <strong>{qty(l.pendingQty)}</strong>
+                    )}
+                  </td>
                   <td className="num">{money(l.rate)}</td>
                   <td className="num">{money(l.amount)}</td>
                   <td className="code">{l.order?.orderNo ?? '-'}</td>
@@ -497,6 +525,52 @@ export function PoDocumentDetail() {
           </table>
         </TableWrap>
       </div>
+
+      {/* What came in, receipt by receipt - the goods receipts behind each
+          line's Received figure. */}
+      <div className="card" style={{ marginTop: 16 }}>
+        <div className="card-header">
+          <span>Goods received against this PO</span>
+          {can('GRN.CREATE') && doc.lines.some((l) => l.approved && !l.fullyReceived && l.status !== 'CANCELLED') && (
+            <button type="button" className="btn btn-sm" onClick={() => navigate('/grns/new-document')}>
+              Receive goods
+            </button>
+          )}
+        </div>
+        {doc.lines.some((l) => l.receipts?.length) ? (
+          <TableWrap>
+            <table className="data">
+              <thead>
+                <tr>
+                  <th>GRN No</th><th>Date</th><th>Bill No</th><th>PO line</th><th>Item</th>
+                  <th className="num">Qty received</th><th />
+                </tr>
+              </thead>
+              <tbody>
+                {doc.lines.flatMap((l) =>
+                  (l.receipts ?? []).map((g) => (
+                    <tr key={g.id} className={`clickable ${g.reversed ? 'inactive' : ''}`} onClick={() => navigate(`/grns/${g.id}`)}>
+                      <td className="code">{g.grnNo}</td>
+                      <td className="nowrap">{fmtDate(g.grnDate)}</td>
+                      <td>{g.billNo}</td>
+                      <td className="code">{l.poId}</td>
+                      <td>
+                        <strong>{itemName(l)}</strong>
+                        {l.colorCode && <span className="faint"> · {l.colorCode}</span>}
+                      </td>
+                      <td className="num">{qty(g.receivingQty)} {g.uom}</td>
+                      <td>{g.reversed ? <span className="badge badge-inactive">reversed</span> : ''}</td>
+                    </tr>
+                  )),
+                )}
+              </tbody>
+            </table>
+          </TableWrap>
+        ) : (
+          <div className="card-body faint">Nothing has been received against this purchase order yet.</div>
+        )}
+      </div>
+
       <Trail history={doc.history} />
 
       {rejecting && (
@@ -613,7 +687,6 @@ export function QuotationDocumentForm() {
       />
       <Alert kind="error">{error}</Alert>
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-header">Quote</div>
         <div className="card-body">
           <div className="form-grid">
             <Field label="Vendor" required>
@@ -783,7 +856,9 @@ export function GrnDocumentForm() {
   const [vendors, setVendors] = useState(null);
   const [gstRates, setGstRates] = useState([]);
   const [pos, setPos] = useState([]);
-  const [head, setHead] = useState({ vendorId: '', billNo: '', billDate: '', grnDate: today(), purpose: 'RAW_MATERIAL', gstRatePct: '', location: '', headerRemarks: '' });
+  // GRN date starts blank: the store keys the day the goods actually came in,
+  // which is often not the day the receipt is entered.
+  const [head, setHead] = useState({ vendorId: '', billNo: '', billDate: '', grnDate: '', purpose: 'RAW_MATERIAL', gstRatePct: '', location: '', headerRemarks: '' });
   const [lines, setLines] = useState([blankGrnLine()]);
   const [acknowledge, setAcknowledge] = useState(false);
   const [needsAck, setNeedsAck] = useState(false);
@@ -809,7 +884,7 @@ export function GrnDocumentForm() {
   const setLine = (k, patch) => setLines((ls) => ls.map((l) => (l.key === k ? { ...l, ...patch } : l)));
   const rollTotal = (l) => l.rolls.reduce((a, r) => a + (Number(r.qty) || 0), 0);
   const rollsOk = (l) => l.rolls.length === 0 || Math.abs(rollTotal(l) - Number(l.receivingQty || 0)) < 0.00005;
-  const ready = head.vendorId && head.billNo.trim() && lines.every((l) => l.purchaseOrderId && Number(l.receivingQty) > 0 && rollsOk(l));
+  const ready = head.vendorId && head.billNo.trim() && head.grnDate && lines.every((l) => l.purchaseOrderId && Number(l.receivingQty) > 0 && rollsOk(l));
 
   async function save() {
     setBusy(true);
@@ -819,7 +894,7 @@ export function GrnDocumentForm() {
       const doc = await grnApi.createDocument({
         billNo: head.billNo,
         billDate: head.billDate || null,
-        grnDate: head.grnDate || undefined,
+        grnDate: head.grnDate,
         purpose: head.purpose,
         gstRatePct: head.gstRatePct || undefined,
         location: head.location || undefined,
@@ -876,7 +951,7 @@ export function GrnDocumentForm() {
             </Field>
             <Field label="Bill / challan no" required><TextInput value={head.billNo} maxLength={60} onChange={setH('billNo')} /></Field>
             <Field label="Bill date"><TextInput type="date" value={head.billDate} onChange={setH('billDate')} /></Field>
-            <Field label="GRN date"><TextInput type="date" value={head.grnDate} max={today()} onChange={setH('grnDate')} /></Field>
+            <Field label="GRN date" required><TextInput type="date" value={head.grnDate} max={today()} onChange={setH('grnDate')} /></Field>
             <Field label="Purpose">
               <EnumSelect options={GRN_PURPOSES} includeBlank={false} value={head.purpose} onChange={setH('purpose')} />
             </Field>

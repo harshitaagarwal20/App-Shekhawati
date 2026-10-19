@@ -83,11 +83,18 @@ before(async () => {
   maker = { userId: users[0].id, fullName: `F04 maker ${users[0].username}` };
   checker = { userId: users[1].id, fullName: `F04 checker ${users[1].username}` };
 
+  // One that can take goods: grn.service refuses a receipt against a PO that
+  // is not APPROVED, or is cancelled - and the newest seeded PO is pending.
   po = await prisma.purchaseOrder.findFirst({
-    where: { deletedAt: null, workflowState: { notIn: ['CANCELLED', 'REJECTED'] } },
+    where: {
+      deletedAt: null,
+      approvalStatus: 'APPROVED',
+      status: { not: 'CANCELLED' },
+      workflowState: { notIn: ['CANCELLED', 'REJECTED'] },
+    },
     orderBy: { createdAt: 'desc' },
   });
-  assert.ok(po, 'seed must provide a purchase order');
+  assert.ok(po, 'seed must provide an approved purchase order');
 
   // The order's figures as they stood, so `after()` can put them back exactly.
   poBefore = { receivedQty: po.receivedQty, payableQty: po.payableQty, status: po.status };
@@ -299,22 +306,18 @@ describe('F-04 - a posted receipt can be corrected', { skip: skipIfNoDb() }, () 
 });
 
 describe('F-04 - what a reversal refuses', { skip: skipIfNoDb() }, () => {
-  test('the person who raised it cannot also sign it', async () => {
+  // Maker-checker is switched off everywhere, reversals included, at the
+  // owner's instruction (domain/makerChecker.js). The person who raised a
+  // reversal may sign it, and signing it posts it. The trail still records
+  // that one person did both.
+  test('the person who raised it may also sign it - maker-checker is off', async () => {
     const grn = await receive({ qty: 6 });
     const rev = await raise(grn, 'Rate was taken from the previous bill by mistake.');
 
-    await assert.rejects(
-      () => revSvc.approve(rev.id, {}, maker),
-      (e) => /cannot also approve|maker and checker/i.test(e.message),
-      'this is the one document whose whole purpose is to undo the raiser\'s own work, so ' +
-        'self-approval would leave no maker-checker at all',
-    );
+    await revSvc.approve(rev.id, {}, maker);
 
-    // And the refusal left the ledger alone.
     const after = await prisma.grnReversal.findUnique({ where: { id: rev.id } });
-    assert.equal(after.postedAt, null, 'a refused approval must not have posted anything');
-
-    await revSvc.approve(rev.id, {}, checker);
+    assert.ok(after.postedAt, 'approving it posts it');
   });
 
   test('a receipt is reversed once', async () => {

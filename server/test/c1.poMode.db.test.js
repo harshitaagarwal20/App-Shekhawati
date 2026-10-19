@@ -149,10 +149,20 @@ before(async () => {
 });
 
 after(async () => {
+  const headerIds = (
+    await prisma.purchaseOrder.findMany({ where: { id: { in: createdPoIds } }, select: { headerId: true } })
+  ).map((r) => r.headerId);
   if (createdPoIds.length) {
     await prisma.approvalHistory.deleteMany({ where: { documentId: { in: createdPoIds } } });
     await prisma.purchaseOrder.deleteMany({ where: { id: { in: createdPoIds } } });
   }
+  // The PO sheets left empty: this file's own, and the raw inserts'.
+  await prisma.purchaseOrderHeader.deleteMany({
+    where: {
+      OR: [{ id: { in: headerIds } }, { poNo: { startsWith: 'C1-RAW-' } }],
+      lines: { none: {} },
+    },
+  });
   if (createdOrderIds.length) {
     await prisma.buyerOrder.deleteMany({ where: { id: { in: createdOrderIds } } });
   }
@@ -187,21 +197,30 @@ function insertPoRaw({
   const qty = new Prisma.Decimal(orderQty);
   const amount = qty.mul(rate).toDecimalPlaces(2);
 
+  // Every PO line belongs to a PO sheet (purchase_order_headers), and
+  // header_id is NOT NULL - without one the insert fails on that, before it
+  // reaches the constraint under test. Written in the same statement, so a
+  // refused line leaves no header behind.
   return prisma.$executeRaw`
+    WITH header AS (
+      INSERT INTO purchase_order_headers (id, po_no, po_date, vendor_id, created_at, updated_at)
+      VALUES (gen_random_uuid(), ${poId}, CURRENT_DATE, ${vendor.id}::uuid, now(), now())
+      RETURNING id
+    )
     INSERT INTO purchase_orders (
       id, po_id, po_date, item, category, uom, order_qty, rate, amount,
       excess_allowed, order_tolerance_pct, receipt_tolerance_pct,
       vendor_id, order_mode, computed_requirement_qty,
       status, approval_status, workflow_state, received_qty,
-      created_at, updated_at
-    ) VALUES (
+      created_at, updated_at, header_id
+    ) SELECT
       gen_random_uuid(), ${poId}, CURRENT_DATE, 'Fabric', 'FABRIC', 'Mtrs',
       ${qty}, ${new Prisma.Decimal(rate)}, ${amount},
       ${new Prisma.Decimal(excessAllowed)}, 0.03, 0.02,
       ${vendor.id}::uuid, ${orderMode}::"PoOrderMode", ${new Prisma.Decimal(requirement)},
       'PENDING', 'PENDING', 'PENDING_APPROVAL', 0,
-      now(), now()
-    )`;
+      now(), now(), header.id
+      FROM header`;
 }
 
 /** Posts a PO against `order` (or `on`, for a case that wants a clean slate). */

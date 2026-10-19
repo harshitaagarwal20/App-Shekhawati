@@ -36,10 +36,11 @@
 
 import prisma, { notDeleted } from '../config/prisma.js';
 import { ApiError } from '../utils/ApiError.js';
-import { isBelowReorder } from './inventory.service.js';
+import { isBelowReorder, itemShortName } from './inventory.service.js';
 import { D, ageDays } from '../utils/figures.js';
 import { toCsv as writeCsv } from '../utils/csv.js';
 import { EXTRA_REPORTS } from './reports.extra.js';
+import { INVENTORY_ANALYSIS_REPORTS } from './reports.inventory.js';
 
 const ZERO = D(0);
 
@@ -186,64 +187,6 @@ export const REPORTS = {
     run: planningStatus,
   },
 
-  // -------------------------------------------------------------------------
-  //  PROCUREMENT
-  // -------------------------------------------------------------------------
-
-  'pending-quotations': {
-    title: 'Pending quotations',
-    description:
-      'Quotations awaiting the Director, with the competing rate for the same item so the ' +
-      'decision does not need a second screen.',
-    permission: 'VENDOR_QUOTATION.VIEW',
-    excelRef: 'Vendor Quotation-Approval',
-    category: 'PROCUREMENT',
-    filters: ['vendorId', 'orderId'],
-    columns: [
-      col('quotationNo', 'Quotation No'),
-      col('quotationDate', 'Date', 'date'),
-      col('vendorName', 'Vendor'),
-      col('item', 'Item'),
-      col('uom', 'UOM'),
-      col('qty', 'Qty', 'qty'),
-      col('rateQuoted', 'Rate', 'money'),
-      col('amount', 'Amount', 'money'),
-      col('orderNo', 'Order No'),
-      col('competingCount', 'Other quotes', 'qty'),
-      col('lowestRate', 'Lowest rate', 'money'),
-      col('isLowest', 'Is lowest'),
-      col('waitingDays', 'Waiting', 'qty'),
-    ],
-    run: pendingQuotations,
-  },
-
-  'pending-po-approvals': {
-    title: 'Pending PO approvals',
-    description:
-      'Purchase orders awaiting approval, and — where one is not ready to send — what it is ' +
-      'still missing.',
-    permission: 'PURCHASE_ORDER.VIEW',
-    excelRef: 'PO',
-    category: 'PROCUREMENT',
-    filters: ['vendorId', 'orderId'],
-    columns: [
-      col('poId', 'PO ID'),
-      col('poDate', 'Date', 'date'),
-      col('vendorName', 'Vendor'),
-      col('item', 'Item'),
-      col('orderQty', 'Order Qty', 'qty'),
-      col('rate', 'Rate', 'money'),
-      col('amount', 'Amount', 'money'),
-      col('orderNo', 'Order No'),
-      col('quotationNo', 'Quotation'),
-      col('rateMatchesQuote', 'Rate matches quote'),
-      col('readyToApprove', 'Ready'),
-      col('missing', 'Still needs'),
-      col('waitingDays', 'Waiting', 'qty'),
-    ],
-    run: pendingPoApprovals,
-  },
-
   'po-status': {
     title: 'PO status',
     description: 'Every purchase order against what has actually been received on it.',
@@ -312,9 +255,8 @@ export const REPORTS = {
     category: 'INVENTORY',
     filters: ['itemCategory', 'location'],
     columns: [
-      col('itemCode', 'Item Code'),
-      col('description', 'Description'),
-      col('itemCategory', 'Category'),
+      col('item', 'Item'),
+      col('colorCode', 'Colour'),
       col('location', 'Location'),
       col('uom', 'UOM'),
       col('qtyIn', 'Total in', 'qty'),
@@ -547,6 +489,9 @@ export const REPORTS = {
 
   // Cutting efficiency, stock valuation, ITC-04, TNA - see reports.extra.js.
   ...EXTRA_REPORTS,
+
+  // Supplier-wise stock, supplier yield, inward inspection - see reports.inventory.js.
+  ...INVENTORY_ANALYSIS_REPORTS,
 };
 
 // ===========================================================================
@@ -930,157 +875,6 @@ async function planningStatus(q) {
   };
 }
 
-async function pendingQuotations(q) {
-  const quotations = await prisma.vendorQuotation.findMany({
-    where: {
-      ...LIVE,
-      authorisationStatus: 'PENDING',
-      ...(q.vendorId ? { vendorId: q.vendorId } : {}),
-      ...(q.orderId ? { orderId: q.orderId } : {}),
-    },
-    orderBy: { quotationDate: 'asc' },
-    take: q.limit,
-    include: {
-      vendor: { select: { vendorName: true } },
-      order: { select: { orderNo: true } },
-    },
-  });
-
-  /**
-   * The competing rate for the same thing, so the approver does not need a
-   * second screen to see whether this is the cheapest quote on the table.
-   *
-   * -------------------------------------------------------------------------
-   *  ONE QUERY FOR EVERY SIBLING, NOT ONE PER QUOTATION
-   *
-   *  This used to run a `findMany` inside the row map - a round trip per
-   *  pending quotation to find the others quoting the same item. A busy
-   *  approval queue is exactly when this report is opened, so the cost grew
-   *  precisely when it was least wanted.
-   *
-   *  Every candidate is fetched once, keyed by item, and matched in memory.
-   *  The matching rule is unchanged, including its asymmetry: a quotation
-   *  raised against an order is compared only against that order's quotes,
-   *  while one with no order is compared against every quote for the item.
-   * -------------------------------------------------------------------------
-   */
-  const candidates = await prisma.vendorQuotation.findMany({
-    where: { ...LIVE, item: { in: [...new Set(quotations.map((qt) => qt.item))] } },
-    select: { id: true, item: true, orderId: true, rateQuoted: true },
-  });
-
-  const byItem = new Map();
-  for (const c of candidates) {
-    const bucket = byItem.get(c.item);
-    if (bucket) bucket.push(c);
-    else byItem.set(c.item, [c]);
-  }
-
-  const rows = quotations.map((qt) => {
-    const siblings = (byItem.get(qt.item) ?? []).filter(
-      (c) => c.id !== qt.id && (qt.orderId ? c.orderId === qt.orderId : true),
-    );
-    const rates = [D(qt.rateQuoted), ...siblings.map((s) => D(s.rateQuoted))];
-    const lowest = rates.reduce((a, r) => (r.lessThan(a) ? r : a), rates[0]);
-
-    return {
-      id: qt.id,
-      route: `/quotations/${qt.id}`,
-      quotationNo: qt.quotationNo,
-      quotationDate: qt.quotationDate,
-      vendorName: qt.vendor?.vendorName ?? null,
-      item: [qt.item, qt.subCategory, qt.accessoriesItem].filter(Boolean).join(' / '),
-      uom: qt.uom,
-      qty: D(qt.qty).toFixed(4),
-      rateQuoted: D(qt.rateQuoted).toFixed(4),
-      amount: D(qt.amount).toFixed(2),
-      orderNo: qt.order?.orderNo ?? null,
-      competingCount: String(siblings.length),
-      lowestRate: lowest.toFixed(4),
-      isLowest: lowest.equals(D(qt.rateQuoted)) ? 'Yes' : 'No',
-      waitingDays: String(ageDays(qt.quotationDate)),
-    };
-  });
-
-  return {
-    rows,
-    totals: {
-      quotations: rows.length,
-      amount: rows.reduce((a, r) => a.plus(D(r.amount)), ZERO).toFixed(2),
-      notLowest: rows.filter((r) => r.isLowest === 'No').length,
-    },
-  };
-}
-
-async function pendingPoApprovals(q) {
-  const pos = await prisma.purchaseOrder.findMany({
-    where: {
-      ...LIVE,
-      approvalStatus: 'PENDING',
-      status: { not: 'CANCELLED' },
-      ...(q.vendorId ? { vendorId: q.vendorId } : {}),
-      ...(q.orderId ? { orderId: q.orderId } : {}),
-    },
-    orderBy: { poDate: 'asc' },
-    take: q.limit,
-    include: {
-      vendor: { select: { vendorName: true } },
-      order: { select: { orderNo: true } },
-      quotation: { select: { quotationNo: true, rateQuoted: true } },
-    },
-  });
-
-  // The same completeness rule the approval endpoint enforces, reported here so
-  // a buyer can fix everything before opening the PO at all.
-  const requirements = [
-    ['address', 'delivery address', () => true],
-    ['hsnCode', 'HSN code', () => true],
-    ['gsm', 'GSM', (po) => po.item === 'Fabric'],
-    ['content', 'content', (po) => po.item === 'Fabric'],
-    ['colorCode', 'colour', (po) => po.item === 'Fabric'],
-    ['subCategory', 'sub-category', (po) => po.item === 'Fabric'],
-    ['accessoriesItem', 'accessory item', (po) => po.item === 'Accessories'],
-  ];
-
-  const rows = pos.map((po) => {
-    const missing = requirements
-      .filter(([field, , applies]) => applies(po) && !po[field])
-      .map(([, label]) => label);
-
-    return {
-      id: po.id,
-      route: `/purchase-orders/${po.id}`,
-      poId: po.poId,
-      poDate: po.poDate,
-      vendorName: po.vendor?.vendorName ?? null,
-      item: [po.item, po.subCategory, po.accessoriesItem].filter(Boolean).join(' / '),
-      orderQty: D(po.orderQty).toFixed(4),
-      rate: D(po.rate).toFixed(4),
-      amount: D(po.amount).toFixed(2),
-      orderNo: po.order?.orderNo ?? null,
-      quotationNo: po.quotation?.quotationNo ?? null,
-      rateMatchesQuote: !po.quotation
-        ? '— no quote'
-        : D(po.quotation.rateQuoted).equals(D(po.rate))
-          ? 'Yes'
-          : 'No',
-      readyToApprove: missing.length === 0 ? 'Yes' : 'No',
-      missing: missing.join(', ') || '—',
-      waitingDays: String(ageDays(po.poDate)),
-    };
-  });
-
-  return {
-    rows,
-    totals: {
-      purchaseOrders: rows.length,
-      amount: rows.reduce((a, r) => a.plus(D(r.amount)), ZERO).toFixed(2),
-      incomplete: rows.filter((r) => r.readyToApprove === 'No').length,
-      rateMismatches: rows.filter((r) => r.rateMatchesQuote === 'No').length,
-    },
-  };
-}
-
 async function poStatus(q) {
   const pos = await prisma.purchaseOrder.findMany({
     where: {
@@ -1253,7 +1047,8 @@ async function inventoryReport(q) {
       id: b.itemId,
       route: `/inventory/stock/ledger?itemId=${b.itemId}`,
       itemCode: b.item.itemCode,
-      description: b.item.description,
+      item: itemShortName(b.item),
+      colorCode: b.item.colorCode || null,
       itemCategory: b.item.itemCategory,
       location: b.location,
       uom: b.item.uom,

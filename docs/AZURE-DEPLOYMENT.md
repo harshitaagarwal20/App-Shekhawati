@@ -281,6 +281,7 @@ Create `client/public/staticwebapp.config.json` — `public/` is copied into
   "globalHeaders": {
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
+    "Content-Security-Policy": "frame-ancestors 'none'",
     "Referrer-Policy": "no-referrer"
   },
   "routes": [
@@ -294,6 +295,15 @@ Create `client/public/staticwebapp.config.json` — `public/` is copied into
 > no `sourceMappingURL` comment points a browser at them. Blocking them at the
 > edge closes the remaining gap: someone who guesses the filename gets nothing,
 > and you still have the maps in the build artifact.
+
+> **Why the two frame headers.** The screens carry Approve buttons, and a page
+> that another site can load in a frame can be overlaid and clicked through
+> without the user knowing (clickjacking). `X-Frame-Options: DENY` is the older
+> header and `frame-ancestors 'none'` the current one; browsers honour one or
+> the other, so send both. The API already sets the same pair, but the API's
+> headers do not cover the pages — the Static Web App serves those, and only
+> this file sets its headers. The app never frames itself, so `'none'` is safe.
+> Check after deploying: `curl -sI https://<your-site>/ | grep -i frame`.
 
 **✓ Check before moving on**
 
@@ -952,10 +962,11 @@ npm --workspace server run db:setup     # migrate deploy + seed
 npm --workspace server run verify:seed  # every cross-reference resolves
 ```
 
-Every seeded user is created with `mustChangePassword = true`, so the API
-refuses everything except the password-change endpoint until each person sets
-their own. **These are handover credentials, not production ones** — used once,
-then replaced.
+**These are handover credentials, not production ones** — used once, then
+replaced. The system no longer forces a password change at first sign-in (the
+feature was retired), so replacing them is a step for whoever hands the
+accounts over: each person sets their own from **Change Password** on first
+use, and the admin password is changed before go-live.
 
 Seeded accounts (full list in the [README](../README.md#seed-accounts)):
 `admin`, `dinesh` (Director), `vinay` (Planning GM), `ravi` and `maharaj`
@@ -1047,7 +1058,7 @@ each routed to a **named person**, not a shared inbox nobody reads:
 
 - [ ] `GET https://<api>/api/health` returns `{"status":"ok","database":"up"}`
 - [ ] The client loads over the custom domain and shows the login screen
-- [ ] `admin` can log in and is forced to change the password
+- [ ] `admin` can log in, and the seeded admin password has been changed from **Change Password**
 - [ ] After the change, the dashboard renders — this proves auth, RBAC and the database read path in one action
 - [ ] A list screen's **Export CSV** downloads with the right filename (proves `Content-Disposition` survived CORS, which it only does because `exposedHeaders` names it)
 - [ ] `COMPANY_GSTIN` and `COMPANY_STATE_CODE` are the real ones — print one purchase order and check the tax split

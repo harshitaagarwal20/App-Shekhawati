@@ -45,6 +45,7 @@ import { ApiError, ERROR_CODES } from '../utils/ApiError.js';
 import { searchFilter } from '../utils/http.js';
 import { assertValueInList } from './masterList.service.js';
 import { nextNumber, peekNumber } from './documentNumber.service.js';
+import { istDate } from '../utils/dates.js';
 
 export const SORTABLE = [
   'scrutinyNo',
@@ -193,7 +194,7 @@ function assertOpen(scrutiny, what = 'changed') {
   throw new ApiError(
     409,
     `${scrutiny.scrutinyNo} was finalised as ${scrutiny.decision} on ` +
-      `${new Date(scrutiny.lockedAt ?? scrutiny.decidedAt).toISOString().slice(0, 10)} and cannot ` +
+      `${istDate(scrutiny.lockedAt ?? scrutiny.decidedAt)} and cannot ` +
       `be ${what}. A roll has been released or held on the strength of it. ` +
       'Record an amendment instead - it keeps what the record said before.',
     {

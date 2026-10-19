@@ -49,6 +49,7 @@ import {
   cancelCuttingIssueSchema,
   createCuttingIssueSchema,
   createExcessRuleSchema,
+  createFabricIssueBatchSchema,
   createFabricIssueSchema,
   createJobWorkSchema,
   createPlanApprovalSchema,
@@ -133,6 +134,14 @@ fabricIssueRoutes.post(
   can('FABRIC_ISSUE.CREATE'),
   validate({ body: createFabricIssueSchema }),
   c.createFabricIssue,
+);
+
+/** Several rolls in one go: all of them post, or none do. */
+fabricIssueRoutes.post(
+  '/batch',
+  can('FABRIC_ISSUE.CREATE'),
+  validate({ body: createFabricIssueBatchSchema }),
+  c.createFabricIssueBatch,
 );
 
 fabricIssueRoutes.get('/:id', can('FABRIC_ISSUE.VIEW'), validate({ params: idParam }), c.getFabricIssue);

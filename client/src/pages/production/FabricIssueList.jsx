@@ -116,7 +116,7 @@ export function FabricIssueList() {
               <TextInput
                 id="fi-search"
                 type="search"
-                placeholder="Search issue no, fabric, colour, issuer..."
+                placeholder="Search issue or batch no, fabric, colour, issuer..."
                 value={list.search}
                 onChange={(e) => list.setSearch(e.target.value)}
               />
@@ -198,7 +198,10 @@ export function FabricIssueList() {
                     key={f.id}
                     onClick={() => navigate(`/fabric-issues/${f.id}`)}
                   >
-                    <td className="code">{f.issueNo}</td>
+                    <td className="code">
+                      {f.issueNo}
+                      {f.batchNo && <div className="faint">{f.batchNo}</div>}
+                    </td>
                     <td className="nowrap">{fmtDate(f.issueDate)}</td>
                     <td className="code">{f.roll?.rollNo ?? '-'}</td>
                     <td>{f.fabricName ?? f.roll?.fabricName ?? '-'}</td>
@@ -283,7 +286,8 @@ export function FabricIssueDetail() {
   }
   if (!issue) return <Alert kind="error">{error || 'Fabric issue not found'}</Alert>;
 
-  const { movements, jobWorks, cuttingIssues } = issue;
+  const { movements, jobWorks, cuttingIssues, batch = [] } = issue;
+  const batchTotal = batch.reduce((sum, b) => sum + Number(b.fabricQtyIssued || 0), 0);
 
   return (
     <>
@@ -297,6 +301,7 @@ export function FabricIssueDetail() {
             {can('FABRIC_ISSUE.EXPORT') && (
               <button type="button" className="btn" onClick={() => navigate(`/print/fabric-issue/${issue.id}`)}>
                 {issue.purpose === 'DYEING' || issue.purpose === 'PRINTING' ? 'Print challan' : 'Print'}
+                {batch.length > 1 && ` (all ${batch.length} rolls)`}
               </button>
             )}
           </>
@@ -326,10 +331,10 @@ export function FabricIssueDetail() {
 
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-header">Issue</div>
         <div className="card-body">
           <DetailGrid>
             <Detail label="Issue No" value={issue.issueNo} mono />
+            {issue.batchNo && <Detail label="Batch No" value={issue.batchNo} mono />}
             <Detail label="Date" value={fmtDate(issue.issueDate)} />
             {issue.deliveryDate && <Detail label="Delivery Date" value={fmtDate(issue.deliveryDate)} />}
             <Detail label="Roll No" value={issue.roll?.rollNo} mono />
@@ -355,6 +360,58 @@ export function FabricIssueDetail() {
           </DetailGrid>
         </div>
       </div>
+
+      {/* The rolls posted with this one. Each is its own issue with its own
+          ledger entry; the batch is what they left the store as. */}
+      {batch.length > 1 && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div className="card-header">
+            <span>Issued together - batch {issue.batchNo}</span>
+            <span className="faint" style={{ fontWeight: 400, fontSize: 12 }}>
+              {batch.length} rolls, posted in one transaction
+            </span>
+          </div>
+          <TableWrap>
+            <table className="data">
+              <thead>
+                <tr>
+                  <th>Issue No</th>
+                  <th>Roll</th>
+                  <th className="num">Qty</th>
+                </tr>
+              </thead>
+              <tbody>
+                {batch.map((b) => (
+                  <tr
+                    key={b.id}
+                    className={b.id === issue.id ? '' : 'clickable'}
+                    onClick={() => b.id !== issue.id && navigate(`/fabric-issues/${b.id}`)}
+                  >
+                    <td className="code">
+                      {b.issueNo}
+                      {b.id === issue.id && <span className="faint"> (this one)</span>}
+                    </td>
+                    <td className="code">{b.roll?.rollNo}</td>
+                    <td className="num">
+                      {fmtNum(b.fabricQtyIssued)} <span className="faint">{b.uom}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colSpan={2} className="faint">
+                    Batch total
+                  </td>
+                  <td className="num">
+                    <strong>{fmtNum(batchTotal)}</strong>
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </TableWrap>
+        </div>
+      )}
 
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-header">

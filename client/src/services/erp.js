@@ -91,6 +91,8 @@ export const orders = {
   list: (params) => requestList({ method: 'GET', url: '/orders', params }),
   get: (id) => request({ method: 'GET', url: `/orders/${id}` }),
   options: () => request({ method: 'GET', url: '/orders/options' }),
+  /** The excess band and ceiling the excess rules give this buyer or order. */
+  excessPolicy: (params) => request({ method: 'GET', url: '/orders/excess-policy', params }),
   create: (body) => request({ method: 'POST', url: '/orders', data: body }),
   update: (id, body) => request({ method: 'PATCH', url: `/orders/${id}`, data: body }),
   amend: (id, body) => request({ method: 'POST', url: `/orders/${id}/amend`, data: body }),
@@ -191,6 +193,9 @@ export const plannings = {
    * save runs - the browser never adds up a plan and decides for itself.
    */
   preview: (body) => request({ method: 'POST', url: '/plannings/preview', data: body }),
+
+  /** Fabric on hand, at job workers and still to arrive, for one style of an order. */
+  fabricStock: (params) => request({ method: 'GET', url: '/plannings/fabric-stock', params }),
 };
 
 // --- Vendor Quotations ------------------------------------------------------
@@ -453,6 +458,12 @@ export const inventory = {
   /** Grade a roll's shade band and dye lot. Closed once the roll has been cut from. */
   markRollShade: (id, body) =>
     request({ method: 'PATCH', url: `/inventory/rolls/${id}/shade`, data: body }),
+  /** Record a roll's inward inspection after the GRN. Records only; never holds the roll. */
+  inspectRoll: (id, body) =>
+    request({ method: 'PATCH', url: `/inventory/rolls/${id}/inspection`, data: body }),
+  /** The same result over several rolls. One pass/fail per roll. */
+  inspectRollBatch: (body) =>
+    request({ method: 'POST', url: '/inventory/rolls/inspection', data: body }),
   /** Takes a wrongly-loaded opening balance roll back out. Only while it is untouched. */
   reverseOpeningBalance: (id, body) =>
     request({ method: 'POST', url: `/inventory/rolls/${id}/reverse-opening-balance`, data: body }),
@@ -477,6 +488,8 @@ export const fabricIssues = {
 
   /** Creating one POSTS it: the issue and its ledger OUT are one transaction. */
   create: (body) => request({ method: 'POST', url: '/fabric-issues', data: body }),
+  /** Several rolls in one go - all post under one batch number, or none do. */
+  createBatch: (body) => request({ method: 'POST', url: '/fabric-issues/batch', data: body }),
   update: (id, body) => request({ method: 'PATCH', url: `/fabric-issues/${id}`, data: body }),
   remove: (id) => request({ method: 'DELETE', url: `/fabric-issues/${id}` }),
 
@@ -588,6 +601,8 @@ export const cutPiecesReceipts = {
   /** Pieces in hand for an order: received from cutting, less issued to stitching. */
   summary: (params) => request({ method: 'GET', url: '/cut-pieces-receipts/summary', params }),
   nextNumber: () => request({ method: 'GET', url: '/cut-pieces-receipts/next-number' }),
+  /** The sample check before stitching: pieces checked and defects found. */
+  recordCheck: (id, body) => request({ method: 'POST', url: `/cut-pieces-receipts/${id}/check`, data: body }),
 };
 
 // --- Material Plan (C12) ----------------------------------------------------

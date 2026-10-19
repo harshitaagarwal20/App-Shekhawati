@@ -26,20 +26,17 @@ the build if any of it appears.
 ## 1. Entry
 
 ```
-   Login  ──►  JWT + refresh session  ──►  mustChangePassword?
-   (auth.service.js)                              │
-                                       yes ───────┴─────── no
-                                        │                   │
-                                        ▼                   ▼
-                              /change-password         Dashboard
-                       (the API refuses every           attention
-                        other route until this          approvals
-                        is done)                        the pipeline
-                                        │                   │
-                                        └───────────────────┘
+   Login  ──►  JWT + refresh session  ──►  Dashboard
+   (auth.service.js)                          attention
+                                              approvals
+                                              the pipeline
                                                   │
                                                   ▼
                                      sidebar filtered by permission
+
+   (The forced first password change is retired: no account is sent to
+    /change-password at sign-in. The screen stays, for a person who
+    chooses to change theirs.)
                                      (config/navigation.js)
 ```
 

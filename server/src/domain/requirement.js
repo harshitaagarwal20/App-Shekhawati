@@ -55,6 +55,7 @@
 
 import { Prisma } from '@prisma/client';
 import { ApiError } from '../utils/ApiError.js';
+import { istDate } from '../utils/dates.js';
 
 const D = (v) => new Prisma.Decimal(v ?? 0);
 
@@ -232,7 +233,7 @@ export function requirementFor({ style, order, line, on } = {}) {
       basis:
         `Style ${style.styleNo} has no BOM line for ${named ?? 'this material'}` +
         (line?.accessoriesItem ? ` / ${line.accessoriesItem}` : '') +
-        (at ? ` effective on ${at.toISOString().slice(0, 10)}` : '') +
+        (at ? ` effective on ${istDate(at)}` : '') +
         '. The BOM cannot bound a material it does not mention.',
     };
   }

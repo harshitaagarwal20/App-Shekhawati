@@ -318,9 +318,6 @@ export default function AppLayout() {
                           title={item.hint ? `${item.label} - ${item.hint}` : item.label}
                         >
                           <span className="nav-link-label">{item.label}</span>
-                          {/* What the screen is FOR, in plain words, for staff
-                              who do not know the trade name of the document. */}
-                          {item.hint && <span className="nav-link-hint">{item.hint}</span>}
                         </Link>
                       );
                     })}

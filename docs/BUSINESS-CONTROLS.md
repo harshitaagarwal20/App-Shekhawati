@@ -19,6 +19,9 @@ nothing.
 | Database | `UNIQUE (order_id, COALESCE(container_no,''), round)` on `plan_approvals` — one order cannot have two version 2s |
 | Service | Every `create()` checks for the clash first and raises a sentence naming the document that already holds the number, rather than letting a constraint violation surface |
 | Numbering | `nextNumber()` uses `UPDATE … RETURNING` inside the caller's transaction, so two concurrent documents cannot take the same number |
+| Numbering | **Typed buyer order numbers.** A number typed in the sequence's own format (`SO-00034` while the counter is at 33) moves the counter past it — `advancePast()` — so it is never offered to anyone else. A drawn number skips any number a document already holds — `nextFreeNumber()` — so the next person to save is never refused for a number they did not type |
+| Validator | A typed order number is letters and digits, with `-` `/` `.` `_` or spaces between them, and no `..` — `optionalDocNo()` in `common.validator.js`, mirrored on the order form. `../../x<b>` is refused with 422 |
+| Service | **Buyer names.** `buyer.service` refuses a second live buyer whose name matches an existing one ignoring case and runs of spaces — pickers show the name, so `Aussie Carry Pty` and `aussie carry pty` could not be told apart. Applies to the bulk importer too, which writes through the same service. Not yet a database constraint: existing duplicates have to be merged first |
 
 Numbers are **never generated in React**. `documentNumber.service.js` is the
 only place a document number comes from, and it is server-side by construction.
@@ -104,6 +107,14 @@ Covered by control 3, at both levels. The mobile screen additionally disables
 the Post button while the server's availability preview says no — a
 convenience, on top of a refusal that happens regardless.
 
+Fabric going **to a job worker** (dyeing, printing) also needs an approved job
+work order, and that order has to be for the **same buyer order** as the issue:
+
+| Where | What |
+|---|---|
+| Service | `fabricIssue.assertJobWorkAuthorised()` matches the roll, the process, the vendor **and the order**. Matching on roll and process alone let order A's dyeing job authorise fabric issued — and recorded — against order B. The refusal names the job and the order it was raised for. A job filed under no order still serves any order |
+| Service | `jobWork.create()` refuses a job whose named fabric issue was for a different order; `jobWork.update()` refuses moving a job to another order once fabric has gone out on it |
+
 ---
 
 ## 8. PO approval without required information
@@ -114,7 +125,7 @@ convenience, on top of a refusal that happens regardless.
 | Behaviour | Reports **every** missing field at once, so a buyer is not sent round the loop |
 | Service | Approval is also refused when the PO's quotation is no longer approved |
 | API | `editable.missingForApproval` tells the screen what is still needed |
-| Report | *Pending PO approvals* has a "Ready" column and a "Still needs" column |
+| Screen | Purchase orders awaiting approval are listed on the Approvals queue |
 
 An approved PO is an instruction sent to a vendor. A vendor cannot act on one
 that does not say where to deliver or what the tax code is.
@@ -157,6 +168,7 @@ about.
 | Database | `excess_approvals_only_approved_is_consumed`, plus four CHECKs on the derived figures |
 | Configurable | Every threshold is a row in `excess_rules`. No percentage is compiled into the application |
 | Error codes | `EXCESS_APPROVAL_REQUIRED`, `EXCESS_BEYOND_CEILING` |
+| Service | **Cut pieces receipts.** The good pieces received for an order and style, across every receipt, may not pass what could ever go to stitching: the planned pieces (the order lines' ceiling where nothing is planned yet) plus the hard ceiling of the `CUTTING_ISSUE` excess rule — 1,050 on a 1,000-piece plan with the seeded 5%. Checked inside the receipt's transaction on create and on correction, so a mistyped 5,000 is refused at the receipt rather than surfacing later as a Cutting Issue that cannot be posted. A rule with no ceiling sets no limit here |
 
 GRN over-receipts are the one deliberate exception: the goods are physically in
 the yard, so they are **recorded** rather than refused — but never silently. The

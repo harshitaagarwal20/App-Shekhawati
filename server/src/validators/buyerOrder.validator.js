@@ -9,7 +9,7 @@
  */
 
 import { z } from 'zod';
-import { decimal, fraction, isoDate, listQuery, optionalText, uuid } from './common.validator.js';
+import { decimal, fraction, isoDate, listQuery, optionalDocNo, optionalText, uuid } from './common.validator.js';
 
 /**
  * An order is counted in finished pieces, and there is no half a bag. The
@@ -77,7 +77,7 @@ const commercialTerms = {
 const orderBody = z.object({
   /// Excel: "Order No" (Manual) - "Buyer PO num is their order no".
   /// Left blank, the server draws one from the BUYER_ORDER sequence.
-  orderNo: optionalText(40),
+  orderNo: optionalDocNo(40),
   /// Excel: "Order Date" (Auto) - defaults to today.
   orderDate: isoDate.optional(),
   /// Excel: "Item Description" (Text) - defaults to the style description.
@@ -128,15 +128,18 @@ const orderBody = z.object({
   excessJustification: optionalText(2000),
 });
 
+/*
+ * No justification rule here. Whether an excess needs one depends on the
+ * buyer's excess band - inside it the excess is granted on entry and there is
+ * nobody to persuade - and the band is data, so buyerOrder.service.js decides.
+ * A blanket "any excess needs a justification" here refused a 2% order the
+ * service and the form both accept.
+ */
 export const createOrderSchema = orderBody
   .refine((d) => (d.lines?.length ?? 0) > 0 || (Boolean(d.styleId) && d.orderQty != null), {
     message: 'An order needs at least one style and quantity',
     path: ['lines'],
-  })
-  .refine(
-  (d) => !d.excessPct || Number(d.excessPct) === 0 || Boolean(d.excessJustification),
-  { message: 'A justification is required when an excess is requested', path: ['excessJustification'] },
-);
+  });
 
 /** Every field optional on edit; the service decides what may actually move. */
 export const updateOrderSchema = orderBody.partial();

@@ -35,12 +35,13 @@ export const listFabricIssues = asyncHandler(async (req, res) => {
     defaultSort: 'issueDate',
     defaultDir: 'desc',
   });
-  const { purpose, status, orderId, styleId, rollId, vendorId, employeeId, dateFrom, dateTo } =
+  const { purpose, status, orderId, styleId, rollId, vendorId, employeeId, dateFrom, dateTo, batchNo } =
     req.query;
   return okListWithTotals(
     res,
     await fabricIssue.list({
       ...q,
+      batchNo,
       purpose,
       status,
       orderId,
@@ -61,6 +62,11 @@ export const getFabricIssue = asyncHandler(async (req, res) =>
 /** Issue and stock ledger OUT, in one transaction. 201, because it posted. */
 export const createFabricIssue = asyncHandler(async (req, res) =>
   ok(res, await fabricIssue.create(req.body, who(req)), 201),
+);
+
+/** Several rolls, one transaction, one batch number. 201, because it posted. */
+export const createFabricIssueBatch = asyncHandler(async (req, res) =>
+  ok(res, await fabricIssue.createBatch(req.body, who(req)), 201),
 );
 
 export const updateFabricIssue = asyncHandler(async (req, res) =>

@@ -6,12 +6,14 @@
  * it actually gets asked.
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useResourceList } from '../../hooks/useResourceList.js';
 import { useOptionalColumns } from '../../hooks/useOptionalColumns.js';
-import { inventory as invApi } from '../../services/erp.js';
+import { inventory as invApi, vendors as vendorsApi } from '../../services/erp.js';
+import { loadFailed } from '../../services/loadFailures.js';
+import { loadFabricItems } from '../reports/Reports.jsx';
 import {
   ColumnMenu,
   Alert,
@@ -22,8 +24,10 @@ import {
   Modal,
   PageHeader,
   Pagination,
+  RecordSelect,
   SortableTh,
   Spinner,
+  StatusBadge,
   TextArea,
   TextInput,
 } from '../../components/ui.jsx';
@@ -58,6 +62,12 @@ const STAGES = [
 /** Stages where the roll is not usable, so the row reads as unavailable. */
 const HELD_STAGES = new Set(['SCRUTINY_HOLD', 'REJECTED']);
 
+const INSPECTION = [
+  { value: 'PENDING', label: 'Awaiting inspection' },
+  { value: 'PASSED', label: 'Passed' },
+  { value: 'FAILED', label: 'Failed' },
+];
+
 /**
  * What this register can show, and what it shows unasked.
  *
@@ -79,6 +89,7 @@ const COLUMNS = [
   { key: 'balance', label: 'Balance' },
   { key: 'stage', label: 'Stage' },
   { key: 'location', label: 'Location' },
+  { key: 'inspection', label: 'Inspection', optional: true },
   { key: 'grn', label: 'GRN', optional: true },
   { key: 'po', label: 'PO', optional: true },
   { key: 'order', label: 'Order', optional: true },
@@ -91,10 +102,24 @@ export default function RollList() {
   const cols = useOptionalColumns('rolls', COLUMNS);
   const canReverseOpeningBalance = can('FABRIC_ROLL.CREATE');
 
+  const canInspect = can('FABRIC_ROLL.EDIT');
+
   const [selected, setSelected] = useState(() => new Set());
   const [reversing, setReversing] = useState(false);
+  const [inspecting, setInspecting] = useState(false);
   const [banner, setBanner] = useState(null);
+  const [vendorOptions, setVendorOptions] = useState([]);
+  const [itemOptions, setItemOptions] = useState([]);
 
+  useEffect(() => {
+    vendorsApi.options().then(setVendorOptions).catch(loadFailed(setVendorOptions, 'vendors'));
+    loadFabricItems().then(setItemOptions);
+  }, []);
+
+  /*
+   * `vendorId` and `inspectionStatus` are filters so the Inventory Analysis
+   * screen can link a supplier, or the inspection queue, straight here.
+   */
   const list = useResourceList((params) => invApi.rolls(params), {
     defaultSort: 'rollNo',
     defaultDir: 'asc',
@@ -102,10 +127,29 @@ export default function RollList() {
       stage: '',
       location: '',
       inStockOnly: '',
+      vendorId: '',
+      itemId: '',
+      inspectionStatus: '',
     },
   });
 
-  const eligibleRows = canReverseOpeningBalance ? list.rows.filter(reversible) : [];
+  /*
+   * ONE CHECKBOX COLUMN, TWO JOBS.
+   *
+   * Filtered to rolls awaiting inspection, the boxes select rolls to pass or
+   * fail in one go - a GRN's worth at a time. Otherwise they select untouched
+   * opening-balance rolls to reverse, as before. The selection is cleared when
+   * the job changes so a box ticked for one is never acted on by the other.
+   */
+  const inspectMode = canInspect && list.filters.inspectionStatus === 'PENDING';
+  const canSelect = inspectMode || canReverseOpeningBalance;
+  const isEligible = inspectMode ? (r) => r.inspectionStatus === 'PENDING' : reversible;
+
+  useEffect(() => {
+    setSelected(new Set());
+  }, [inspectMode]);
+
+  const eligibleRows = canSelect ? list.rows.filter(isEligible) : [];
   const allEligibleSelected = eligibleRows.length > 0 && eligibleRows.every((r) => selected.has(r.id));
 
   function toggleOne(id) {
@@ -134,7 +178,12 @@ export default function RollList() {
         title="Fabric Rolls"
         actions={
           <>
-            {canReverseOpeningBalance && selected.size > 0 && (
+            {inspectMode && selected.size > 0 && (
+              <button type="button" className="btn btn-primary" onClick={() => setInspecting(true)}>
+                Record inspection ({selected.size})
+              </button>
+            )}
+            {!inspectMode && canReverseOpeningBalance && selected.size > 0 && (
               <button type="button" className="btn btn-danger" onClick={() => setReversing(true)}>
                 Reverse opening balance ({selected.size})
               </button>
@@ -185,6 +234,38 @@ export default function RollList() {
             />
           </Field>
 
+          <Field label="Supplier" htmlFor="roll-f-vendor">
+            <RecordSelect
+              id="roll-f-vendor"
+              options={vendorOptions}
+              getLabel={(v) => v.vendorName}
+              placeholder="All suppliers"
+              value={list.filters.vendorId ?? ''}
+              onChange={(e) => list.setFilter('vendorId', e.target.value)}
+            />
+          </Field>
+
+          <Field label="Item" htmlFor="roll-f-item">
+            <RecordSelect
+              id="roll-f-item"
+              options={itemOptions}
+              getLabel={(o) => `${o.description} (${o.itemCode})`}
+              placeholder="All items"
+              value={list.filters.itemId ?? ''}
+              onChange={(e) => list.setFilter('itemId', e.target.value)}
+            />
+          </Field>
+
+          <Field label="Inspection" htmlFor="roll-f-insp">
+            <EnumSelect
+              id="roll-f-insp"
+              options={INSPECTION}
+              placeholder="Any"
+              value={list.filters.inspectionStatus ?? ''}
+              onChange={(e) => list.setFilter('inspectionStatus', e.target.value)}
+            />
+          </Field>
+
           <div className="field">
             <label htmlFor="roll-f-stock">Show</label>
             <EnumSelect
@@ -201,15 +282,15 @@ export default function RollList() {
           <table className="data">
             <thead>
               <tr>
-                {canReverseOpeningBalance && (
+                {canSelect && (
                   <th style={{ width: 28 }}>
                     <input
                       type="checkbox"
                       checked={allEligibleSelected}
                       onChange={toggleAllEligible}
                       disabled={eligibleRows.length === 0}
-                      aria-label="Select all opening-balance rolls on this page"
-                      title="Selects every roll on this page eligible for opening-balance reversal"
+                      aria-label={inspectMode ? 'Select all rolls awaiting inspection on this page' : 'Select all opening-balance rolls on this page'}
+                      title={inspectMode ? 'Selects every roll on this page awaiting inspection' : 'Selects every roll on this page eligible for opening-balance reversal'}
                     />
                   </th>
                 )}
@@ -224,6 +305,7 @@ export default function RollList() {
                 <SortableTh field="balanceQty" label="Balance" sortBy={list.sortBy} sortDir={list.sortDir} onSort={list.toggleSort} className="num" />
                 <SortableTh field="stage" label="Stage" sortBy={list.sortBy} sortDir={list.sortDir} onSort={list.toggleSort} />
                 <th>Location</th>
+                {cols.show('inspection') && <th>Inspection</th>}
                 {cols.show('grn') && <th>GRN</th>}
                 {cols.show('po') && <th>PO</th>}
                 {cols.show('order') && <th>Order</th>}
@@ -233,7 +315,7 @@ export default function RollList() {
             <tbody>
               {list.loading && (
                 <tr>
-                  <td colSpan={cols.colSpan + (canReverseOpeningBalance ? 1 : 0)} className="loading-row">
+                  <td colSpan={cols.colSpan + (canSelect ? 1 : 0)} className="loading-row">
                     <Spinner label="Loading rolls..." />
                   </td>
                 </tr>
@@ -241,7 +323,7 @@ export default function RollList() {
 
               {!list.loading && list.rows.length === 0 && (
                 <tr>
-                  <td colSpan={cols.colSpan + (canReverseOpeningBalance ? 1 : 0)}>
+                  <td colSpan={cols.colSpan + (canSelect ? 1 : 0)}>
                     <EmptyState
                       title="No rolls found"
                       message="Rolls are created when a fabric GRN is posted."
@@ -257,15 +339,15 @@ export default function RollList() {
                     onClick={() => navigate(`/inventory/rolls/${r.id}`)}
                     className={`clickable ${r.isHeld || HELD_STAGES.has(r.stage) ? 'row-bad' : ''}`}
                   >
-                    {canReverseOpeningBalance && (
+                    {canSelect && (
                       <td onClick={(e) => e.stopPropagation()}>
                         <input
                           type="checkbox"
                           checked={selected.has(r.id)}
                           onChange={() => toggleOne(r.id)}
-                          disabled={!reversible(r)}
-                          aria-label={`Select ${r.rollNo} for opening-balance reversal`}
-                          title={reversible(r) ? undefined : 'Not an untouched opening-balance roll'}
+                          disabled={!isEligible(r)}
+                          aria-label={`Select ${r.rollNo} for ${inspectMode ? 'inspection' : 'opening-balance reversal'}`}
+                          title={isEligible(r) ? undefined : inspectMode ? 'Already inspected' : 'Not an untouched opening-balance roll'}
                         />
                       </td>
                     )}
@@ -296,6 +378,11 @@ export default function RollList() {
                     </td>
                     <td>{fmtEnum(r.stage)}</td>
                     <td>{r.location ?? '-'}</td>
+                    {cols.show('inspection') && (
+                      <td>
+                        {r.inspectionStatus ? <StatusBadge status={r.inspectionStatus} /> : <span className="faint">-</span>}
+                      </td>
+                    )}
                     {cols.show('grn') && <td className="code">{r.grn?.grnNo ?? '-'}</td>}
                     {cols.show('po') && <td className="code">{r.poId ?? '-'}</td>}
                     {cols.show('order') && <td className="code">{r.orderNo ?? '-'}</td>}
@@ -314,6 +401,22 @@ export default function RollList() {
           onPageSize={list.setPageSize}
         />
       </div>
+
+      {inspecting && (
+        <InspectBatchDialog
+          count={selected.size}
+          onCancel={() => setInspecting(false)}
+          onSettled={async (inspectedIds) => {
+            setSelected((prev) => {
+              const next = new Set(prev);
+              for (const id of inspectedIds) next.delete(id);
+              return next;
+            });
+            await list.reload();
+          }}
+          run={(body) => invApi.inspectRollBatch({ rollIds: [...selected], ...body })}
+        />
+      )}
 
       {reversing && (
         <ReverseBatchDialog
@@ -426,6 +529,106 @@ function ReverseBatchDialog({ count, onCancel, onSettled, run }) {
                     {report.failed.map((f) => (
                       <tr key={f.rollId}>
                         <td className="code">{f.rollNo}</td>
+                        <td className="muted">{f.message}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </TableWrap>
+            )}
+          </>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+/**
+ * One inspection result over the selected rolls - "this GRN's rolls all
+ * passed". Measurements are per roll and are recorded on the roll itself.
+ */
+function InspectBatchDialog({ count, onCancel, onSettled, run }) {
+  const [status, setStatus] = useState('PASSED');
+  const [remarks, setRemarks] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [report, setReport] = useState(null);
+
+  async function go() {
+    setBusy(true);
+    setError('');
+    try {
+      const r = await run({ status, remarks: remarks || undefined });
+      setReport(r);
+      await onSettled(r.inspected.map((x) => x.rollId));
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal
+      title={`Record inspection on ${count} roll(s)`}
+      size="narrow"
+      onClose={onCancel}
+      footer={
+        <>
+          <button type="button" className="btn" onClick={onCancel} disabled={busy}>
+            {report ? 'Close' : 'Cancel'}
+          </button>
+          {!report && (
+            <button type="button" className="btn btn-primary" onClick={go} disabled={busy}>
+              {busy ? 'Saving...' : `Mark ${count} roll(s) ${status === 'PASSED' ? 'passed' : 'failed'}`}
+            </button>
+          )}
+        </>
+      }
+    >
+      <div className="modal-body">
+        <Alert kind="error">{error}</Alert>
+
+        {!report && (
+          <>
+            <p style={{ marginTop: 0 }}>
+              Records the same result on every selected roll. To record a measured length, width,
+              GSM or faulty metres, open the roll and record it there. This does not hold or
+              release any roll.
+            </p>
+            <Field label="Result" required>
+              <EnumSelect
+                options={[
+                  { value: 'PASSED', label: 'Passed' },
+                  { value: 'FAILED', label: 'Failed' },
+                ]}
+                includeBlank={false}
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+              />
+            </Field>
+            <Field label="Remarks">
+              <TextArea rows={2} value={remarks} onChange={(e) => setRemarks(e.target.value)} />
+            </Field>
+          </>
+        )}
+
+        {report && (
+          <>
+            <Alert kind={report.failed.length ? 'warning' : 'success'}>
+              {report.inspected.length} of {count} recorded.
+              {report.failed.length > 0 && ` ${report.failed.length} could not be.`}
+            </Alert>
+            {report.failed.length > 0 && (
+              <TableWrap>
+                <table className="data">
+                  <thead>
+                    <tr><th>Roll</th><th>Reason</th></tr>
+                  </thead>
+                  <tbody>
+                    {report.failed.map((f) => (
+                      <tr key={f.rollId}>
+                        <td className="code">{f.rollNo ?? '-'}</td>
                         <td className="muted">{f.message}</td>
                       </tr>
                     ))}

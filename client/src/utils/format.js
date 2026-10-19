@@ -95,7 +95,6 @@ export function toDateInput(value) {
   return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
-/** Today, in Asia/Kolkata, ready for an `<input type="date">`. */
 /**
  * "Now", in the shape `<input type="datetime-local">` wants: YYYY-MM-DDTHH:mm,
  * in the BROWSER'S OWN timezone rather than UTC.
@@ -114,6 +113,7 @@ export function nowLocalInput() {
   );
 }
 
+/** Today, in Asia/Kolkata, ready for an `<input type="date">`. */
 export function todayInput() {
   return toDateInput(new Date());
 }

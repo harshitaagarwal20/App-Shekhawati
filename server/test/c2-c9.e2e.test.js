@@ -45,6 +45,7 @@ import * as planApproval from '../src/services/planApproval.service.js';
 import * as cuttingChallan from '../src/services/cuttingChallan.service.js';
 import * as fabricIssue from '../src/services/fabricIssue.service.js';
 import * as cuttingIssue from '../src/services/cuttingIssue.service.js';
+import * as cutPieces from '../src/services/cutPiecesReceipt.service.js';
 import * as engine from '../src/services/approvalEngine.js';
 
 let live = false;
@@ -116,6 +117,7 @@ async function cleanUp() {
     `DELETE FROM stock_cost_layers WHERE source_document_no LIKE 'C2C9%'`,
     `DELETE FROM stock_ledger WHERE document_no LIKE 'C2C9%'`,
     `DELETE FROM cutting_issues WHERE challan_no LIKE 'C2C9%'`,
+    `DELETE FROM cut_pieces_receipts WHERE order_id IN (SELECT id FROM buyer_orders WHERE order_no LIKE 'C2C9%')`,
     `DELETE FROM fabric_issues WHERE issue_no LIKE 'C2C9%'`,
     `DELETE FROM cutting_challan_lines WHERE challan_id IN (SELECT id FROM cutting_challans WHERE challan_no LIKE 'C2C9%')`,
     `DELETE FROM cutting_challans WHERE challan_no LIKE 'C2C9%'`,
@@ -126,6 +128,10 @@ async function cleanUp() {
     `DELETE FROM plan_approval_lines WHERE plan_approval_id IN (SELECT id FROM plan_approvals WHERE approval_no LIKE 'C2C9%')`,
     `DELETE FROM plan_approvals WHERE approval_no LIKE 'C2C9%'`,
     `DELETE FROM grns WHERE grn_no LIKE 'C2C9%'`,
+    // The receipt and PO sheets their lines hang from: left behind, the next
+    // run's documents collide with them on number.
+    `DELETE FROM grn_headers WHERE NOT EXISTS (SELECT 1 FROM grns g WHERE g.header_id = grn_headers.id)
+        AND (grn_no LIKE 'C2C9%')`,
     `DELETE FROM gate_passes WHERE gate_pass_no LIKE 'C2C9%'`,
     // Orphaned cache rows: a stock_balances row with no movements behind it
     // is drift by definition, not data. Deleting the ledger rows above leaves
@@ -141,6 +147,8 @@ async function cleanUp() {
       )`,
     `DELETE FROM fabric_rolls WHERE roll_no LIKE 'C2C9%'`,
     `DELETE FROM purchase_orders WHERE po_id LIKE 'C2C9%'`,
+    `DELETE FROM purchase_order_headers WHERE po_no LIKE 'C2C9%'
+        AND NOT EXISTS (SELECT 1 FROM purchase_orders p WHERE p.header_id = purchase_order_headers.id)`,
     `DELETE FROM plannings WHERE plan_no LIKE 'C2C9%'`,
     `DELETE FROM excess_approvals WHERE document_no LIKE 'C2C9%'`,
     `DELETE FROM buyer_orders WHERE order_no LIKE 'C2C9%'`,
@@ -435,6 +443,7 @@ describe('E2E - GRN and the ledger', () => {
 
     const roll = await prisma.fabricRoll.findFirst({ where: { rollNo: 'C2C9-ROLL-1' } });
     made.roll = roll.id;
+    assert.equal(roll.inspectionStatus, 'PENDING', 'every received roll waits for inward inspection');
 
     assert.equal(await onHand(made.item, 'MAIN STORE'), 1000, 'LEDGER: 1000 in the main store');
   });
@@ -535,11 +544,12 @@ describe('E2E - job work', () => {
     assert.equal(row.stockPostedAt, null, 'raising the order moves no stock');
   });
 
-  test('C3: the maker cannot approve their own job work order', { skip: skipIfNoDb() }, async () => {
+  // Maker-checker is switched off (domain/makerChecker.js); what still stands
+  // between a raised order and fabric leaving is that it is submitted first.
+  test('C3: a job work order cannot be approved before it is submitted', { skip: skipIfNoDb() }, async () => {
     await assert.rejects(
-      jobWork.approveJob(made.job, {}, maker),
-      /cannot also approve it/i,
-      'maker-checker',
+      jobWork.approveJob(made.job, {}, checker),
+      /is draft and cannot move to approved/i,
     );
   });
 
@@ -602,6 +612,35 @@ describe('E2E - job work', () => {
       'C3: but excluded from available-for-issue',
     );
     assert.equal(Number(summary.withJobWorkerQty), 500);
+  });
+
+  test("C3: one order's job work cannot authorise fabric issued against another order", { skip: skipIfNoDb() }, async () => {
+    // The job is for made.order. Same roll, same process, same vendor - but a
+    // different buyer order. Matching on roll and process alone let this through
+    // and booked the fabric to the wrong order.
+    const other = await prisma.buyerOrder.findFirst({
+      where: { orderNo: 'B9641IS', deletedAt: null },
+      select: { id: true, styleId: true },
+    });
+    assert.ok(other, 'seeded order B9641IS must exist');
+    await assert.rejects(
+      fabricIssue.create(
+        {
+          issueNo: 'C2C9-FI-WRONG-ORDER',
+          issueDate: '2026-08-27',
+          rollId: made.roll,
+          purpose: 'DYEING',
+          orderId: other.id,
+          styleId: other.styleId,
+          vendorId: made.dyerId,
+          issuedByName: 'E2E Store',
+          fabricQtyIssued: '1',
+        },
+        maker,
+      ),
+      /was raised for .*not B9641IS/i,
+    );
+    assert.equal(await prisma.fabricIssue.count({ where: { issueNo: 'C2C9-FI-WRONG-ORDER' } }), 0);
   });
 
   test('C3: the job work order moved to POSTED with the fabric', { skip: skipIfNoDb() }, async () => {
@@ -745,7 +784,7 @@ describe('E2E - plan approval', () => {
 // ===========================================================================
 
 describe('E2E - cutting challan and fabric issue', () => {
-  test('C5: a challan is raised against the approved plan and approved by a second person', { skip: skipIfNoDb() }, async () => {
+  test('C5: a challan is raised against the approved plan, submitted and approved', { skip: skipIfNoDb() }, async () => {
     const cc = await cuttingChallan.create(
       {
         challanNo: 'C2C9-CC-1',
@@ -772,9 +811,9 @@ describe('E2E - cutting challan and fabric issue', () => {
     made.challanLine = cc.lines[0].id;
 
     await assert.rejects(
-      cuttingChallan.approve(made.challan, {}, maker),
-      /cannot also approve it/i,
-      'maker-checker on the challan too',
+      cuttingChallan.approve(made.challan, {}, checker),
+      /is draft and cannot move to approved/i,
+      'a challan is submitted before it is approved',
     );
 
     await cuttingChallan.submit(made.challan, { submittedTo: 'Dinesh Sir' }, maker);
@@ -895,7 +934,48 @@ describe('E2E - cutting issue and remainder rollback', () => {
     );
   });
 
-  test('C6: posting runs ALL TEN checks and appends the ledger entries', { skip: skipIfNoDb() }, async () => {
+  test('only sample-checked cut pieces may go to stitching', { skip: skipIfNoDb() }, async () => {
+    const before = await cuttingIssue.preview({ orderId: made.order, cuttingPcsIssued: '80' });
+    const unchecked = before.verification.find((c) => c.code === 'PIECES_CHECKED');
+    assert.equal(unchecked.passed, false, 'no lot has been received and checked yet');
+
+    const receipt = await cutPieces.create(
+      { orderId: made.order, cuttingMasterName: 'E2E Cutter', pcsReceived: '100' },
+      maker,
+    );
+    assert.equal(receipt.checkStatus, 'PENDING');
+
+    // 4 defective in a sample of 10 is 40% - the lot fails and nothing is ready.
+    const failed = await cutPieces.recordCheck(
+      receipt.id,
+      { sampleQty: '10', defects: [{ panel: 'Front', defectType: 'Hole', qty: '4' }] },
+      checker,
+    );
+    assert.equal(failed.checkStatus, 'FAILED');
+    assert.equal(Number(failed.summary.pcsReadyToIssue), 0);
+
+    // Sorted and re-checked: none in 10 - passes, all 100 ready.
+    const passed = await cutPieces.recordCheck(receipt.id, { sampleQty: '10', defects: [] }, checker);
+    assert.equal(passed.checkStatus, 'PASSED');
+    assert.equal(Number(passed.summary.pcsReadyToIssue), 100);
+  });
+
+  test('a receipt cannot count in more pieces than the order can ever send to stitching', { skip: skipIfNoDb() }, async () => {
+    // 1000 planned, 5% hard ceiling on the CUTTING_ISSUE rule: 1050 at most.
+    // 100 are already in; 5000 more is a slip of the keyboard, refused here
+    // rather than surfacing later as a Cutting Issue that cannot be posted.
+    await assert.rejects(
+      cutPieces.create(
+        { orderId: made.order, cuttingMasterName: 'E2E Cutter', pcsReceived: '5000' },
+        maker,
+      ),
+      (e) => e.status === 400 && /can ever go to stitching/.test(e.message),
+    );
+    const receipts = await prisma.cutPiecesReceipt.count({ where: { orderId: made.order, deletedAt: null } });
+    assert.equal(receipts, 1, 'the refused receipt was not saved');
+  });
+
+  test('C6: posting runs ALL ELEVEN checks and appends the ledger entries', { skip: skipIfNoDb() }, async () => {
     const beforeStore = await onHand(made.item, 'MAIN STORE');
 
     const posted = await cuttingIssue.post(made.cuttingIssue, {}, checker);
@@ -929,10 +1009,11 @@ describe('E2E - cutting issue and remainder rollback', () => {
     assert.equal(entry.location, 'MAIN STORE');
   });
 
-  test('the ten checks all ran, and none short-circuited', { skip: skipIfNoDb() }, async () => {
+  test('the eleven checks all ran, and none short-circuited', { skip: skipIfNoDb() }, async () => {
     const checks = cuttingIssue.checklist();
-    assert.equal(checks.length, 10, 'nine original plus C6');
+    assert.equal(checks.length, 11, 'nine original, C6, and the cut pieces check');
     assert.ok(checks.some((c) => c.code === 'REMAINDER_RECONCILES'));
+    assert.ok(checks.some((c) => c.code === 'PIECES_CHECKED'));
   });
 });
 

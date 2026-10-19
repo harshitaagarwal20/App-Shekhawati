@@ -57,15 +57,11 @@ import { assertValueInList } from './masterList.service.js';
 import { nextNumber, peekNumber } from './documentNumber.service.js';
 import * as excess from './excess.service.js';
 import * as engine from './approvalEngine.js';
-// C6 - the cutting issue moves stock now. One ledger, one way in.
-import {
-  DEFAULT_LOCATION,
-  LOCATION,
-  assertRollNoAvailable,
-  postMovement,
-} from './inventory.service.js';
+import { piecesPosition } from './cutPiecesReceipt.service.js';
+// C6 - the fabric ledger legs, shared with the Cut Pieces Receipt.
+import { postCuttingFabric, reconcileFabric } from './cuttingFabric.service.js';
 import { panelCounts } from '../domain/panels.js';
-import { takeNewest } from '../domain/fifo.js';
+import { istDate } from '../utils/dates.js';
 
 export const SORTABLE = [
   'challanNo',
@@ -100,51 +96,16 @@ export const CHECKS = [
   ['EXCESS_AUTHORISED', 'Excess authorised'],
   /** C6 - issued = consumed + remainder + wastage, or the posting is refused. */
   ['REMAINDER_RECONCILES', 'Remainder reconciles'],
+  /** Only pieces from lots that passed their sample check go to stitching. */
+  ['PIECES_CHECKED', 'Cut pieces checked'],
 ];
 
 /**
- * C6 - THE FABRIC EQUATION. Pure, so it can be proved without a database.
- *
- *     issuedQty = consumedQty + remainderQty + wastageQty + fabricDamageQty
- *
- * WASTAGE IS STATED, NOT DERIVED. Computing it as "whatever is left over"
- * would make this identity hold by construction and therefore test nothing:
- * the arithmetic would absorb a mis-count in silence, which is the exact
- * failure the check exists to catch. The supervisor writes down what was
- * thrown away, and the four numbers either agree or the challan does not post.
- *
- * @returns {{balances: boolean, issued: string, accounted: string, differenceQty: string}}
+ * C6 - THE FABRIC EQUATION now lives in cuttingFabric.service.js, shared with
+ * the Cut Pieces Receipt, which is where the fabric is accounted for now.
+ * Re-exported so existing callers and tests keep their import.
  */
-export function reconcileFabric({
-  issuedQty, consumedQty, remainderQty, remnantQty, wastageQty, fabricDamageQty,
-}) {
-  const issued = D(issuedQty ?? 0);
-  const consumed = D(consumedQty ?? 0);
-  const remainder = D(remainderQty ?? 0);
-  // End-bits kept as remnants. The fifth term: they neither went back on the
-  // roll nor in the bin, and without a box of their own they were being
-  // entered as wastage and thrown away with it.
-  const remnant = D(remnantQty ?? 0);
-  const wastage = D(wastageQty ?? 0);
-  const fabricDamage = D(fabricDamageQty ?? 0);
-  const accounted = consumed.plus(remainder).plus(remnant).plus(wastage).plus(fabricDamage);
-  const difference = issued.minus(accounted);
-
-  return {
-    issued: issued.toFixed(4),
-    consumed: consumed.toFixed(4),
-    remainder: remainder.toFixed(4),
-    remnant: remnant.toFixed(4),
-    wastage: wastage.toFixed(4),
-    fabricDamage: fabricDamage.toFixed(4),
-    accounted: accounted.toFixed(4),
-    differenceQty: difference.toFixed(4),
-    balances: difference.isZero(),
-    /** Which way it is out, so the message can say "short" or "over". */
-    unaccountedQty: difference.greaterThan(0) ? difference.toFixed(4) : '0.0000',
-    overAccountedQty: difference.isNegative() ? difference.negated().toFixed(4) : '0.0000',
-  };
-}
+export { reconcileFabric };
 
 /**
  * PLANNED VS ACTUAL CONSUMPTION. Pure, so it can be proved without a database.
@@ -457,7 +418,7 @@ export async function verify(input, tx = prisma) {
         ? 'Cannot be checked - there is no plan approval.'
         : approvalOk
           ? `Version ${approval.round} was approved on ` +
-            `${new Date(approval.approvedDate).toISOString().slice(0, 10)}` +
+            `${istDate(approval.approvedDate)}` +
             (approval.approvedByName ? ` by ${approval.approvedByName}.` : '.')
           : `Version ${approval.round} is ${approval.approvalStatus.toLowerCase()}` +
             (approval.approvalStatus === 'REJECTED'
@@ -487,6 +448,10 @@ export async function verify(input, tx = prisma) {
   const reconciliation = verifyRemainder(input);
   results.push(reconciliation.result);
 
+  // --- 11. Cut pieces checked before stitching ----------------------------
+  const pieces = await verifyPiecesChecked(tx, { order, input, cutting });
+  results.push(pieces.result);
+
   const failures = results.filter((r) => !r.passed);
 
   return {
@@ -503,7 +468,73 @@ export async function verify(input, tx = prisma) {
       excess: quantity.assessment,
       permittedQty: quantity.permittedQty,
       reconciliation: reconciliation.figures,
+      pieces: pieces.position,
     },
+  };
+}
+
+/**
+ * Check 11. ONLY CHECKED PIECES GO TO STITCHING.
+ *
+ * Every lot the cutting master hands over is sample-checked on its Cut Pieces
+ * Receipt. What may be issued is the pieces from PASSED lots, less the
+ * defective pieces pulled out of them, less what earlier challans already
+ * sent. A lot still waiting for its check, or one that failed it, contributes
+ * nothing - a hole found at the stitching machine has already cost a bag.
+ *
+ * Like check 10, a challan that has not stated its pieces yet has not reached
+ * this check rather than failing it.
+ */
+async function verifyPiecesChecked(tx, { order, input, cutting }) {
+  if (!order) {
+    return { position: null, result: check('PIECES_CHECKED', false, 'Cannot be checked - there is no order.') };
+  }
+
+  const position = await piecesPosition(tx, { orderId: order.id, excludeIssueId: input.excludeId });
+  const ready = D(position.pcsReadyToIssue);
+  const waiting = [
+    position.lotsPendingCheck > 0
+      ? `${D(position.pcsPendingCheck).toFixed(0)} pcs in ${position.lotsPendingCheck} lot(s) waiting for a sample check`
+      : null,
+    position.lotsFailedCheck > 0
+      ? `${D(position.pcsFailedCheck).toFixed(0)} pcs in ${position.lotsFailedCheck} lot(s) that failed and must be sorted and re-checked`
+      : null,
+  ].filter(Boolean);
+  const detail = {
+    pcsReadyToIssue: ready.toFixed(4),
+    pcsPendingCheck: position.pcsPendingCheck,
+    pcsFailedCheck: position.pcsFailedCheck,
+    cuttingNow: cutting.toFixed(4),
+  };
+
+  if (cutting.lte(0)) {
+    return {
+      position,
+      result: check(
+        'PIECES_CHECKED',
+        true,
+        `${ready.toFixed(0)} checked pieces are ready for stitching.` +
+          (waiting.length ? ` Not yet ready: ${waiting.join('; ')}.` : ''),
+        detail,
+      ),
+    };
+  }
+
+  const ok = cutting.lte(ready);
+  return {
+    position,
+    result: check(
+      'PIECES_CHECKED',
+      ok,
+      ok
+        ? `${cutting.toFixed(0)} of the ${ready.toFixed(0)} checked pieces ready for stitching.`
+        : `Only ${ready.lessThan(0) ? 0 : ready.toFixed(0)} checked pieces are ready for stitching; ` +
+            `${cutting.toFixed(0)} cannot be issued.` +
+            (waiting.length
+              ? ` Not yet ready: ${waiting.join('; ')}.`
+              : ' Receive and check the cut pieces on a Cut Pieces Receipt first.'),
+      { ...detail, field: 'cuttingPcsIssued' },
+    ),
   };
 }
 
@@ -532,9 +563,9 @@ function verifyRemainder(input) {
       result: check(
         'REMAINDER_RECONCILES',
         true,
-        'No fabric quantities have been entered yet, so there is nothing to reconcile. ' +
-          'They are required before this challan can be posted.',
-        { ...figures, notYetEntered: true },
+        'The fabric is accounted for on the Cut Pieces Receipt, where the pieces were counted ' +
+          'in - this challan moves no cloth.',
+        { ...figures, notYetEntered: true, accountedOnReceipt: true },
       ),
     };
   }
@@ -1274,7 +1305,7 @@ export async function post(id, input, actor) {
   if (existing.postedAt) {
     throw ApiError.conflict(
       `${existing.challanNo} was posted on ` +
-        `${new Date(existing.postedAt).toISOString().slice(0, 10)} and cannot be posted again.`,
+        `${istDate(existing.postedAt)} and cannot be posted again.`,
       { postedAt: existing.postedAt },
     );
   }
@@ -1285,25 +1316,15 @@ export async function post(id, input, actor) {
   const excessApprovalId = input?.excessApprovalId ?? existing.excessApprovalId ?? null;
 
   /**
-   * C6 - a challan that moves no cloth is not a cutting issue.
+   * FABRIC IS ACCOUNTED FOR ON THE CUT PIECES RECEIPT NOW.
    *
-   * The tenth check reports an unentered equation rather than failing it, so
-   * that a half-built draft does not show a red cross against a box nobody has
-   * reached yet. THIS is where the absence bites: posting requires the
-   * quantities, and requires them to balance.
+   * A cutting issue sends checked pieces to stitching. The cloth they were cut
+   * from came off the cutting floor when the pieces were counted in, so a
+   * challan normally carries no fabric figures and moves no stock. One drafted
+   * before that change, with figures already on it, still posts them - the
+   * tenth check holds it to the equation exactly as before.
    */
-  if (!D(existing.issuedQty).greaterThan(0)) {
-    throw ApiError.badRequest(
-      `${existing.challanNo} has no fabric quantities. Enter what came onto the cutting floor, ` +
-        'what was consumed, what is being returned and what was wasted before posting - the ' +
-        'four have to reconcile and the wastage is never inferred.',
-      {
-        field: 'issuedQty',
-        code: ERROR_CODES.VERIFICATION_FAILED,
-        required: ['issuedQty', 'consumedQty', 'remainderQty', 'wastageQty'],
-      },
-    );
-  }
+  const carriesFabric = D(existing.issuedQty).greaterThan(0);
 
   const posted = await prisma.$transaction(async (tx) => {
     // THE TEN CHECKS, on the transaction, against rows it has locked. Two
@@ -1382,7 +1403,9 @@ export async function post(id, input, actor) {
      * quantity of metres that nobody can trace to a receipt. That is what
      * `reuse the existing roll model` means in practice.
      */
-    const ledger = await postFabricMovements(tx, { issue: existing, verification, actor });
+    const ledger = carriesFabric
+      ? await postFabricMovements(tx, { issue: existing, verification, actor })
+      : { moved: false, itemId: null };
 
     // Planned vs actual, against the style's average AS IT STANDS TODAY, and
     // then frozen - the efficiency report reads these columns, not the style.
@@ -1461,236 +1484,36 @@ export async function post(id, input, actor) {
 }
 
 /**
- * C6 - THE LEDGER LEGS, written inside the posting transaction.
- *
- * ---------------------------------------------------------------------------
- *  NO STOCK BALANCE IS TOUCHED HERE.
- *
- *  Both movements go through `postMovement()`, which appends to the ledger and
- *  then RE-DERIVES the balance by aggregating it. Nothing in this function
- *  adds to or subtracts from a stored balance, which is why a stock
- *  reconciliation dry-run after a cutting issue reports zero differences.
- *
- *  WHERE THE FABRIC COMES FROM
- *
- *  The CUTTING FLOOR, not the main store. The Fabric Issue's second leg put it
- *  there. A challan whose fabric issue predates C3/C5 has no such leg - the
- *  cloth left stock entirely on that issue - and there is nothing on the
- *  cutting floor to take out. That is refused by name rather than silently
- *  skipped: posting without the ledger would be bypassing it.
- * ---------------------------------------------------------------------------
+ * C6 - THE LEDGER LEGS for a challan that carries fabric figures - one
+ * drafted before the fabric moved to the Cut Pieces Receipt. The legs
+ * themselves are written by the shared postCuttingFabric().
  *
  * @param {import('@prisma/client').Prisma.TransactionClient} tx
  */
 async function postFabricMovements(tx, { issue, verification, actor }) {
   const fabricIssue = verification.resolved.fabricIssue;
-
   if (!fabricIssue) {
     throw new ApiError(
       409,
-      `${issue.challanNo} names no fabric issue, so there is no cloth on the cutting floor to ` +
-        'account for. A cutting issue moves stock now: it has to say which issue put the fabric ' +
-        'there.',
+      `${issue.challanNo} carries fabric quantities but names no fabric issue, so there is no ` +
+        'cloth on the cutting floor to account for them against.',
       { code: ERROR_CODES.VERIFICATION_FAILED, details: { field: 'fabricIssueId' } },
     );
   }
-
-  const roll = await tx.fabricRoll.findUnique({
-    where: { id: fabricIssue.roll?.id ?? fabricIssue.rollId },
-    include: { inventoryItem: { select: { id: true, itemCategory: true } } },
-  });
-
-  if (!roll?.inventoryItemId) {
-    throw ApiError.conflict(
-      `Roll ${roll?.rollNo ?? ''} is not linked to a stock item, so the cutting movements could ` +
-        'not be written to the ledger.',
-      { code: ERROR_CODES.VERIFICATION_FAILED },
-    );
-  }
-
-  const from = issue.cuttingLocation ?? 'CUTTING FLOOR';
-
-  // A fabric issue raised before the in-process locations existed left nothing
-  // at the cutting floor to draw down. Say so, rather than posting a challan
-  // with no ledger behind it.
-  if (!fabricIssue.inProcessLocation) {
-    throw new ApiError(
-      409,
-      `Fabric issue ${fabricIssue.issueNo} predates the cutting-floor stock location, so there ` +
-        `is no balance at ${from} for this challan to consume. Raise a fresh fabric issue ` +
-        'against an approved cutting challan and post against that.',
-      {
-        code: ERROR_CODES.VERIFICATION_FAILED,
-        details: { field: 'fabricIssueId', issueNo: fabricIssue.issueNo, legacyIssue: true },
-      },
-    );
-  }
-
-  const consumed = D(issue.consumedQty);
-  const wastage = D(issue.wastageQty);
-  const fabricDamage = D(issue.fabricDamageQty);
-  const remainder = D(issue.remainderQty);
-  const remnant = D(issue.remnantQty);
-
-  const snapshot = {
-    itemCategory: roll.inventoryItem?.itemCategory ?? 'Fabric',
-    colorCode: roll.colorCode,
-    gsm: roll.gsm,
-    content: roll.content,
-    uom: roll.uom,
-  };
-
-  // ---- OUT: EVERYTHING that came onto the floor for this challan ---------
-  //
-  //     OUT (cutting floor) = consumed + wastage + fabric damage + remainder = issuedQty
-  //     IN  (main store)    = remainder
-  //
-  // The remainder is in BOTH legs on purpose, and getting that wrong is what
-  // the end-to-end test caught: taking out only consumption and wastage left
-  // the remainder sitting on the cutting floor AND added it back to the store,
-  // so fifteen metres existed twice and total on-hand was overstated by
-  // exactly the remainder of every challan ever posted.
-  //
-  // Read as a pair the two legs say the true thing: a hundred metres left the
-  // floor, fifteen came back to the rack, and the eighty-five in between is
-  // the cloth that became panels and offcuts. The floor ends at zero for this
-  // challan, which is what "the challan is finished" means physically.
-  const leaving = consumed.plus(wastage).plus(fabricDamage).plus(remainder).plus(remnant);
-  // FIFO - what the floor gave up, layer by layer. The remainder and the
-  // remnants go back carrying the NEWEST part of it: the oldest cloth is the
-  // cloth that was cut.
-  let backToStore = [];
-  let toRemnants = [];
-  if (leaving.greaterThan(0)) {
-    const out = await postMovement(tx, {
-      itemId: roll.inventoryItemId,
-      rollId: roll.id,
-      direction: 'OUT',
-      qty: leaving,
-      rate: roll.rate ?? 0,
-      entryDate: issue.issueDate,
-      location: from,
+  return postCuttingFabric(tx, {
+    doc: {
       documentType: 'CUTTING_ISSUE',
-      documentId: issue.id,
-      documentNo: issue.challanNo,
+      id: issue.id,
+      no: issue.challanNo,
+      date: issue.issueDate,
       orderId: issue.orderId,
-      snapshot,
-      remarks:
-        `Cut on ${issue.challanNo}: ${consumed.toFixed(4)} ${issue.fabricUom} consumed` +
-        (wastage.greaterThan(0) ? `, ${wastage.toFixed(4)} wastage` : '') +
-        (fabricDamage.greaterThan(0) ? `, ${fabricDamage.toFixed(4)} fabric damage` : '') +
-        (remainder.greaterThan(0) ? `, ${remainder.toFixed(4)} returned to store` : '') +
-        (remnant.greaterThan(0) ? `, ${remnant.toFixed(4)} kept as remnants` : ''),
-      actor,
-    });
-    [backToStore, toRemnants] = takeNewest(out.consumed, [remainder, remnant]);
-  }
-
-  // ---- IN: the remnants, as a short roll of their own ---------------------
-  //
-  // End-bits are not the remainder - they are no longer on the roll - and they
-  // are not wastage, because they can still be cut into a pocket or a handle.
-  // Booking them as a roll is what lets the ordinary Fabric Issue issue them
-  // again. Numbered after the parent (FAB-0123-R1) and linked to it, so the
-  // cloth still traces back to the receipt that bought it.
-  let remnantRoll = null;
-  if (remnant.greaterThan(0)) {
-    const siblings = await tx.fabricRoll.count({ where: { parentRollId: roll.id } });
-    const remnantNo = `${roll.rollNo}-R${siblings + 1}`;
-    await assertRollNoAvailable(tx, remnantNo);
-    remnantRoll = await tx.fabricRoll.create({
-      data: {
-        rollNo: remnantNo,
-        isRemnant: true,
-        parentRollId: roll.id,
-        grnId: roll.grnId,
-        vendorId: roll.vendorId,
-        inventoryItemId: roll.inventoryItemId,
-        fabricName: roll.fabricName,
-        colorCode: roll.colorCode,
-        content: roll.content,
-        count: roll.count,
-        construction: roll.construction,
-        width: roll.width,
-        gsm: roll.gsm,
-        uom: roll.uom,
-        shade: roll.shade ?? null,
-        dyeLot: roll.dyeLot ?? null,
-        receivedQty: remnant,
-        balanceQty: remnant,
-        rate: roll.rate,
-        stage: 'RAW',
-        location: LOCATION.REMNANT_STORE,
-        remarks: `End-bits from ${issue.challanNo}, cut from roll ${roll.rollNo}`,
-        createdById: actor.userId ?? null,
-        updatedById: actor.userId ?? null,
-      },
-    });
-
-    await postMovement(tx, {
-      itemId: roll.inventoryItemId,
-      rollId: remnantRoll.id,
-      direction: 'IN',
-      qty: remnant,
-      rate: roll.rate ?? 0,
-      carryCost: toRemnants,
-      entryDate: issue.issueDate,
-      location: LOCATION.REMNANT_STORE,
-      documentType: 'CUTTING_ISSUE',
-      documentId: issue.id,
-      documentNo: issue.challanNo,
-      orderId: issue.orderId,
-      snapshot,
-      remarks:
-        `Remnants from ${issue.challanNo}: ${remnant.toFixed(4)} ${issue.fabricUom} of roll ` +
-        `${roll.rollNo}, booked as ${remnantNo}`,
-      actor,
-    });
-  }
-
-  // ---- IN: the remainder, back on the rack, on the SAME roll -------------
-  if (remainder.greaterThan(0)) {
-    await postMovement(tx, {
-      itemId: roll.inventoryItemId,
-      // THE ROLL IDENTITY. Not a new roll and not an anonymous quantity: the
-      // cloth going back is the cloth that came off this roll, and the ledger
-      // says so, so it can still be traced to the GRN that received it.
-      rollId: roll.id,
-      direction: 'IN',
-      qty: remainder,
-      rate: roll.rate ?? 0,
-      carryCost: backToStore,
-      entryDate: issue.issueDate,
-      location: DEFAULT_LOCATION,
-      documentType: 'CUTTING_ISSUE',
-      documentId: issue.id,
-      documentNo: issue.challanNo,
-      orderId: issue.orderId,
-      snapshot,
-      remarks:
-        `Remainder returned to store on ${issue.challanNo}: ${remainder.toFixed(4)} ` +
-        `${issue.fabricUom} of roll ${roll.rollNo}`,
-      actor,
-    });
-  }
-
-  // The roll follows its cloth: what is left on it, where it is, and whether
-  // anything remains to cut.
-  await tx.fabricRoll.update({
-    where: { id: roll.id },
-    data: {
-      balanceQty: remainder,
-      location: remainder.greaterThan(0) ? DEFAULT_LOCATION : roll.location,
-      stage: remainder.greaterThan(0) ? 'RAW' : 'CONSUMED',
-      updatedById: actor.userId ?? null,
+      uom: issue.fabricUom,
+      location: issue.cuttingLocation,
     },
+    fabricIssue,
+    figures: issue,
+    actor,
   });
-
-  return {
-    moved: leaving.greaterThan(0) || remainder.greaterThan(0),
-    itemId: roll.inventoryItemId,
-    remnantRollNo: remnantRoll?.rollNo ?? null,
-  };
 }
 
 /** Cancels a draft. A posted challan cannot be cancelled - the cloth is cut. */
@@ -1736,7 +1559,7 @@ function assertUnlocked(ci, what) {
   throw new ApiError(
     409,
     `${ci.challanNo} was posted on ` +
-      `${new Date(ci.postedAt ?? ci.lockedAt).toISOString().slice(0, 10)} and cannot be ${what}. ` +
+      `${istDate(ci.postedAt ?? ci.lockedAt)} and cannot be ${what}. ` +
       'Cloth has been cut and issued to the unit. This is the last document in the pipeline - ' +
       'there is nothing downstream of it to correct it with, so it does not change.',
     {

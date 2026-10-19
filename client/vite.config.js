@@ -29,6 +29,10 @@ export default defineConfig({
   },
   server: {
     port: 5175,
+    // Fail instead of drifting. Without this a second `npm run dev` while 5175
+    // is taken quietly starts on 5176; a tab opened there loses its API the
+    // moment that copy stops, and reports only "The server is unreachable".
+    strictPort: true,
     // Proxying /api in development means the browser sees one origin, so the
     // client never needs to know the API host and CORS stays out of the way.
     proxy: {

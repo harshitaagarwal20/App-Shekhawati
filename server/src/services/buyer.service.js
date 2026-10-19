@@ -115,8 +115,37 @@ async function writeAddresses(buyerId, addresses, actorId) {
   ]);
 }
 
+/**
+ * ONE BUYER, ONE NAME.
+ *
+ * Pickers show the name, so two buyers called "Aussie Carry Pty" and
+ * "aussie carry pty" are indistinguishable on every order screen, and orders
+ * split between them without anyone choosing to. Compared ignoring case and
+ * runs of spaces, among buyers not deleted.
+ */
+async function assertNameFree(buyerName, exceptId = null) {
+  if (!buyerName?.trim()) return;
+  const [clash] = await prisma.$queryRaw`
+    SELECT buyer_code AS "buyerCode", buyer_name AS "buyerName"
+      FROM buyers
+     WHERE deleted_at IS NULL
+       AND lower(regexp_replace(btrim(buyer_name), '\\s+', ' ', 'g'))
+         = lower(regexp_replace(btrim(${buyerName}), '\\s+', ' ', 'g'))
+       AND (${exceptId}::uuid IS NULL OR id <> ${exceptId}::uuid)
+     LIMIT 1
+  `;
+  if (clash) {
+    throw ApiError.conflict(
+      `A buyer called "${clash.buyerName}" already exists (code ${clash.buyerCode}). ` +
+        'Use that buyer, or give this one a name that tells them apart.',
+      { field: 'buyerName' },
+    );
+  }
+}
+
 export async function create(input, actorId) {
   await validateDropdowns(input);
+  await assertNameFree(input.buyerName);
   // Taken as typed. The code used to be derived from the buyer's initials when
   // left blank, which meant a blank field produced a code nobody chose and
   // nobody recognised on a document. It is a master field the office types.
@@ -141,6 +170,7 @@ export async function create(input, actorId) {
 
 export async function update(id, input, actorId) {
   await validateDropdowns(input);
+  if (input.buyerName !== undefined) await assertNameFree(input.buyerName, id);
   if (input.buyerCode) {
     const clash = await prisma.buyer.findFirst({
       where: { buyerCode: { equals: input.buyerCode.trim(), mode: 'insensitive' }, id: { not: id } },

@@ -4,16 +4,18 @@
  * ---------------------------------------------------------------------------
  *  WHAT THIS SCREEN IS FOR
  *
- *  It is the first thing every user sees, and it answers three questions in
- *  the order somebody standing in the office actually asks them:
+ *  It is the first thing every user sees, laid out like an Odoo dashboard -
+ *  stat cards across the top, then chart panels in a two-column grid:
  *
- *    1. THE HEADLINE      five figures, read in one glance
- *    2. AWAITING DECISION what is waiting, and how much of it is waiting on me
- *    3. THE PIPELINE      where the work is sitting, stage by stage
+ *    THE HEADLINE         a row of stat cards, read in one glance
+ *    THE TREND            documents per month at four points of the pipeline
+ *    AWAITING DECISION    what is waiting, and how much of it is waiting on me
+ *    NEEDS ATTENTION      what has been left too long, worst first
+ *    LOW STOCK            the items furthest under their reorder level
+ *    MASTERS              how many buyers, vendors, styles... a footer strip
  *
- *  The reference panels that used to sit below - stock, recent activity, the
- *  master counts - have been removed: each is a screen of its own, and none of
- *  them was a reason to act.
+ *  Every panel is optional: a section the server did not send is not drawn,
+ *  and the grid closes up around it.
  *
  *  WHY BARS RATHER THAN A GRID OF NUMBERS
  *
@@ -46,8 +48,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { dashboard as dashboardApi, health } from '../services/erp.js';
-import { Alert, EmptyState, PageHeader, Spinner } from '../components/ui.jsx';
-import { fmtNum } from '../utils/format.js';
+import { Alert, EmptyState, Spinner } from '../components/ui.jsx';
+import TrendChart from '../components/TrendChart.jsx';
+import { fmtMoney, fmtNum } from '../utils/format.js';
 
 /**
  * The stage a document type's queue is worked from.
@@ -91,23 +94,24 @@ const QUEUE_ROUTE = {
 };
 
 /**
- * Whether this user holds nothing at all.
+ * Whether the server sent nothing this screen draws.
  *
- * Only what the screen actually draws counts. A store manager may hold gate
- * passes and GRNs and no approval at all, and telling them their role grants
- * nothing while eleven pipeline stages sit above the message would be both
- * wrong and alarming. Every section has to be absent before that is the right
- * thing to say.
+ * Only what the screen actually draws counts. Every drawn section has to be
+ * absent before "your role grants nothing" is the right thing to say.
  *
- * `masters` and `activity` are not consulted: the server still sends them, but
- * nothing on this screen renders them, so their presence would claim a section
- * the reader cannot see. `stock` still counts - it feeds three KPI tiles.
- *
- * An empty `attention` is not evidence either way - it means nothing is wrong,
- * which is the good case, so it is not consulted here.
+ * `masters` and `activity` are not consulted: on their own they are reference,
+ * not work, and a role holding only those still has nothing to act on. (The
+ * activity feed is not drawn at all - the Audit Trail screen is where it lives.)
+ * Nor is `pipeline`: the server still sends it, but the card was removed from
+ * this screen.
  */
 function isEmptyDashboard(data) {
-  return (data.pipeline?.length ?? 0) === 0 && !data.approvals && !data.stock;
+  return (
+    !data.approvals &&
+    !data.stock &&
+    !data.attention &&
+    !data.trend
+  );
 }
 
 /** "3 days", "1 day", "today" - the way somebody would say it out loud. */
@@ -115,6 +119,13 @@ function ageLabel(days) {
   if (days === null || days === undefined) return null;
   if (days <= 0) return 'today';
   return days === 1 ? '1 day' : `${days} days`;
+}
+
+function greeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
 }
 
 export default function Dashboard() {
@@ -152,22 +163,18 @@ export default function Dashboard() {
   const firstName = user?.fullName?.split(' ')[0] ?? 'there';
   const roleNames = (user?.roles ?? []).map((r) => r.name).join(', ') || 'no role';
 
-  if (loading && !data) {
-    return (
-      <>
-        <PageHeader title={`Welcome, ${firstName}`} />
-        <div className="card">
-          <div className="loading-row">
-            <Spinner label="Reading the pipeline..." />
-          </div>
-        </div>
-      </>
-    );
-  }
-
   return (
-    <>
-      <PageHeader title={`Welcome, ${firstName}`} />
+    <div className="home">
+      <header className="home-hero">
+        <div>
+          <h1 className="home-title">
+            {greeting()}, {firstName}
+          </h1>
+        </div>
+        <button type="button" className="btn" onClick={load} disabled={loading}>
+          {loading ? 'Refreshing…' : 'Refresh'}
+        </button>
+      </header>
 
       {error && <Alert kind="error">{error}</Alert>}
 
@@ -176,6 +183,14 @@ export default function Dashboard() {
           The API cannot reach the database. Nothing on this screen is current until the connection
           is restored.
         </Alert>
+      )}
+
+      {loading && !data && (
+        <div className="card">
+          <div className="loading-row">
+            <Spinner label="Loading the dashboard..." />
+          </div>
+        </div>
       )}
 
       {data && isEmptyDashboard(data) && (
@@ -187,11 +202,214 @@ export default function Dashboard() {
 
       {data && !isEmptyDashboard(data) && (
         <>
-          <ApprovalsSection approvals={data.approvals} />
-          <PipelineSection stages={data.pipeline} />
+          <KpiRow approvals={data.approvals} stock={data.stock} />
+
+          {/* Panels flow into a two-column grid; `wide` spans both. A panel
+              whose section was not sent is simply absent and the grid closes
+              up around it. */}
+          <div className="home-grid">
+            {data.trend && (
+              <Panel title="Documents per month" note="last 6 months" wide>
+                <TrendChart trend={data.trend} />
+              </Panel>
+            )}
+            {data.approvals?.total > 0 && (
+              <Panel>
+                <ApprovalsSection approvals={data.approvals} />
+              </Panel>
+            )}
+            {data.attention && (
+              <Panel>
+                <AttentionSection items={data.attention} />
+              </Panel>
+            )}
+            {data.stock?.lowest?.length > 0 && (
+              <Panel>
+                <LowStockSection stock={data.stock} />
+              </Panel>
+            )}
+          </div>
+
+          <MastersStrip masters={data.masters} />
         </>
       )}
+    </div>
+  );
+}
+
+/** A white card on the grey page - the unit the dashboard grid is made of. */
+function Panel({ title, note, wide = false, children }) {
+  return (
+    <div className={`home-panel${wide ? ' is-wide' : ''}`}>
+      {title && (
+        <h2 className="dash-heading">
+          {title}
+          {note && <span className="dash-heading-note">{note}</span>}
+        </h2>
+      )}
+      {children}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+//  1. THE HEADLINE
+// ---------------------------------------------------------------------------
+
+/**
+ * Stat cards, Odoo-style: a coloured edge, a label, one large figure and a
+ * line of context. Every figure is the server's; a card whose section was not
+ * sent is not drawn.
+ */
+function Kpi({ label, value, sub, to, tone = '' }) {
+  const body = (
+    <>
+      <div className="kpi-label">{label}</div>
+      <div className="kpi-value">{value}</div>
+      {sub && <div className="kpi-sub">{sub}</div>}
     </>
+  );
+  return to ? (
+    <Link to={to} className={`kpi kpi-link ${tone}`}>{body}</Link>
+  ) : (
+    <div className={`kpi ${tone}`}>{body}</div>
+  );
+}
+
+function KpiRow({ approvals, stock }) {
+  if (!approvals && !stock) return null;
+  return (
+    <div className="kpi-row">
+      {approvals && (
+        <Kpi
+          label="Awaiting decision"
+          value={fmtNum(approvals.total, { decimals: 0 })}
+          sub={
+            approvals.mineTotal > 0
+              ? `${fmtNum(approvals.mineTotal, { decimals: 0 })} yours to decide`
+              : 'none waiting on you'
+          }
+          to={approvals.queueTo ?? undefined}
+          tone={approvals.mineTotal > 0 ? 'is-mine' : ''}
+        />
+      )}
+      {stock && (
+        <>
+          <Kpi
+            label="Fabric stock value"
+            value={fmtMoney(stock.stockValue)}
+            sub="all locations"
+            to="/inventory"
+            tone="is-mine"
+          />
+          <Kpi
+            label="Rolls on hand"
+            value={fmtNum(stock.rollsOnHand, { decimals: 0 })}
+            sub={stock.heldRolls > 0 ? `${fmtNum(stock.heldRolls, { decimals: 0 })} on hold` : 'none on hold'}
+            to="/inventory"
+            tone={stock.heldRolls > 0 ? 'is-warn' : ''}
+          />
+          <Kpi
+            label="Fabric below reorder"
+            value={fmtNum(stock.belowReorder, { decimals: 0 })}
+            sub={stock.belowReorder > 0 ? (stock.lowest?.[0]?.description ?? 'items short') : 'nothing short'}
+            to="/inventory"
+            tone={stock.belowReorder > 0 ? 'is-bad' : ''}
+          />
+        </>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+//  NEEDS ATTENTION
+// ---------------------------------------------------------------------------
+
+/**
+ * Like Odoo's activity list: what is overdue, worst first. The server already
+ * sorted it by severity and then age. An empty list is the good case and says
+ * so; `null` (not this user's to see) never reaches here.
+ */
+function AttentionSection({ items }) {
+  return (
+    <section className="dash-section">
+      <h2 className="dash-heading">Needs attention</h2>
+      {items.length === 0 ? (
+        <p className="attn-clear">Nothing is overdue. All clear.</p>
+      ) : (
+        <ul className="attn-list">
+          {items.map((a) => (
+            <li key={a.key}>
+              <Link to={a.to} className={`attn-row sev-${a.severity}`}>
+                <span className="attn-dot" aria-hidden="true" />
+                <span className="attn-text">
+                  <strong>{a.title}</strong>
+                  <span>
+                    {a.detail}
+                    {a.oldestAgeDays > 0 ? ` · oldest ${ageLabel(a.oldestAgeDays)}` : ''}
+                  </span>
+                </span>
+                <span className="attn-count">{fmtNum(a.count, { decimals: 0 })}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+//  LOW STOCK
+// ---------------------------------------------------------------------------
+
+/**
+ * The five items furthest under their reorder level, worst first (the server
+ * ranked them). Each bar is the stock on hand against a track that is the
+ * reorder level, so how empty the track is shows how short the item is.
+ */
+function LowStockSection({ stock }) {
+  return (
+    <section className="dash-section">
+      <h2 className="dash-heading">
+        Fabric below reorder level
+        <span className="dash-heading-count">{fmtNum(stock.belowReorder, { decimals: 0 })}</span>
+        <Link to="/inventory" className="dash-heading-link">Open inventory</Link>
+      </h2>
+      <div className="bar-chart">
+        {stock.lowest.map((it) => (
+          <Bar
+            key={it.itemId}
+            label={it.description || it.itemCode}
+            value={Number(it.qty)}
+            max={Number(it.reorderLevel)}
+            tone="is-bad"
+            note={fmtNum(it.qty, { decimals: 0 })}
+            sub={`of ${fmtNum(it.reorderLevel, { decimals: 0 })} ${it.uom ?? ''} · short ${fmtNum(it.shortfall, { decimals: 0 })}`}
+            to="/inventory"
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+//  MASTERS
+// ---------------------------------------------------------------------------
+
+function MastersStrip({ masters }) {
+  if (!masters || masters.length === 0) return null;
+  return (
+    <div className="masters-strip">
+      {masters.map((m) => (
+        <Link key={m.key} to={m.to} className="master-chip">
+          <strong>{fmtNum(m.count, { decimals: 0 })}</strong>
+          <span>{m.label}</span>
+        </Link>
+      ))}
+    </div>
   );
 }
 
@@ -305,76 +523,6 @@ function ApprovalsSection({ approvals }) {
           across the document types this role may view, not the whole system.
         </Alert>
       )}
-    </section>
-  );
-}
-
-// ---------------------------------------------------------------------------
-//  3. THE PIPELINE
-// ---------------------------------------------------------------------------
-
-/**
- * Masters -> Cutting Issue, stage by stage, in pipeline order.
- *
- * `open` is what is in flight; `recent` is what has moved in the last seven
- * days. Both are needed, because they tell a quiet stage apart from a stuck
- * one: nine open and nothing this week is a different problem from nine open
- * with six booked yesterday, and a single number cannot say which it is.
- *
- * `open` arrives as `null` for a stage whose documents are terminal the moment
- * they are written - a goods receipt is posted as it is created, so there is no
- * such thing as an open one. That is drawn as a dash rather than a zero:
- * "none in flight" and "no such thing as in flight here" are different facts,
- * and a confident 0 in the all-clear styling reads as the first.
- */
-function PipelineSection({ stages }) {
-  if (!stages || stages.length === 0) return null;
-
-  const openMax = Math.max(...stages.map((s) => s.open ?? 0), 1);
-  /* A stage with no such thing as "open" sinks to the bottom rather than
-     sorting as a zero, which would read as "this stage is clear". */
-  const ranked = [...stages].sort((a, b) => {
-    if (a.open === null) return 1;
-    if (b.open === null) return -1;
-    return b.open - a.open;
-  });
-
-  return (
-    <section className="dash-section">
-      <h2 className="dash-heading">
-        The pipeline
-        <span className="dash-heading-note">open now, busiest first · last 7 days</span>
-      </h2>
-
-      {/* Sorted by what is in flight rather than left in pipeline order: the
-          question this chart answers is "where is the work piling up", and the
-          answer should be the top bar. The stage's own position in the pipeline
-          is on the left of each row, so the sequence is not lost. */}
-      <div className="bar-chart">
-        {ranked.map((s) => (
-          <Bar
-            key={s.key}
-            label={s.label}
-            value={s.open ?? 0}
-            max={openMax}
-            tone={s.open === null ? 'is-na' : ''}
-            note={s.open === null ? '—' : undefined}
-            sub={
-              s.open === null
-                ? 'posted as written'
-                : s.recent > 0
-                  ? `+${fmtNum(s.recent, { decimals: 0 })} this week`
-                  : 'nothing this week'
-            }
-            to={s.to}
-          />
-        ))}
-      </div>
-
-      <p className="faint dash-foot">
-        The pipeline ends at Cutting Issue. Stitching, QC records, packing and dispatch are not part
-        of this system.
-      </p>
     </section>
   );
 }

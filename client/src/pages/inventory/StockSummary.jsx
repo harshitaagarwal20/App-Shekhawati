@@ -50,9 +50,11 @@ export default function StockSummary() {
    * the table describe whatever survived the filter. Both problems go away by
    * asking the server the question instead of asking it for everything.
    */
+  // Opens on fabric: the stock that matters day to day. Accessories, packaging
+  // and stationery are one choice away in the Category filter.
   const list = useResourceList((params) => invApi.stock(params), {
     pageSize: 25,
-    initialFilters: { location: '', itemCategory: '' },
+    initialFilters: { location: '', itemCategory: 'Fabric' },
   });
 
   const { rows, meta, loading, error, search, setSearch, filters, setFilter } = list;

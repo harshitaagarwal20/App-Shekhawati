@@ -100,6 +100,11 @@
 
 html, body, #root { height: 100%; }
 
+/* No rubber-band bounce past the top or bottom of the page. Chromium on a
+   Windows touchpad (and Safari) otherwise drags the whole app 80px or so off
+   the edge, and the strip it leaves reads as a gap beside the dark sidebar. */
+html, body { overscroll-behavior: none; }
+
 body {
   margin: 0;
   font-family: var(--font);
@@ -320,23 +325,12 @@ a { color: var(--primary); }
   text-overflow: ellipsis;
   transition: background var(--t-fast), color var(--t-fast);
 }
-/* Label and plain-words hint on two lines. Each clips on its own, so a long
-   hint cannot push the label out of view. */
-.nav-link-label,
-.nav-link-hint {
+.nav-link-label {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .nav-link-label { font-size: 13.5px; }
-.nav-link-hint {
-  margin-top: 1px;
-  font-size: 11.5px;
-  font-weight: 400;
-  color: #7f97ab;
-}
-.nav-link:hover .nav-link-hint,
-.nav-link.active .nav-link-hint { color: #b9cad8; }
 .nav-link:hover { background: rgba(255, 255, 255, 0.07); color: #fff; }
 .nav-link.active {
   background: rgba(109, 191, 143, 0.16);
@@ -949,9 +943,7 @@ textarea { min-height: 68px; resize: vertical; }
   color: #fff;
 }
 .hub-choice-name { font-size: 15px; font-weight: 700; }
-.hub-choice-blurb { font-size: 12px; line-height: 1.4; color: var(--text-muted); }
 /* The muted line has to lighten with the fill or it disappears into it. */
-.hub-choice-btn:hover .hub-choice-blurb { color: rgba(255, 255, 255, 0.82); }
 
 @media (max-width: 640px) {
   .hub-choice { flex-direction: column; }
@@ -3326,4 +3318,360 @@ table.data.dash-mini tr:first-child td { border-top: none; }
 @media print {
   .no-print { display: none !important; }
   .doc-sheet { border: 0; padding: 0; max-width: none; }
+}
+
+/* ==========================================================================
+   HOME - the dashboard, laid out like an Odoo dashboard.
+
+   Stat cards across the top, then white chart panels in a two-column grid on
+   the grey page, then a strip of master counts. A panel the server did not
+   send is absent and the grid closes up around it.
+   ========================================================================== */
+
+.home {
+  max-width: 1280px;
+  margin: 0 auto;
+  /* Categorical series, in the validated order (blue, orange, aqua, violet):
+     every adjacent pair clears the colour-vision checks on white. Aqua is
+     under 3:1, so the trend chart also offers a table. */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #6250d6;
+}
+
+.home-hero {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 4px 0 18px;
+}
+.home-title { margin: 0; font-size: 22px; font-weight: 600; color: var(--text); }
+
+/* --- Stat cards ---------------------------------------------------------- */
+
+.home .kpi-row { margin-bottom: 18px; }
+.home .kpi { border-radius: 10px; padding: 15px 18px; }
+.kpi-link { display: block; color: inherit; text-decoration: none; transition: box-shadow var(--t-fast) var(--ease), transform var(--t-fast) var(--ease); }
+.kpi-link:hover { text-decoration: none; box-shadow: var(--shadow-md); transform: translateY(-1px); }
+
+/* --- Panels -------------------------------------------------------------- */
+
+.home-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  align-items: start;
+}
+.home-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 16px 16px 8px;
+  min-width: 0;
+}
+.home-panel.is-wide { grid-column: 1 / -1; }
+.home-panel .dash-section { margin-bottom: 8px; }
+.home-panel .bar-row { grid-template-columns: minmax(96px, 160px) 1fr 52px; }
+.bar-fill.is-bad { background: var(--danger); }
+
+/* --- Trend chart --------------------------------------------------------- */
+
+.trend-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+.trend-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 12.5px; }
+.trend-legend li { display: flex; align-items: center; gap: 7px; }
+.trend-legend a { color: var(--text); }
+.trend-total { color: var(--text-faint); font-variant-numeric: tabular-nums; }
+
+.line-key { display: inline-block; width: 14px; height: 2px; border-radius: 1px; background: var(--text-faint); }
+.line-key.s1 { background: var(--series-1); }
+.line-key.s2 { background: var(--series-2); }
+.line-key.s3 { background: var(--series-3); }
+.line-key.s4 { background: var(--series-4); }
+
+.trend-plot { position: relative; width: 100%; }
+.trend-plot svg { display: block; overflow: visible; }
+.trend-plot svg:focus { outline: none; }
+.trend-plot svg:focus-visible { box-shadow: var(--ring); border-radius: 4px; }
+.trend-plot .grid { stroke: var(--chart-track); stroke-width: 1; }
+.trend-plot .axis { fill: var(--text-faint); font-size: 11px; font-variant-numeric: tabular-nums; }
+.trend-plot .crosshair { stroke: var(--border-strong); stroke-width: 1; }
+.trend-plot .series polyline { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.trend-plot .series circle { stroke: var(--surface); stroke-width: 2; }
+.series.s1 polyline { stroke: var(--series-1); } .series.s1 circle { fill: var(--series-1); }
+.series.s2 polyline { stroke: var(--series-2); } .series.s2 circle { fill: var(--series-2); }
+.series.s3 polyline { stroke: var(--series-3); } .series.s3 circle { fill: var(--series-3); }
+.series.s4 polyline { stroke: var(--series-4); } .series.s4 circle { fill: var(--series-4); }
+
+.chart-tip {
+  position: absolute;
+  min-width: 168px;
+  pointer-events: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  padding: 8px 10px;
+  font-size: 12px;
+}
+.chart-tip-head { color: var(--text-muted); font-weight: 600; margin-bottom: 4px; }
+.chart-tip-row { display: flex; align-items: center; gap: 7px; line-height: 1.6; }
+.chart-tip-row strong { min-width: 22px; text-align: right; font-variant-numeric: tabular-nums; }
+.chart-tip-row span { color: var(--text-muted); }
+.trend-table { margin: 4px 0 8px; }
+
+/* --- Needs attention ----------------------------------------------------- */
+
+.attn-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.attn-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-lg);
+  color: inherit;
+  text-decoration: none;
+}
+.attn-row:hover { background: var(--surface-3); text-decoration: none; }
+.attn-dot { flex: 0 0 9px; height: 9px; border-radius: 50%; background: var(--text-faint); }
+.sev-high .attn-dot { background: var(--danger); }
+.sev-medium .attn-dot { background: var(--accent); }
+.attn-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.attn-text strong { font-size: 13px; font-weight: 600; }
+.attn-text span { font-size: 11.5px; color: var(--text-faint); }
+.attn-count {
+  flex: 0 0 auto;
+  min-width: 28px;
+  text-align: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.sev-high .attn-count { background: var(--danger-soft); color: var(--danger); }
+.attn-clear { margin: 0 0 10px; font-size: 13px; color: var(--success); }
+
+/* --- Masters strip ------------------------------------------------------- */
+
+.masters-strip { display: flex; flex-wrap: wrap; gap: 10px; margin: 18px 0 6px; }
+.master-chip {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 8px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  text-decoration: none;
+}
+.master-chip:hover { border-color: var(--border-strong); text-decoration: none; }
+.master-chip strong { color: var(--text); font-size: 14px; font-variant-numeric: tabular-nums; }
+
+@media (max-width: 1024px) {
+  .home-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 560px) {
+  .home-title { font-size: 19px; }
+  .home-hero .btn { display: none; }
+}
+
+/* --- Issue fabric, on the cutting challan -------------------------------- */
+.issue-rolls-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 4px 0 6px; flex-wrap: wrap; }
+.issue-rolls-head label { font-size: 12px; display: flex; align-items: center; gap: 4px; }
+table.data tr.is-selected td { background: var(--primary-soft); }
+.form-grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 12px; }
+@media (max-width: 640px) { .form-grid.two { grid-template-columns: minmax(0, 1fr); } }
+
+/* ==========================================================================
+   REPORTS - laid out like Zoho's Reports Center.
+
+   The landing page is a category rail beside grouped lists of reports; an
+   opened report is a toolbar over the report set out as a page.
+   ========================================================================== */
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* --- The Reports Center -------------------------------------------------- */
+
+.rc { max-width: 1180px; margin: 0 auto; }
+.rc-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin: 4px 0 16px; flex-wrap: wrap; }
+.rc-title { margin: 0; font-size: 22px; font-weight: 600; }
+
+.rc-search { position: relative; width: min(340px, 100%); color: var(--text-faint); }
+.rc-search svg { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); }
+.rc-search input {
+  width: 100%; height: 36px; padding: 0 12px 0 34px;
+  border: 1px solid var(--border); border-radius: var(--radius-lg);
+  background: var(--surface); font: inherit; font-size: 13px; color: var(--text);
+}
+.rc-search input:focus { outline: none; border-color: var(--primary); box-shadow: var(--ring); }
+
+.rc-body {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  /* The rail's grey column and its edge are painted here rather than on the
+     rail, so the column runs the full height while the rail itself stays
+     put. No `overflow: hidden` - it would stop the rail from sticking. */
+  background: linear-gradient(to right, var(--surface-2) 219px, var(--border) 219px 220px, var(--surface) 220px);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  min-height: 420px;
+}
+
+/* Static: the categories stay in view while the list of reports scrolls. */
+.rc-rail {
+  position: sticky;
+  top: calc(var(--topbar-h) + 12px);
+  align-self: start;
+  max-height: calc(100vh - var(--topbar-h) - 24px);
+  overflow-y: auto;
+  padding: 10px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.rc-rail-label { margin: 12px 10px 4px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-faint); }
+.rc-rail-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  width: 100%; padding: 7px 10px; border: 0; border-radius: var(--radius);
+  background: transparent; color: var(--text); font: inherit; font-size: 13px; text-align: left; cursor: pointer;
+}
+.rc-rail-item:hover { background: var(--surface-3); }
+.rc-rail-item.is-active { background: var(--primary-soft); color: var(--primary); font-weight: 600; }
+.rc-rail-count { font-size: 11.5px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.rc-rail-item.is-active .rc-rail-count { color: var(--primary); }
+
+.rc-main { padding: 6px 22px 18px; min-width: 0; }
+.rc-group { margin-top: 14px; }
+.rc-group-title {
+  margin: 0 0 4px; padding-bottom: 6px; border-bottom: 1px solid var(--border);
+  font-size: 13.5px; font-weight: 700; color: var(--text);
+}
+.rc-list { list-style: none; margin: 0; padding: 0; }
+.rc-row { display: flex; align-items: flex-start; gap: 4px; border-bottom: 1px solid var(--border); }
+.rc-row:last-child { border-bottom: 0; }
+.rc-star {
+  flex: 0 0 auto; margin-top: 8px; padding: 4px; border: 0; background: transparent; cursor: pointer;
+  border-radius: var(--radius);
+}
+.rc-star svg { fill: none; stroke: var(--border-strong); stroke-width: 1.6; stroke-linejoin: round; transition: fill var(--t-fast) var(--ease), stroke var(--t-fast) var(--ease); }
+.rc-star:hover svg { stroke: var(--accent); }
+.rc-star.is-on svg { fill: var(--accent); stroke: #c9a21c; }
+.rc-star:focus-visible { outline: none; box-shadow: var(--ring); }
+.rc-open {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px;
+  padding: 9px 6px; border: 0; background: transparent; text-align: left; cursor: pointer; font: inherit;
+  border-radius: var(--radius);
+}
+.rc-open:hover .rc-name { text-decoration: underline; }
+.rc-open:focus-visible { outline: none; box-shadow: var(--ring); }
+.rc-name { color: var(--primary); font-size: 13.5px; font-weight: 500; }
+.rc-empty { padding: 40px 0; text-align: center; color: var(--text-faint); font-size: 13px; }
+
+/* --- One report ----------------------------------------------------------- */
+
+.rv { max-width: 1240px; margin: 0 auto; }
+.rv-crumbs { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-muted); margin: 2px 0 6px; }
+.rv-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.rv-title { margin: 0; font-size: 20px; font-weight: 600; }
+.rv-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.rv-period {
+  display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 4px 0 10px;
+  border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text-muted);
+}
+.rv-period select { border: 0; background: transparent; font: inherit; font-size: 13px; color: var(--text); height: 30px; padding-right: 4px; }
+.rv-period select:focus { outline: none; }
+.rv-period:focus-within { border-color: var(--primary); box-shadow: var(--ring); }
+
+.rv-customise {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 12px 14px 4px; margin-bottom: 12px; box-shadow: var(--shadow);
+}
+.rv-customise .link-button { margin: 0 0 10px; font-size: 12.5px; }
+
+.rv-sheet {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: var(--shadow); padding: 22px 22px 14px;
+}
+.rv-sheet-head { text-align: center; margin-bottom: 14px; }
+.rv-company { font-size: 13px; color: var(--text-muted); }
+.rv-sheet-title { font-size: 19px; font-weight: 600; margin: 2px 0; }
+.rv-sheet-period { font-size: 12.5px; color: var(--text-muted); }
+.rv-stale { opacity: 0.55; transition: opacity var(--t-fast) var(--ease); }
+.rv-foot { margin: 8px 2px 0; font-size: 11.5px; color: var(--text-faint); }
+
+@media (max-width: 760px) {
+  .rc-body { grid-template-columns: minmax(0, 1fr); background: var(--surface); }
+  .rc-rail { position: static; max-height: none; flex-direction: row; overflow-x: auto; background: var(--surface-2); border-bottom: 1px solid var(--border); border-radius: 10px 10px 0 0; }
+  .rc-rail-label { display: none; }
+  .rc-rail-item { width: auto; white-space: nowrap; }
+  .rc-main { padding: 4px 14px 14px; }
+  .rv-sheet { padding: 16px 12px 10px; }
+}
+
+@media print {
+  .rv-crumbs, .rv-toolbar, .rv-customise { display: none !important; }
+  .rv-sheet { border: 0; box-shadow: none; padding: 0; }
+}
+
+/* ==========================================================================
+   CUTTING ISSUE - the steps on the left, the checks and Post kept in view on
+   the right. Stacks on a phone, where the checks follow the steps.
+   ========================================================================== */
+.floor-page.ci-page { max-width: 1180px; }
+.ci-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 20px;
+  align-items: start;
+}
+.ci-steps { min-width: 0; }
+.ci-side {
+  position: sticky;
+  top: calc(var(--topbar-h) + 12px);
+  max-height: calc(100vh - var(--topbar-h) - 24px);
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 4px 14px 14px;
+}
+.ci-side .checklist { margin: 10px 0; }
+/* A passed check is a tick and its name; only a failure needs its sentence. */
+.ci-side .checklist-items li { padding: 7px 12px; }
+.ci-side .check-pass .check-message { display: none; }
+.ci-side .check-mark { flex-basis: 18px; height: 18px; font-size: 10px; }
+.ci-side-empty { padding: 16px 2px 6px; font-size: 13px; color: var(--text-muted); }
+.ci-summary {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  margin: 12px 0 0;
+  font-size: 13px;
+}
+.ci-summary dt { color: var(--text-muted); }
+.ci-summary dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.ci-post { margin-top: 14px; display: flex; flex-direction: column; gap: 6px; }
+.ci-post .big-btn, .ci-post button { width: 100%; }
+.ci-blocker { text-align: center; }
+.ci-two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 14px 0; }
+.ci-derived { padding-top: 2px; }
+.ci-derived-value { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; margin: 4px 0 2px; }
+@media (max-width: 1024px) {
+  .ci-layout { grid-template-columns: minmax(0, 1fr); }
+  .ci-side { position: static; max-height: none; }
+}
+@media (max-width: 560px) {
+  .ci-two { grid-template-columns: minmax(0, 1fr); }
 }

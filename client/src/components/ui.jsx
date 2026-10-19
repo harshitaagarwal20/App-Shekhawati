@@ -66,6 +66,9 @@ export function StatusBadge({ status }) {
     COMPLETED: 'badge-approved',
     ON_HOLD: 'badge-pending',
     CANCELLED: 'badge-inactive',
+    // Inward inspection of a fabric roll.
+    PASSED: 'badge-approved',
+    FAILED: 'badge-rejected',
   };
   const label = String(status ?? '').replace(/_/g, ' ');
   return <span className={`badge ${map[status] ?? 'badge-inactive'}`}>{label || '-'}</span>;

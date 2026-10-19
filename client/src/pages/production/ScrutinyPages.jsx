@@ -585,7 +585,6 @@ export function ScrutinyDetail() {
       />
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-header">Scrutiny report</div>
         <div className="card-body">
           <DetailGrid>
             <Detail label="Scrutiny No" value={s.scrutinyNo} mono />

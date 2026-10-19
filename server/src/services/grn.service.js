@@ -1229,6 +1229,9 @@ async function writeLine(tx, ctx, { header, lineNo }, actor) {
             shade: spec.shade ?? null,
             dyeLot: spec.dyeLot ?? null,
             shadeMarkedByName: spec.shade || spec.dyeLot ? actor.fullName ?? null : null,
+            // Every received roll waits for inward inspection - a record, not
+            // a gate; see InspectionStatus in the schema.
+            inspectionStatus: 'PENDING',
             remarks: spec.remarks ?? null,
           },
           actor.userId,

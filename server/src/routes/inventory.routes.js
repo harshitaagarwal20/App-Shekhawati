@@ -32,6 +32,8 @@ import {
   reconcileQuery,
   relocateRollSchema,
   markRollShadeSchema,
+  inspectRollSchema,
+  inspectRollBatchSchema,
   rollListQuery,
   stockSummaryQuery,
   updateItemSchema,
@@ -137,6 +139,20 @@ router.post(
   c.reverseOpeningBalanceBatch,
 );
 
+/**
+ * Inward inspection over a batch - a GRN's rolls passed in one go. Before
+ * `/rolls/:id` for the same reason as the batch above.
+ *
+ * FABRIC_ROLL.EDIT, like shade grading: it is held by the store and by QC,
+ * the two desks that inspect fabric, and it moves no stock.
+ */
+router.post(
+  '/rolls/inspection',
+  can('FABRIC_ROLL.EDIT'),
+  validate({ body: inspectRollBatchSchema }),
+  c.inspectRollBatch,
+);
+
 /** One roll, with its whole chain: GRN, vendor, PO, order, and issue history. */
 router.get('/rolls/:id', can('FABRIC_ROLL.VIEW'), validate({ params: idParam }), c.getRoll);
 
@@ -162,6 +178,14 @@ router.patch(
   can('FABRIC_ROLL.EDIT'),
   validate({ params: idParam, body: markRollShadeSchema }),
   c.markRollShade,
+);
+
+/** Inward inspection of one roll after the GRN. Records; never holds. */
+router.patch(
+  '/rolls/:id/inspection',
+  can('FABRIC_ROLL.EDIT'),
+  validate({ params: idParam, body: inspectRollSchema }),
+  c.inspectRoll,
 );
 
 router.patch(

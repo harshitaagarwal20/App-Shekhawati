@@ -20,6 +20,7 @@ export const reportQuery = z
     buyerId: uuid.optional(),
     vendorId: uuid.optional(),
     orderId: uuid.optional(),
+    itemId: uuid.optional(),
 
     // Where
     location: z.string().trim().max(80).optional(),
@@ -49,6 +50,7 @@ export const reportQuery = z
     status: z.string().trim().max(30).optional(),
     approvalStatus: z.enum(['PENDING', 'APPROVED', 'REJECTED']).optional(),
     decision: z.enum(['ACCEPT', 'REJECT', 'REWORK']).optional(),
+    inspectionStatus: z.enum(['PENDING', 'PASSED', 'FAILED']).optional(),
 
     // When
     dateFrom: isoDate.optional(),

@@ -13,6 +13,7 @@
 
 import prisma, { notDeleted } from '../config/prisma.js';
 import { D } from '../utils/figures.js';
+import { itemShortName } from './inventory.service.js';
 
 const ZERO = D(0);
 const col = (key, label, format = 'text') => ({ key, label, format });
@@ -177,7 +178,14 @@ async function stockValuationReport(q) {
     },
     orderBy: [{ itemId: 'asc' }, { location: 'asc' }, { layerDate: 'asc' }],
     take: q.limit,
-    include: { item: { select: { itemCode: true, description: true, itemCategory: true, uom: true } } },
+    include: {
+      item: {
+        select: {
+          itemCode: true, description: true, itemCategory: true, subCategory: true,
+          accessoriesItem: true, accessoryType: true, colorCode: true, uom: true,
+        },
+      },
+    },
   });
 
   const today = new Date();
@@ -187,7 +195,8 @@ async function stockValuationReport(q) {
       id: l.id,
       route: `/inventory/items/${l.itemId}`,
       itemCode: l.item?.itemCode ?? null,
-      description: l.item?.description ?? null,
+      item: itemShortName(l.item),
+      colorCode: l.item?.colorCode || null,
       itemCategory: l.item?.itemCategory ?? null,
       location: l.location,
       layerDate: l.layerDate,
@@ -257,9 +266,8 @@ export const EXTRA_REPORTS = {
     category: 'INVENTORY',
     filters: ['itemCategory', 'location', 'dateFrom', 'dateTo'],
     columns: [
-      col('itemCode', 'Item Code'),
-      col('description', 'Description'),
-      col('itemCategory', 'Category'),
+      col('item', 'Item'),
+      col('colorCode', 'Colour'),
       col('location', 'Location'),
       col('layerDate', 'Received', 'date'),
       col('ageDays', 'Age (days)', 'qty'),

@@ -212,6 +212,8 @@ describe('plan creation derives what the sheet marks Auto', () => {
   test('style, order qty and the totals come from the server, not the request', async () => {
     const order = await makeOrder({ orderQty: '5000' });
     const res = await makePlan(order.id, [
+      // cuttingPcsAllotted is RETIRED (see PlanningLine in schema.prisma):
+      // nothing writes it, so a posted figure is ignored.
       line('2026-09-01', '2500', { cuttingPcsAllotted: '200' }),
       line('2026-09-05', '2500'),
     ]);
@@ -222,7 +224,7 @@ describe('plan creation derives what the sheet marks Auto', () => {
     assert.equal(plan.styleNo, style.styleNo, 'Style No follows the order');
     assert.equal(Number(plan.orderQty), 5000, 'Order Qty follows the order');
     assert.equal(Number(plan.plannedQty), 5000, 'planned qty is summed from the lines');
-    assert.equal(Number(plan.plannedCuttingPcs), 200);
+    assert.equal(Number(plan.plannedCuttingPcs), 0, 'the retired column is not written');
     assert.equal(plan.state, 'DRAFT');
     assert.equal(plan.version, 1);
     assert.ok(plan.planNo.startsWith('PLN-'), 'a plan number is issued from the sequence');
@@ -308,16 +310,18 @@ describe('THE RULE - planning may not exceed the permitted order quantity', () =
     assert.equal(Number(res.body.error.details.allocation.overBy), 1);
   });
 
+  // Up to the band (2% by default) an excess is granted on entry; these use 4%,
+  // which waits for the Director.
   test('a REQUESTED but unapproved excess does NOT raise the ceiling', async () => {
-    // 2% asked for, no decision taken: the ceiling stays at the plain 5000.
-    const order = await makeOrder({ orderQty: '5000', excessPct: '0.02' });
+    // 4% asked for, no decision taken: the ceiling stays at the plain 5000.
+    const order = await makeOrder({ orderQty: '5000', excessPct: '0.04' });
     assert.equal(order.excessApprovalStatus, 'PENDING');
     assert.equal(Number(order.effectiveQty), 5000);
 
     const atPlain = await makePlan(order.id, [line('2026-09-01', '5000')]);
     assert.equal(atPlain.status, 201, 'the plain quantity is always plannable');
 
-    const order2 = await makeOrder({ orderQty: '5000', excessPct: '0.02' });
+    const order2 = await makeOrder({ orderQty: '5000', excessPct: '0.04' });
     const overreach = await makePlan(order2.id, [line('2026-09-01', '5100')]);
 
     assert.equal(overreach.status, 409, 'a pending excess must not be usable');
@@ -325,7 +329,7 @@ describe('THE RULE - planning may not exceed the permitted order quantity', () =
   });
 
   test('a REJECTED excess leaves the ceiling at the plain order quantity', async () => {
-    const order = await makeOrder({ orderQty: '5000', excessPct: '0.02' });
+    const order = await makeOrder({ orderQty: '5000', excessPct: '0.04' });
     const rejected = await call('POST', `/api/orders/${order.id}/excess/reject`, {
       token: directorToken,
       body: { reason: 'Buyer will not take an overship' },
@@ -338,16 +342,16 @@ describe('THE RULE - planning may not exceed the permitted order quantity', () =
   });
 
   test('an APPROVED excess raises the ceiling by exactly what was granted', async () => {
-    const order = await makeOrder({ orderQty: '5000', excessPct: '0.02', approvedExcess: '0.02' });
-    assert.equal(Number(order.effectiveQty), 5100);
+    const order = await makeOrder({ orderQty: '5000', excessPct: '0.04', approvedExcess: '0.04' });
+    assert.equal(Number(order.effectiveQty), 5200);
 
-    const atCeiling = await makePlan(order.id, [line('2026-09-01', '5100')]);
+    const atCeiling = await makePlan(order.id, [line('2026-09-01', '5200')]);
     assert.equal(atCeiling.status, 201, JSON.stringify(atCeiling.body));
     assert.equal(atCeiling.body.data.allocation.usesExcess, true);
-    assert.equal(Number(atCeiling.body.data.allocation.excessUsedQty), 100);
+    assert.equal(Number(atCeiling.body.data.allocation.excessUsedQty), 200);
 
-    const order2 = await makeOrder({ orderQty: '5000', excessPct: '0.02', approvedExcess: '0.02' });
-    const overCeiling = await makePlan(order2.id, [line('2026-09-01', '5101')]);
+    const order2 = await makeOrder({ orderQty: '5000', excessPct: '0.04', approvedExcess: '0.04' });
+    const overCeiling = await makePlan(order2.id, [line('2026-09-01', '5201')]);
     assert.equal(overCeiling.status, 409, 'the ceiling is exact, not approximate');
   });
 
@@ -388,17 +392,19 @@ describe('THE RULE - planning may not exceed the permitted order quantity', () =
     assert.equal(Number(res.body.error.details.allocation.overBy), 1000);
   });
 
-  test('a day cannot allot more cutting pieces than it is due to deliver', async () => {
+  // A cutting plan allots fabric now, not pieces; cuttingPcsAllotted is retired
+  // and the per-day "cutting pieces <= deliverable" check went with it.
+  test('a posted cuttingPcsAllotted is ignored - the column is retired', async () => {
     const order = await makeOrder({ orderQty: '5000' });
     const res = await makePlan(order.id, [
       line('2026-09-01', '1000', { cuttingPcsAllotted: '1500' }),
     ]);
-    assert.equal(res.status, 400);
-    assert.match(res.body.error.message, /cannot be allotted to a day/i);
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.equal(Number(res.body.data.plannedCuttingPcs), 0);
   });
 
   test('the preview refuses in the same words the save would', async () => {
-    const order = await makeOrder({ orderQty: '5000', excessPct: '0.02' });
+    const order = await makeOrder({ orderQty: '5000', excessPct: '0.04' });
     const res = await call('POST', '/api/plannings/preview', {
       token: adminToken,
       body: {
@@ -540,7 +546,7 @@ describe('the approval flow', () => {
 
   test('approval is REFUSED when the order excess was revoked after drafting', async () => {
     // The case the whole re-check at approval exists for.
-    const order = await makeOrder({ orderQty: '5000', excessPct: '0.02', approvedExcess: '0.02' });
+    const order = await makeOrder({ orderQty: '5000', excessPct: '0.04', approvedExcess: '0.04' });
     const created = await makePlan(order.id, [line('2026-09-01', '5100')]);
     assert.equal(created.status, 201, 'legal when drawn: the excess was approved');
 
@@ -579,8 +585,11 @@ describe('the approval flow', () => {
 
 // ===========================================================================
 
-describe('RBAC - a planner cannot approve their own plan', () => {
-  test('the planner may create and submit', async () => {
+// MERCHANDISING absorbed PLANNING_GM and with it PLANNING.APPROVE (see
+// prisma/seed/data/rbac.js), and maker-checker is switched off - so the
+// planning desk now raises, submits and decides its own plans.
+describe('RBAC - the planning desk holds the whole plan workflow', () => {
+  test('the planner may create, submit and approve', async () => {
     const order = await makeOrder({ orderQty: '2000' });
     const created = await makePlan(order.id, [line('2026-09-01', '2000')], {}, plannerToken);
     assert.equal(created.status, 201, JSON.stringify(created.body));
@@ -591,18 +600,11 @@ describe('RBAC - a planner cannot approve their own plan', () => {
     });
     assert.equal(submitted.status, 200);
 
-    // ...but the decision is not theirs to take.
     const approve = await call('POST', `/api/plannings/${created.body.data.id}/approve`, {
       token: plannerToken,
       body: {},
     });
-    assert.equal(approve.status, 403, 'PLANNING.APPROVE is not held by MERCHANDISING');
-
-    const reject = await call('POST', `/api/plannings/${created.body.data.id}/reject`, {
-      token: plannerToken,
-      body: { reason: 'trying to reject my own plan' },
-    });
-    assert.equal(reject.status, 403);
+    assert.equal(approve.status, 200, JSON.stringify(approve.body));
   });
 });
 
@@ -626,7 +628,7 @@ describe('unit allocation', () => {
     assert.equal(units.length, 2);
     const unit1 = units.find((u) => u.unit === 'Unit 1 - Anil Kumar');
     assert.equal(Number(unit1.deliverableSize), 4000);
-    assert.equal(Number(unit1.cuttingPcsAllotted), 150);
+    assert.equal(Number(unit1.cuttingPcsAllotted), 0, 'the retired column is not written');
     assert.equal(unit1.lineCount, 2);
   });
 
@@ -636,7 +638,7 @@ describe('unit allocation', () => {
       line('2026-09-01', '1000', { unit: 'Unit 9 - Does Not Exist' }),
     ], { planDepartment: 'STITCHING' });
     assert.equal(res.status, 400);
-    assert.match(res.body.error.message, /not an active value of the StitchingUnit list/i);
+    assert.match(res.body.error.message, /not one of the Stitching Unit values/i);
   });
 
   test('cutting, packing and dispatch plans carry no unit', async () => {

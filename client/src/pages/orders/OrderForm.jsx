@@ -39,20 +39,23 @@ import ColourwayGrid, {
   gridTotal,
   linesFromGrid,
 } from './ColourwayGrid.jsx';
+import { todayInput } from '../../utils/format.js';
 
 const optional = (max) =>
   z.string().trim().max(max).optional().transform((v) => (v ? v : undefined));
 
-/**
- * The excess the office grants without asking, as a PERCENTAGE (the server
- * holds the same number as the fraction 0.02). Above this the excess goes to
- * the Director and the ceiling does not move until they sign.
- */
-const AUTO_APPROVED_PCT = 2;
+/** A fraction from the server (0.02) as the percentage this form shows (2). */
+const fractionToPct = (f) => Math.round(Number(f) * 1e6) / 1e4;
+
+// The server's rule for a typed document number, so it is caught before saving.
+const DOC_NO = /^[A-Za-z0-9](?:[A-Za-z0-9 _./-]*[A-Za-z0-9])?$/;
 
 const schema = z
   .object({
-    orderNo: optional(40),
+    orderNo: optional(40).refine(
+      (v) => !v || (DOC_NO.test(v) && !v.includes('..')),
+      'Use letters and digits, with - / . _ or spaces between them',
+    ),
     orderDate: z.string().trim().min(1, 'Order date is required'),
     buyerId: z.string().uuid('Select a buyer'),
     styleId: z.string().uuid('Select a style'),
@@ -96,25 +99,14 @@ const schema = z
     excessJustification: optional(2000),
     remarks: optional(2000),
   })
-  /*
-   * Only an excess that needs a DECISION needs a case made for it. Up to and
-   * including AUTO_APPROVED_PCT the excess is granted on entry - see
-   * excessOnEntry() in buyerOrder.service.js, which is the authority - so
-   * demanding a justification here would be asking the merchandiser to argue
-   * a point nobody is going to read. Kept in step with the server by hand:
-   * the server refuses either way, this only decides when to ask.
-   */
-  .refine((d) => Number(d.excessPctInput || 0) <= AUTO_APPROVED_PCT || Boolean(d.excessJustification), {
-    message: `A justification is required for an excess above ${AUTO_APPROVED_PCT}%`,
-    path: ['excessJustification'],
-  })
   // The same rule the server holds: goods leave the factory before they are due.
   .refine((d) => !d.exFactoryDate || !d.buyerDeliveryDate || d.exFactoryDate <= d.buyerDeliveryDate, {
     message: 'Ex-factory must be on or before the buyer delivery date',
     path: ['exFactoryDate'],
   });
 
-const today = () => new Date().toISOString().slice(0, 10);
+// Kolkata's calendar date, not UTC's - before 05:30 IST those differ by a day.
+const today = todayInput;
 const asDateInput = (v) => (v ? String(v).slice(0, 10) : '');
 
 /** The form takes a human percentage (2); the API takes a fraction (0.02). */
@@ -184,6 +176,34 @@ export default function OrderForm({ order, onSaved, onCancel }) {
   const buyerId = watch('buyerId');
   const styleId = watch('styleId');
   const excessPctInput = watch('excessPctInput');
+
+  /*
+   * THE EXCESS BAND COMES FROM THE EXCESS RULES, not from this file.
+   *
+   * Up to the band the excess is granted on entry; above it the Director
+   * decides; past the ceiling it is refused. The server resolves that from the
+   * BUYER_ORDER rule (an order or buyer rule first), and this asks it for the
+   * same figures - so a band changed on the Excess Rules screen changes what
+   * this form asks for. The server refuses either way; this only decides when
+   * to ask for a justification.
+   */
+  const [excessPolicy, setExcessPolicy] = useState(null);
+  useEffect(() => {
+    let live = true;
+    ordersApi
+      .excessPolicy({ buyerId: buyerId || undefined, orderId: order?.id })
+      .then((p) => live && setExcessPolicy(p))
+      .catch(() => live && setExcessPolicy(null));
+    return () => { live = false; };
+  }, [buyerId, order?.id]);
+
+  const bandPct = excessPolicy ? fractionToPct(excessPolicy.autoApprovedPct) : null;
+  const ceilingPct = excessPolicy?.hardCeilingPct != null ? fractionToPct(excessPolicy.hardCeilingPct) : null;
+  const excessNow = Number(excessPctInput || 0);
+  // Without the policy, ask - a justification nobody reads costs less than a refusal.
+  const excessNeedsDecision = excessPolicy
+    ? excessPolicy.requiresApproval && excessNow > bandPct
+    : excessNow > 0;
 
   useEffect(() => {
     buyersApi.options().then(setBuyerOptions).catch(loadFailed(setBuyerOptions, 'buyers'));
@@ -386,6 +406,20 @@ export default function OrderForm({ order, onSaved, onCancel }) {
 
   async function onSubmit(values) {
     setServerError('');
+    if (ceilingPct !== null && excessNow > ceilingPct) {
+      setError('excessPctInput', {
+        type: 'policy',
+        message: `No excess above ${ceilingPct}% can be approved on an order`,
+      });
+      return;
+    }
+    if (excessNeedsDecision && !values.excessJustification) {
+      setError('excessJustification', {
+        type: 'policy',
+        message: `A justification is required for an excess above ${bandPct ?? 0}%`,
+      });
+      return;
+    }
     if (gridMode) {
       const problem = gridProblem(grid);
       if (problem) {
@@ -479,8 +513,6 @@ export default function OrderForm({ order, onSaved, onCancel }) {
         )}
 
         <div className="form-grid">
-          <div className="fieldset-title">Order</div>
-
           <Field
             label="Order No"
             error={errors.orderNo?.message}
@@ -752,7 +784,15 @@ export default function OrderForm({ order, onSaved, onCancel }) {
           <Field
             label="Excess %"
             error={errors.excessPctInput?.message}
-            hint="2 means 2%. The Director approves anything above zero."
+            hint={
+              excessPolicy
+                ? `2 means 2%. ${
+                    excessPolicy.requiresApproval
+                      ? `Up to ${bandPct}% is approved automatically; above that the Director decides`
+                      : 'Approved automatically'
+                  }${ceilingPct !== null ? `, and nothing above ${ceilingPct}% is allowed` : ''}.`
+                : '2 means 2%.'
+            }
             htmlFor="excessPct"
           >
             <SuffixInput
@@ -769,7 +809,7 @@ export default function OrderForm({ order, onSaved, onCancel }) {
 
           <Field
             label="Excess Justification"
-            required={excessRequested}
+            required={excessNeedsDecision}
             error={errors.excessJustification?.message}
             hint="Goes to the Director with the request."
             className="span-2"

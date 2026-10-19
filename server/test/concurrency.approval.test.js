@@ -342,7 +342,9 @@ describe('F-02 - a quotation decision moves the workflow state too', () => {
     );
   });
 
-  test('the maker still cannot approve their own quotation', { skip: skipIfNoDb() }, async () => {
+  // Maker-checker is switched off at the owner's instruction (domain/makerChecker.js).
+  // Routing the decision through the engine must still let it through.
+  test('the maker may approve their own quotation - maker-checker is off', { skip: skipIfNoDb() }, async () => {
     const user = await prisma.user.findFirst({ where: { username: 'admin' }, select: { id: true, fullName: true } });
     const q = await prisma.vendorQuotation.create({
       data: {
@@ -363,10 +365,12 @@ describe('F-02 - a quotation decision moves the workflow state too', () => {
     });
     made.quotations.push(q.id);
 
-    await assert.rejects(
-      () => quotations.approve(q.id, { remarks: 'self' }, { userId: user.id, fullName: user.fullName }),
-      (err) => err.status === 403,
-      'routing the decision through the engine must not lose the maker-checker rule',
-    );
+    await quotations.approve(q.id, { remarks: 'self' }, { userId: user.id, fullName: user.fullName });
+    const row = await prisma.vendorQuotation.findUnique({
+      where: { id: q.id },
+      select: { authorisationStatus: true, workflowState: true },
+    });
+    assert.equal(row.authorisationStatus, 'APPROVED');
+    assert.equal(row.workflowState, 'APPROVED');
   });
 });

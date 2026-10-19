@@ -27,10 +27,6 @@
  *  control. A pair of small buttons in the corner of an empty card reads as a
  *  leftover filter somebody forgot to remove.
  *
- *  Each panel carries the register's full name AND one line saying what is in
- *  it. The blurb is the part nobody can look up: "Stock" and "Stock Movement"
- *  are near enough as words that somebody new picks by meaning, not by name.
- *
  *  They are plain buttons, not a toggle. Nothing here is "currently on", so
  *  there is no selected state to paint or to announce.
  *
@@ -54,7 +50,7 @@ import { PageHeader } from './ui.jsx';
  *
  * @param {string}   title     the page heading - the subject, not the answer
  * @param {string}   question  asked above the panels, in plain words
- * @param {Array}    choices   `{ value, label, blurb }` - one panel each
+ * @param {Array}    choices   `{ value, label }` - one panel each
  * @param {Function} onChoose  called with the value of the panel pressed
  */
 export default function HubChoice({ title, question, choices, onChoose }) {
@@ -66,7 +62,7 @@ export default function HubChoice({ title, question, choices, onChoose }) {
       <div className="hub-ask">
         <h2 className="hub-ask-q">{question}</h2>
         <div className="hub-choice">
-          {choices.map(({ value, label, blurb }) => (
+          {choices.map(({ value, label }) => (
             <button
               key={value}
               type="button"
@@ -74,7 +70,6 @@ export default function HubChoice({ title, question, choices, onChoose }) {
               onClick={() => onChoose(value)}
             >
               <span className="hub-choice-name">{label}</span>
-              <span className="hub-choice-blurb">{blurb}</span>
             </button>
           ))}
         </div>
@@ -104,7 +99,7 @@ export default function HubChoice({ title, question, choices, onChoose }) {
  * The screen behind it checks again regardless; this only decides what to show.
  *
  * @param {string} param    the query parameter that carries the choice
- * @param {Array}  choices  `{ value, label, blurb, permission }`
+ * @param {Array}  choices  `{ value, label, permission }`
  * @returns `{ allowed, chosen, choose }` - `chosen` is the whole choice object,
  *          or null while the question is still unanswered.
  */

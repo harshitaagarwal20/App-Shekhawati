@@ -53,6 +53,7 @@ import prisma from '../config/prisma.js';
 import { ApiError } from '../utils/ApiError.js';
 import { ITEM_CATEGORIES, CATEGORY_LABEL, mappingByCategory } from '../domain/itemCategory.js';
 import * as excess from './excess.service.js';
+import { istDate } from '../utils/dates.js';
 
 const D = (v) => new Prisma.Decimal(v ?? 0);
 
@@ -288,7 +289,7 @@ export async function resolveShrinkage(tx, { process, vendorId, on } = {}) {
   if (!rule) {
     throw ApiError.badRequest(
       `No shrinkage tolerance is configured for ${String(process).toLowerCase()}` +
-        `${vendorId ? ' at this job worker' : ''} as at ${at.toISOString().slice(0, 10)}. ` +
+        `${vendorId ? ' at this job worker' : ''} as at ${istDate(at)}. ` +
         'A job work order cannot be raised without one - see the Shrinkage Rules screen. ' +
         'No figure is assumed.',
       { field: 'process', process, vendorId: vendorId ?? null },

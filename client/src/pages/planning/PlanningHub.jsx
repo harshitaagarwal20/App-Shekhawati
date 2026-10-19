@@ -69,21 +69,17 @@ const PROCUREMENT = 'procurement';
 /*
  * `label` titles the register once it is open and names the button that opens
  * it - the same words in both places, so the screen you land on is plainly the
- * one you asked for. `blurb` is the difference between them in one line, which
- * is the part nobody can look up: "production" and "procurement" are near
- * enough as words that somebody new picks by meaning, not by name.
+ * one you asked for.
  */
 const KINDS = [
   {
     value: PRODUCTION,
     label: 'Production Planning',
-    blurb: 'How many pieces, by which department, by when.',
     permission: 'PLANNING.VIEW',
   },
   {
     value: PROCUREMENT,
     label: 'Procurement Planning',
-    blurb: 'What has to be bought before production can start.',
     permission: 'MATERIAL_PLAN.VIEW',
   },
 ];
@@ -141,7 +137,7 @@ export default function PlanningHub() {
         <div className="hub-ask">
           <h2 className="hub-ask-q">Which plans do you want to see?</h2>
           <div className="hub-choice">
-            {allowed.map(({ value, label, blurb }) => (
+            {allowed.map(({ value, label }) => (
               <button
                 key={value}
                 type="button"
@@ -149,7 +145,6 @@ export default function PlanningHub() {
                 onClick={() => setKind(value)}
               >
                 <span className="hub-choice-name">{label}</span>
-                <span className="hub-choice-blurb">{blurb}</span>
               </button>
             ))}
           </div>

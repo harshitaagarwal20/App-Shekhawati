@@ -206,7 +206,7 @@ const INCLUDE = {
   challans: {
     where: { deletedAt: null },
     orderBy: [{ issueDate: 'asc' }, { issueNo: 'asc' }],
-    select: { id: true, issueNo: true, issueDate: true, fabricQtyIssued: true, uom: true },
+    select: { id: true, issueNo: true, batchNo: true, issueDate: true, fabricQtyIssued: true, uom: true },
   },
   receipts: {
     where: { deletedAt: null },
@@ -684,6 +684,15 @@ export async function create(input, actorId) {
       { field: 'fabricIssueId' },
     );
   }
+  // The fabric issue released the roll for ONE order. Filing the job under a
+  // different one would book order A's fabric to order B.
+  if (fabricIssue && order && fabricIssue.orderId && fabricIssue.orderId !== order.id) {
+    throw ApiError.badRequest(
+      `Fabric issue ${fabricIssue.issueNo} released the roll for a different order than ` +
+        `${order.orderNo}. Raise the job against the issue's own order.`,
+      { field: 'orderId' },
+    );
+  }
   if (issueLine && issueLine.qty.greaterThan(D(fabricIssue.fabricQtyIssued))) {
     throw ApiError.badRequest(
       `Fabric issue ${fabricIssue.issueNo} released ${D(fabricIssue.fabricQtyIssued).toFixed(4)} ` +
@@ -876,6 +885,21 @@ export async function update(id, input, actorId) {
   if (input.vendorId !== undefined) {
     await resolveVendor(input.vendorId, input.process ?? existing.process);
   }
+
+  // Fabric already sent on this job was issued against its order. Re-filing
+  // the job under another order would leave that fabric booked to the wrong one.
+  if (
+    input.orderId !== undefined &&
+    input.orderId !== existing.orderId &&
+    D(existing.issuedQty ?? 0).greaterThan(0)
+  ) {
+    throw ApiError.conflict(
+      'Fabric has already gone out on this job against its order, so the job cannot be moved ' +
+        'to a different order. Raise a new job work order for the other order.',
+      { field: 'orderId' },
+    );
+  }
+  if (input.orderId) await resolveOrder(input.orderId);
 
   // Re-checked on edit, not only on create: switching a printing job to dyeing,
   // or re-pointing a dyeing job at a Natural order, would otherwise walk around

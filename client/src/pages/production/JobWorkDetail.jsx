@@ -28,6 +28,31 @@ import { Detail, DetailGrid, TraceChain } from '../shared/Detail.jsx';
 import { fmtDate, fmtEnum, fmtNum } from '../../utils/format.js';
 import TableWrap from '../../components/TableWrap.jsx';
 
+/**
+ * One row per challan that went to the vendor, not per roll.
+ *
+ * Rolls issued together are separate fabric issues but left on ONE sheet
+ * under the batch number, and that number is what the vendor quotes back.
+ */
+function groupChallans(challans) {
+  const byNo = new Map();
+  for (const c of challans) {
+    const no = c.batchNo ?? c.issueNo;
+    const row = byNo.get(no) ?? {
+      challanNo: no,
+      firstId: c.id,
+      issueDate: c.issueDate,
+      uom: c.uom,
+      qty: 0,
+      issueNos: [],
+    };
+    row.qty += Number(c.fabricQtyIssued || 0);
+    row.issueNos.push(c.issueNo);
+    byNo.set(no, row);
+  }
+  return [...byNo.values()];
+}
+
 export default function JobWorkDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -214,8 +239,8 @@ export default function JobWorkDetail() {
         {(job.challans ?? []).length === 0 ? (
           <div className="card-body muted">
             No fabric has gone out yet. Once this PO is approved, issue fabric for{' '}
-            {meta.label.toLowerCase()} from Fabric Issue — each issue is a challan, and several
-            challans can be sent against one PO.
+            {meta.label.toLowerCase()} from Fabric Issue — rolls issued together go on one challan,
+            and several challans can be sent against one PO.
           </div>
         ) : (
           <TableWrap>
@@ -224,16 +249,21 @@ export default function JobWorkDetail() {
                 <tr>
                   <th>Challan No</th>
                   <th>Date</th>
+                  <th>Rolls</th>
                   <th className="num">Qty</th>
                   <th>UOM</th>
                 </tr>
               </thead>
               <tbody>
-                {job.challans.map((c) => (
-                  <tr className="clickable" key={c.id} onClick={() => navigate(`/fabric-issues/${c.id}`)}>
-                    <td className="code">{c.issueNo}</td>
+                {groupChallans(job.challans).map((c) => (
+                  <tr className="clickable" key={c.challanNo} onClick={() => navigate(`/fabric-issues/${c.firstId}`)}>
+                    <td className="code">
+                      {c.challanNo}
+                      {c.issueNos.length > 1 && <div className="faint">{c.issueNos.join(', ')}</div>}
+                    </td>
                     <td className="nowrap">{fmtDate(c.issueDate)}</td>
-                    <td className="num">{fmtNum(c.fabricQtyIssued)}</td>
+                    <td className="num">{c.issueNos.length}</td>
+                    <td className="num">{fmtNum(c.qty)}</td>
                     <td>{c.uom}</td>
                   </tr>
                 ))}
@@ -244,11 +274,11 @@ export default function JobWorkDetail() {
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-header">Job work issue</div>
         <div className="card-body">
           <DetailGrid>
             <Detail label="Job No" value={job.dyeIssueNo} mono />
             <Detail label="Date" value={fmtDate(job.issueDate)} />
+            {job.deliveryDate && <Detail label="Delivery Date" value={fmtDate(job.deliveryDate)} />}
             <Detail label="Process" value={meta.label} />
             <Detail label="Fabric stage" value={fmtEnum(job.fabricStage)} />
             <Detail label={meta.vendorLabel} value={job.vendor?.vendorName} />
@@ -273,7 +303,6 @@ export default function JobWorkDetail() {
             <Detail label="Order No" value={job.order?.orderNo} mono />
             <Detail label="Style No" value={job.style?.styleNo} mono />
             {job.remark && <Detail label="Remark" value={job.remark} className="span-2" />}
-            {job.deliveryDate && <Detail label="Delivery Date" value={fmtDate(job.deliveryDate)} />}
           </DetailGrid>
         </div>
       </div>

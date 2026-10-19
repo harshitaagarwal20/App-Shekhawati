@@ -21,11 +21,13 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import { inventory as invApi } from '../../services/erp.js';
 import {
   Alert,
+  EnumSelect,
   Field,
   MasterSelect,
   Modal,
   PageHeader,
   Spinner,
+  StatusBadge,
   TextArea,
   TextInput,
 } from '../../components/ui.jsx';
@@ -43,6 +45,7 @@ export default function RollDetail() {
   const [banner, setBanner] = useState(null);
   const [relocating, setRelocating] = useState(false);
   const [grading, setGrading] = useState(false);
+  const [inspecting, setInspecting] = useState(false);
   const [reversing, setReversing] = useState(false);
 
   const canRelocate = can('FABRIC_ROLL.EDIT');
@@ -113,6 +116,15 @@ export default function RollDetail() {
                 Grade shade
               </button>
             )}
+            {canRelocate && (
+              <button
+                type="button"
+                className={`btn ${roll.inspectionStatus === 'PENDING' ? 'btn-primary' : ''}`}
+                onClick={() => setInspecting(true)}
+              >
+                {roll.inspectionStatus === 'PENDING' || !roll.inspectionStatus ? 'Record inspection' : 'Re-inspect'}
+              </button>
+            )}
             {canReverseOpeningBalance && !roll.isHeld && isUnreversedOpeningBalance && (
               <button type="button" className="btn btn-danger" onClick={() => setReversing(true)}>
                 Reverse opening balance
@@ -170,12 +182,6 @@ export default function RollDetail() {
       />
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-header">Roll</div>
-        <div className="card-body">
-        </div>
-      </div>
-
-      <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-header">Fabric characteristics</div>
         <div className="card-body">
           <DetailGrid>
@@ -208,6 +214,72 @@ export default function RollDetail() {
             <Detail label="Dye lot" value={roll.dyeLot} mono />
             {roll.remarks && <Detail label="Remarks" value={roll.remarks} className="span-2" />}
           </DetailGrid>
+        </div>
+      </div>
+
+      {/* --- Inward inspection, after the GRN ------------------------------ */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="card-header">
+          <span>Inward inspection</span>
+          {roll.inspectionStatus && <StatusBadge status={roll.inspectionStatus} />}
+        </div>
+        <div className="card-body">
+          {!roll.inspectionStatus && (
+            <p className="muted" style={{ margin: 0 }}>
+              Not asked of this roll - it was not received on a GRN, or was received before inward
+              inspection was recorded. It can still be inspected.
+            </p>
+          )}
+          {roll.inspectionStatus === 'PENDING' && (
+            <p className="muted" style={{ margin: 0 }}>
+              Waiting for inspection since it was received. It can be issued meanwhile; inspection
+              records what was found and does not hold the roll.
+            </p>
+          )}
+          {(roll.inspectionStatus === 'PASSED' || roll.inspectionStatus === 'FAILED') && (
+            <>
+              {roll.inspectionStatus === 'FAILED' && (
+                <Alert kind="warning">
+                  Inspection failed this roll. If it should not be used, raise a Fabric Scrutiny so
+                  the Director can decide to rework or reject it - inspection alone does not hold it.
+                </Alert>
+              )}
+              <DetailGrid>
+                <Detail label="Billed" value={`${fmtNum(roll.receivedQty)} ${roll.uom}`} />
+                <Detail
+                  label="Measured length"
+                  value={roll.inspectedQty != null ? `${fmtNum(roll.inspectedQty)} ${roll.uom}` : null}
+                  sub={
+                    roll.inspectedQty != null && Number(roll.receivedQty) !== Number(roll.inspectedQty)
+                      ? `${fmtNum(Number(roll.receivedQty) - Number(roll.inspectedQty))} short of the bill`
+                      : undefined
+                  }
+                />
+                <Detail
+                  label="Width"
+                  value={roll.inspectedWidth != null ? fmtNum(roll.inspectedWidth) : null}
+                  sub={roll.width ? `ordered ${fmtNum(roll.width)}` : undefined}
+                />
+                <Detail
+                  label="GSM"
+                  value={roll.inspectedGsm != null ? fmtNum(roll.inspectedGsm) : null}
+                  sub={roll.gsm ? `ordered ${roll.gsm}` : undefined}
+                />
+                <Detail
+                  label="Faulty length"
+                  value={roll.inspectionDefectQty != null ? `${fmtNum(roll.inspectionDefectQty)} ${roll.uom}` : null}
+                />
+                <Detail
+                  label="Inspected by"
+                  value={roll.inspectedByName}
+                  sub={roll.inspectedAt ? fmtDate(roll.inspectedAt) : undefined}
+                />
+                {roll.inspectionRemarks && (
+                  <Detail label="Remarks" value={roll.inspectionRemarks} className="span-2" />
+                )}
+              </DetailGrid>
+            </>
+          )}
         </div>
       </div>
 
@@ -266,6 +338,18 @@ export default function RollDetail() {
           onCancel={() => setGrading(false)}
           onDone={async (message) => {
             setGrading(false);
+            setBanner({ kind: 'success', text: message });
+            await load();
+          }}
+        />
+      )}
+
+      {inspecting && (
+        <InspectDialog
+          roll={roll}
+          onCancel={() => setInspecting(false)}
+          onDone={async (message) => {
+            setInspecting(false);
             setBanner({ kind: 'success', text: message });
             await load();
           }}
@@ -359,6 +443,95 @@ function ShadeDialog({ roll, onCancel, onDone }) {
 }
 
 /** Moving a roll between store locations. The stock does not move, the shelf does. */
+/**
+ * Inward inspection of one roll. Only the result is required; leave a
+ * measurement blank when it was not taken, rather than copying the bill.
+ */
+function InspectDialog({ roll, onCancel, onDone }) {
+  const [status, setStatus] = useState(roll.inspectionStatus === 'FAILED' ? 'FAILED' : 'PASSED');
+  const [inspectedQty, setInspectedQty] = useState(roll.inspectedQty ?? '');
+  const [inspectedWidth, setInspectedWidth] = useState(roll.inspectedWidth ?? '');
+  const [inspectedGsm, setInspectedGsm] = useState(roll.inspectedGsm ?? '');
+  const [defectQty, setDefectQty] = useState(roll.inspectionDefectQty ?? '');
+  const [remarks, setRemarks] = useState(roll.inspectionRemarks ?? '');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const blankToNull = (v) => (v === '' || v === null ? null : String(v));
+
+  async function go() {
+    setBusy(true);
+    setError('');
+    try {
+      await invApi.inspectRoll(roll.id, {
+        status,
+        inspectedQty: blankToNull(inspectedQty),
+        inspectedWidth: blankToNull(inspectedWidth),
+        inspectedGsm: blankToNull(inspectedGsm),
+        defectQty: blankToNull(defectQty),
+        remarks: remarks || undefined,
+      });
+      onDone(`${roll.rollNo} inspection recorded: ${status === 'PASSED' ? 'passed' : 'failed'}.`);
+    } catch (e) {
+      setError(e.message);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal
+      title={`Inspect ${roll.rollNo}`}
+      size="narrow"
+      onClose={onCancel}
+      footer={
+        <>
+          <button type="button" className="btn" onClick={onCancel} disabled={busy}>
+            Cancel
+          </button>
+          <button type="button" className="btn btn-primary" onClick={go} disabled={busy}>
+            {busy ? 'Saving...' : 'Save'}
+          </button>
+        </>
+      }
+    >
+      <div className="modal-body">
+        <Alert kind="error">{error}</Alert>
+        <p style={{ marginTop: 0 }}>
+          Billed at {fmtNum(roll.receivedQty)} {roll.uom}
+          {roll.width ? `, width ${fmtNum(roll.width)}` : ''}
+          {roll.gsm ? `, GSM ${roll.gsm}` : ''}. Leave a measurement blank if it was not taken.
+        </p>
+        <Field label="Result" required>
+          <EnumSelect
+            options={[
+              { value: 'PASSED', label: 'Passed' },
+              { value: 'FAILED', label: 'Failed' },
+            ]}
+            includeBlank={false}
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+          />
+        </Field>
+        <Field label={`Measured length (${roll.uom})`} hint="What the roll actually measured on the table.">
+          <TextInput type="number" min="0" step="0.01" value={inspectedQty} onChange={(e) => setInspectedQty(e.target.value)} />
+        </Field>
+        <Field label="Measured width">
+          <TextInput type="number" min="0" step="0.01" value={inspectedWidth} onChange={(e) => setInspectedWidth(e.target.value)} />
+        </Field>
+        <Field label="Measured GSM">
+          <TextInput type="number" min="0" step="0.01" value={inspectedGsm} onChange={(e) => setInspectedGsm(e.target.value)} />
+        </Field>
+        <Field label={`Faulty length (${roll.uom})`} hint="Holes, slubs, stains, shade bars.">
+          <TextInput type="number" min="0" step="0.01" value={defectQty} onChange={(e) => setDefectQty(e.target.value)} />
+        </Field>
+        <Field label="Remarks">
+          <TextArea rows={2} value={remarks} onChange={(e) => setRemarks(e.target.value)} />
+        </Field>
+      </div>
+    </Modal>
+  );
+}
+
 function RelocateDialog({ roll, onCancel, onDone }) {
   const [location, setLocation] = useState('');
   const [remarks, setRemarks] = useState('');

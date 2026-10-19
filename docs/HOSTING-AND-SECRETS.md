@@ -37,6 +37,13 @@ and on the server as a rejected request.
 [client/public/staticwebapp.config.json](../client/public/staticwebapp.config.json)
 rewrites unknown paths to `index.html`.
 
+**The pages cannot be framed by another site.** The same file sends
+`X-Frame-Options: DENY` and `Content-Security-Policy: frame-ancestors 'none'` on
+every response. The API sets its own copies, but they only cover `/api` — the
+pages, with their Approve buttons, are served by the Static Web App and get
+their headers from this file alone. It reaches the site on the next frontend
+deploy.
+
 **The backend still serves the old combined site** at the App Service URL
 (App Setting `CLIENT_DIST`). The old link keeps working while users move to the
 new one. To stop serving it, delete `CLIENT_DIST`, and stop including `public/`

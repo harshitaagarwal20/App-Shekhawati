@@ -69,6 +69,17 @@ export const remove = asyncHandler(async (req, res) =>
  * Requirement preview for an unsaved order. Exists so the create form can show
  * what the order will consume without the browser doing any of the arithmetic.
  */
+/** The excess band and ceiling for an order, from the excess rules - for the form. */
+export const excessPolicy = asyncHandler(async (req, res) => {
+  const policy = await service.excessPolicy(req.query);
+  ok(res, {
+    autoApprovedPct: policy.autoApprovedPct.toFixed(6),
+    hardCeilingPct: policy.hardCeilingPct === null ? null : policy.hardCeilingPct.toFixed(6),
+    requiresApproval: policy.requiresApproval,
+    resolution: policy.resolution,
+  });
+});
+
 export const preview = asyncHandler(async (req, res) =>
   ok(res, await service.previewRequirement(req.body)),
 );

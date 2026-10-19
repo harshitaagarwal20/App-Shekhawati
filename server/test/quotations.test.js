@@ -237,13 +237,13 @@ describe('vendor, item and order reference', () => {
   test('an item outside the List Master is refused', async () => {
     const res = await makeQuotation({ item: 'Unobtainium' });
     assert.equal(res.status, 400);
-    assert.match(res.body.error.message, /not an active value of the ItemCategory list/i);
+    assert.match(res.body.error.message, /not one of the Item Category values/i);
   });
 
   test('a UOM outside the List Master is refused', async () => {
     const res = await makeQuotation({ uom: 'Furlongs' });
     assert.equal(res.status, 400);
-    assert.match(res.body.error.message, /not an active value of the UOM list/i);
+    assert.match(res.body.error.message, /not one of the Unit of Measure values/i);
   });
 
   test('a non-existent vendor is refused', async () => {

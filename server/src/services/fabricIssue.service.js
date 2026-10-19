@@ -75,7 +75,7 @@ export const SORTABLE = [
   'createdAt',
 ];
 
-const SEARCH = ['issueNo', 'fabricName', 'colorCode', 'issuedByName', 'remarks'];
+const SEARCH = ['issueNo', 'batchNo', 'fabricName', 'colorCode', 'issuedByName', 'remarks'];
 
 const D = (v) => new Prisma.Decimal(v ?? 0);
 const ZERO = D(0);
@@ -380,7 +380,11 @@ export function requiresJobWorkOrder(purpose) {
  *  first, and this is the gate.
  *
  *  It looks for an APPROVED job work order that names the same roll, the same
- *  process and the same vendor, and still has quantity left to send. Matching
+ *  process, the same vendor and the same buyer order, and still has quantity
+ *  left to send. The order matters as much as the roll: matching on roll and
+ *  process alone let order A's dyeing job authorise fabric issued, and
+ *  recorded, against unrelated order B. A job filed under no order is still
+ *  accepted for any order - it never claimed one. Matching
  *  on the roll rather than on an id the caller passes is deliberate: it means
  *  a store keeper cannot satisfy the check by quoting some other roll's
  *  authorisation.
@@ -394,11 +398,11 @@ export function requiresJobWorkOrder(purpose) {
  *
  * @param {import('@prisma/client').Prisma.TransactionClient} [tx]
  */
-export async function assertJobWorkAuthorised(tx, { rollId, purpose, vendorId, qty }) {
+export async function assertJobWorkAuthorised(tx, { rollId, purpose, vendorId, orderId, qty }) {
   const db = tx ?? prisma;
   const process = JOB_WORK_PURPOSES[purpose];
 
-  const candidates = await db.dyeIssue.findMany({
+  let candidates = await db.dyeIssue.findMany({
     where: {
       // C16: a job covers a SET of rolls. Matching on the header's lead roll
       // found no authority for the second roll of a multi-roll lot, so a
@@ -415,6 +419,7 @@ export async function assertJobWorkAuthorised(tx, { rollId, purpose, vendorId, q
     },
     include: {
       vendor: { select: { id: true, vendorName: true } },
+      order: { select: { id: true, orderNo: true } },
       // Only the line for THIS roll: it is the one that authorises the issue.
       rolls: {
         where: { rollId, deletedAt: null },
@@ -423,6 +428,12 @@ export async function assertJobWorkAuthorised(tx, { rollId, purpose, vendorId, q
     },
     orderBy: { issueDate: 'asc' },
   });
+
+  // Another order's job is no authority for this one. Filtered here rather
+  // than in the query so the refusal can say which order the job is for.
+  const forOrder = (c) => !orderId || !c.orderId || c.orderId === orderId;
+  const elsewhere = candidates.filter((c) => !forOrder(c));
+  candidates = candidates.filter(forOrder);
 
   /*
    * C16 - THE BALANCE IS THE ROLL'S, NOT THE JOB'S.
@@ -445,13 +456,23 @@ export async function assertJobWorkAuthorised(tx, { rollId, purpose, vendorId, q
       where: { id: rollId },
       select: { rollNo: true },
     });
+    const order = orderId
+      ? await db.buyerOrder.findUnique({ where: { id: orderId }, select: { orderNo: true } })
+      : null;
+    const other = elsewhere[0];
 
     throw new ApiError(
       409,
-      `No approved job work order exists for roll ${roll?.rollNo ?? rollId} and ` +
-        `${String(process).toLowerCase()}` +
-        '. Fabric cannot be sent to a job worker on a bare issue - raise the job work order, ' +
-        'have it approved, and then issue against it.',
+      other
+        ? `Job work order ${other.dyeIssueNo} for roll ${roll?.rollNo ?? rollId} was raised for ` +
+          `${other.order?.orderNo ?? 'another order'}, not ${order?.orderNo ?? 'this order'}. ` +
+          "Fabric cannot be issued against one order on the strength of another order's job - " +
+          "issue it against the job's own order, or raise a job work order for this one."
+        : `No approved job work order exists for roll ${roll?.rollNo ?? rollId} and ` +
+          `${String(process).toLowerCase()}` +
+          (order ? ` on ${order.orderNo}` : '') +
+          '. Fabric cannot be sent to a job worker on a bare issue - raise the job work order, ' +
+          'have it approved, and then issue against it.',
       {
         code: ERROR_CODES.VERIFICATION_FAILED,
         details: {
@@ -459,7 +480,9 @@ export async function assertJobWorkAuthorised(tx, { rollId, purpose, vendorId, q
           rollId,
           process,
           vendorId: vendorId ?? null,
-          required: 'An APPROVED job work order naming this roll, process and vendor.',
+          orderId: orderId ?? null,
+          otherOrderJobNo: other?.dyeIssueNo ?? null,
+          required: 'An APPROVED job work order naming this roll, process, vendor and order.',
         },
       },
     );
@@ -578,11 +601,12 @@ function project(issue) {
 export async function list(query) {
   const {
     page, pageSize, skip, take, orderBy, search, includeDeleted,
-    purpose, status, orderId, styleId, rollId, vendorId, employeeId, dateFrom, dateTo,
+    purpose, status, orderId, styleId, rollId, vendorId, employeeId, dateFrom, dateTo, batchNo,
   } = query;
 
   const where = {
     ...(includeDeleted ? {} : { deletedAt: null }),
+    ...(batchNo ? { batchNo } : {}),
     ...(purpose ? { purpose } : {}),
     ...(status ? { status } : {}),
     ...(orderId ? { orderId } : {}),
@@ -623,7 +647,7 @@ export async function getById(id) {
   });
   if (!issue) throw ApiError.notFound('Fabric issue');
 
-  const [usage, movements, jobWorks, cuttingIssues] = await Promise.all([
+  const [usage, movements, jobWorks, cuttingIssues, batch] = await Promise.all([
     downstreamUsage(id),
     prisma.stockLedger.findMany({
       where: { documentType: 'FABRIC_ISSUE', documentId: id },
@@ -658,6 +682,20 @@ export async function getById(id) {
         status: true,
       },
     }),
+    // The rolls posted together with this one, this one included.
+    issue.batchNo
+      ? prisma.fabricIssue.findMany({
+          where: { batchNo: issue.batchNo, deletedAt: null },
+          orderBy: { issueNo: 'asc' },
+          select: {
+            id: true,
+            issueNo: true,
+            fabricQtyIssued: true,
+            uom: true,
+            roll: { select: { id: true, rollNo: true } },
+          },
+        })
+      : [],
   ]);
 
   return {
@@ -665,6 +703,7 @@ export async function getById(id) {
     movements,
     jobWorks,
     cuttingIssues,
+    batch,
     usage,
     editable: editability(issue, usage),
   };
@@ -691,6 +730,23 @@ export async function printView(id) {
     where: { id, deletedAt: null },
     include: {
       ...INCLUDE,
+      order: {
+        select: {
+          ...INCLUDE.order.select,
+          shipTo: true,
+          buyer: {
+            select: {
+              id: true,
+              buyerCode: true,
+              buyerName: true,
+              address: true,
+              consigneeName: true,
+              consigneeAddress: true,
+              phone: true,
+            },
+          },
+        },
+      },
       vendor: {
         select: {
           id: true,
@@ -713,7 +769,14 @@ export async function printView(id) {
           pinCode: true,
           challans: {
             where: { deletedAt: null },
-            select: { id: true, issueNo: true, fabricQtyIssued: true, postedAt: true, createdAt: true },
+            select: {
+              id: true,
+              issueNo: true,
+              batchNo: true,
+              fabricQtyIssued: true,
+              postedAt: true,
+              createdAt: true,
+            },
           },
         },
       },
@@ -721,33 +784,89 @@ export async function printView(id) {
   });
   if (!issue) throw ApiError.notFound('Fabric issue');
 
-  const job = issue.jobWork;
+  /*
+   * A BATCH PRINTS AS ONE CHALLAN.
+   *
+   * Rolls posted together leave together, on one sheet: every roll in the
+   * batch is a line, and the challan number is the batch number. Printing any
+   * one issue of the batch prints the whole sheet. A lone issue is a batch of
+   * one and prints exactly as it always did.
+   */
+  const members = issue.batchNo
+    ? await prisma.fabricIssue.findMany({
+        where: { batchNo: issue.batchNo, deletedAt: null },
+        orderBy: { issueNo: 'asc' },
+        include: { roll: INCLUDE.roll },
+      })
+    : [issue];
+  const memberIds = new Set(members.map((m) => m.id));
+  const totalQty = members.reduce((sum, m) => sum.plus(D(m.fabricQtyIssued)), D(0));
+
+  // The PO block only makes sense when the whole sheet draws on one job work
+  // order; a batch spread across several has no single "this challan" figure.
+  const job = members.every((m) => m.jobWorkId === issue.jobWorkId) ? issue.jobWork : null;
   let po = null;
   if (job) {
     const at = (c) => (c.postedAt ?? c.createdAt).getTime();
-    const mine = at(issue);
+    const mine = Math.min(...members.map(at));
+    const firstNo = members[0].issueNo;
     const earlier = job.challans.filter(
-      (c) => c.id !== issue.id && (at(c) < mine || (at(c) === mine && c.issueNo < issue.issueNo)),
+      (c) => !memberIds.has(c.id) && (at(c) < mine || (at(c) === mine && c.issueNo < firstNo)),
     );
     const before = earlier.reduce((sum, c) => sum.plus(D(c.fabricQtyIssued)), D(0));
-    const afterThis = before.plus(D(issue.fabricQtyIssued));
+    const afterThis = before.plus(totalQty);
     po = {
       jobWorkNo: job.dyeIssueNo,
       date: job.issueDate,
       orderedQty: D(job.qty).toFixed(4),
       previouslySentQty: before.toFixed(4),
-      thisChallanQty: D(issue.fabricQtyIssued).toFixed(4),
+      thisChallanQty: totalQty.toFixed(4),
       sentToDateQty: afterThis.toFixed(4),
       balanceQty: D(job.qty).minus(afterThis).toFixed(4),
-      challanSeq: earlier.length + 1,
+      // Counted in challans, not issues: an earlier batch of three rolls went
+      // out on ONE sheet, so it is one part, not three.
+      challanSeq: new Set(earlier.map((c) => c.batchNo ?? c.issueNo)).size + 1,
       uom: job.uom,
     };
   }
 
-  const roll = issue.roll;
+  const fabricOf = (m) => ({
+    rollNo: m.roll.rollNo,
+    fabricName: m.fabricName ?? m.roll.fabricName,
+    colourCode: m.colorCode ?? m.roll.colorCode,
+    content: m.roll.content,
+    count: m.roll.count,
+    construction: m.roll.construction,
+    width: m.roll.width,
+    gsm: m.roll.gsm,
+  });
+
+  const buyer = issue.order?.buyer;
+  const cuttingConsignee =
+    !issue.vendor &&
+    (issue.purpose === 'CUTTING' || issue.purpose === 'STITCHING') &&
+    buyer
+      ? {
+          label: 'Consignee',
+          name: buyer.consigneeName || buyer.buyerName,
+          code: buyer.buyerCode,
+          address: issue.order.shipTo || buyer.consigneeAddress || buyer.address,
+          phone: buyer.phone,
+        }
+      : null;
+
   return {
     documentTitle: CHALLAN_TITLE[issue.purpose] ?? 'FABRIC ISSUE SLIP',
-    challanNo: issue.issueNo,
+    challanNo: issue.batchNo ?? issue.issueNo,
+    batchNo: issue.batchNo,
+    /** One line per roll on the sheet - a single entry for a lone issue. */
+    rolls: members.map((m, i) => ({
+      lineNo: i + 1,
+      issueNo: m.issueNo,
+      fabric: fabricOf(m),
+      qty: D(m.fabricQtyIssued).toFixed(4),
+      uom: m.uom,
+    })),
     issueDate: issue.issueDate,
     deliveryDate: issue.deliveryDate,
     purpose: issue.purpose,
@@ -757,24 +876,16 @@ export async function printView(id) {
           label: 'Job worker',
           name: issue.vendor.vendorName,
           code: issue.vendor.vendorCode,
-          address: job?.address ?? issue.vendor.address,
-          pinCode: job?.pinCode ?? issue.vendor.pinCode,
+          address: issue.jobWork?.address ?? issue.vendor.address,
+          pinCode: issue.jobWork?.pinCode ?? issue.vendor.pinCode,
           gstNo: issue.vendor.gstNo,
           phone: issue.vendor.phone,
         }
-      : null,
-    fabric: {
-      rollNo: roll.rollNo,
-      fabricName: issue.fabricName ?? roll.fabricName,
-      colourCode: issue.colorCode ?? roll.colorCode,
-      content: roll.content,
-      count: roll.count,
-      construction: roll.construction,
-      width: roll.width,
-      gsm: roll.gsm,
-    },
+      : cuttingConsignee,
+    fabric: fabricOf(issue),
     line: {
-      qty: D(issue.fabricQtyIssued).toFixed(4),
+      // The sheet's total: this issue's quantity, or the batch's.
+      qty: totalQty.toFixed(4),
       uom: issue.uom,
       from: issue.location,
       to: issue.inProcessLocation,
@@ -843,7 +954,12 @@ async function assertShadeConsistent(client, lineId, roll, reasonText) {
   return { verdict, mixReason };
 }
 
-export async function create(input, actor) {
+/**
+ * Every check an issue makes before anything is written, and everything the
+ * writes need. Run outside the transaction for a fast refusal; `postIssue()`
+ * repeats the checks that count on the transaction itself.
+ */
+async function prepareIssue(input) {
   await validateDropdowns(input);
 
   const roll = await resolveRoll(input.rollId);
@@ -879,6 +995,7 @@ export async function create(input, actor) {
         rollId: input.rollId,
         purpose: input.purpose,
         vendorId: vendor?.id ?? null,
+        orderId: order.id,
         qty,
       })
     : null;
@@ -966,113 +1083,203 @@ export async function create(input, actor) {
     await assertShadeConsistent(prisma, input.cuttingChallanLineId, roll, input.shadeMixReason);
   }
 
-  const issueId = await prisma.$transaction(async (tx) => {
-    /*
-     * LOCK THE ROLL, THEN READ IT.
-     *
-     * -----------------------------------------------------------------------
-     *  This used to be a bare re-read on the transaction client, commented
-     *  "only one passes this one". It was not true. `resolveRoll()` is an
-     *  ordinary `findFirst`, and under READ COMMITTED two storemen issuing the
-     *  same roll both read the same committed balance and both went on to
-     *  write. The variable was called `locked` and nothing was locked, which is
-     *  the reason the defect survived review - a reader checking for a lock
-     *  found the word and stopped looking.
-     *
-     *  `FOR UPDATE` is taken BEFORE the read so the balance this transaction
-     *  goes on to reason about cannot change underneath it. The second storeman
-     *  waits here until the first commits, then reads the balance the first one
-     *  left. PostgreSQL releases the lock at COMMIT or ROLLBACK, so there is
-     *  nothing to unlock on the error paths below.
-     *
-     *  Scope note: this serialises issues OF THE SAME ROLL only. Two storemen
-     *  working different rolls never meet here. The wider (item, location)
-     *  serialisation that protects the stock ledger is separate and lives in
-     *  `postMovement()`.
-     * -----------------------------------------------------------------------
-     */
-    await tx.$executeRaw`SELECT id FROM fabric_rolls WHERE id = ${input.rollId}::uuid FOR UPDATE`;
+  return {
+    order,
+    employee,
+    vendor,
+    styleId,
+    qty,
+    inward,
+    jobWorkOrder,
+    from,
+    destination,
+    inProcessTo,
+    needsChallanLine,
+  };
+}
 
-    const locked = await resolveRoll(input.rollId, tx);
-    if (!inward) {
-      assertAvailable(await checkAvailability(tx, { roll: locked, qty, location: from }));
-      if (needsChallanLine) await assertLineCanTake(tx, input.cuttingChallanLineId, qty);
-    }
-    const shadeCheck = needsChallanLine
-      ? await assertShadeConsistent(tx, input.cuttingChallanLineId, locked, input.shadeMixReason)
-      : { mixReason: null };
+/**
+ * The writes: issue row, ledger legs, challan-line fulfilment, job work
+ * order, roll balance and stage - on the caller's transaction, so a batch of
+ * rolls commits together or not at all.
+ *
+ * @param {import('@prisma/client').Prisma.TransactionClient} tx
+ * @param {object} input
+ * @param {Awaited<ReturnType<typeof prepareIssue>>} ctx
+ * @param {{userId: string, fullName: string}} actor
+ * @param {{batchNo?: string|null}} [opts]
+ * @returns {Promise<string>} the new issue's id
+ */
+async function postIssue(tx, input, ctx, actor, { batchNo = null } = {}) {
+  const {
+    order,
+    employee,
+    vendor,
+    styleId,
+    qty,
+    inward,
+    jobWorkOrder,
+    from,
+    destination,
+    inProcessTo,
+    needsChallanLine,
+  } = ctx;
 
-    // C3: re-resolve the job work authorisation on the transaction too.
-    const authorised = jobWorkOrder
-      ? await assertJobWorkAuthorised(tx, {
-          rollId: input.rollId,
-          purpose: input.purpose,
-          vendorId: vendor?.id ?? null,
-          qty,
-        })
-      : null;
+  /*
+   * LOCK THE ROLL, THEN READ IT.
+   *
+   * -----------------------------------------------------------------------
+   *  This used to be a bare re-read on the transaction client, commented
+   *  "only one passes this one". It was not true. `resolveRoll()` is an
+   *  ordinary `findFirst`, and under READ COMMITTED two storemen issuing the
+   *  same roll both read the same committed balance and both went on to
+   *  write. The variable was called `locked` and nothing was locked, which is
+   *  the reason the defect survived review - a reader checking for a lock
+   *  found the word and stopped looking.
+   *
+   *  `FOR UPDATE` is taken BEFORE the read so the balance this transaction
+   *  goes on to reason about cannot change underneath it. The second storeman
+   *  waits here until the first commits, then reads the balance the first one
+   *  left. PostgreSQL releases the lock at COMMIT or ROLLBACK, so there is
+   *  nothing to unlock on the error paths below.
+   *
+   *  Scope note: this serialises issues OF THE SAME ROLL only. Two storemen
+   *  working different rolls never meet here. The wider (item, location)
+   *  serialisation that protects the stock ledger is separate and lives in
+   *  `postMovement()`.
+   * -----------------------------------------------------------------------
+   */
+  await tx.$executeRaw`SELECT id FROM fabric_rolls WHERE id = ${input.rollId}::uuid FOR UPDATE`;
 
-    const issueNo = input.issueNo?.trim() || (await nextNumber('FABRIC_ISSUE', { tx }));
-    const clash = await tx.fabricIssue.findUnique({ where: { issueNo }, select: { id: true } });
-    if (clash) throw ApiError.conflict('This issue number already exists', { field: 'issueNo' });
+  const locked = await resolveRoll(input.rollId, tx);
+  if (!inward) {
+    assertAvailable(await checkAvailability(tx, { roll: locked, qty, location: from }));
+    if (needsChallanLine) await assertLineCanTake(tx, input.cuttingChallanLineId, qty);
+  }
+  const shadeCheck = needsChallanLine
+    ? await assertShadeConsistent(tx, input.cuttingChallanLineId, locked, input.shadeMixReason)
+    : { mixReason: null };
 
-    const issueDate = input.issueDate ? new Date(input.issueDate) : new Date();
-    const postedAt = new Date();
-
-    const issue = await tx.fabricIssue.create({
-      data: {
-        issueNo,
-        issueDate,
-        vendorId: vendor?.id ?? null,
-        rollId: locked.id,
+  // C3: re-resolve the job work authorisation on the transaction too.
+  const authorised = jobWorkOrder
+    ? await assertJobWorkAuthorised(tx, {
+        rollId: input.rollId,
         purpose: input.purpose,
+        vendorId: vendor?.id ?? null,
         orderId: order.id,
-        styleId,
-        issuedByEmployeeId: employee?.id ?? null,
-        issuedByName: employee?.empName ?? input.issuedByName,
-        fabricQtyIssued: qty,
-        // Excel: "Fabric name" and "Color Code" are attributes of the roll, not
-        // of the issue. Copied from it rather than retyped on a phone.
-        fabricName: input.fabricName ?? locked.fabricName,
-        colorCode: input.colorCode ?? locked.colorCode,
-        uom: input.uom ?? locked.uom,
-        status: 'IN_PROGRESS',
-        remarks: input.remarks ?? null,
-        deliveryDate: input.deliveryDate ? new Date(input.deliveryDate) : null,
-        location: from,
-        // C5 - the requirement this issue fulfils.
-        cuttingChallanLineId: needsChallanLine ? input.cuttingChallanLineId : null,
-        // The roll's shade and lot as issued, and the reason if this issue
-        // knowingly mixed them on its line.
-        shade: locked.shade ?? null,
-        dyeLot: locked.dyeLot ?? null,
-        shadeMixReason: shadeCheck.mixReason,
-        // The job work order (PO) this challan draws on.
-        jobWorkId: authorised?.id ?? null,
-        // C3 / C6 - where the fabric goes TO, when it is going somewhere the
-        // company still owns it. Null on a return and on the purposes that
-        // genuinely consume stock.
-        inProcessLocation: inward ? null : (inProcessTo ?? null),
-        inventoryItemId: locked.inventoryItemId,
-        postedAt,
-        postedById: actor.userId,
-        postedByName: actor.fullName,
-        createdById: actor.userId,
-        updatedById: actor.userId,
-      },
-    });
+        qty,
+      })
+    : null;
 
-    // THE stock ledger movement - OUT for an issue, IN for a return.
-    // postMovement re-checks availability itself on an OUT, and recomputes the
-    // balance from the ledger afterwards either way.
-    const leg1 = await postMovement(tx, {
+  const issueNo = input.issueNo?.trim() || (await nextNumber('FABRIC_ISSUE', { tx }));
+  const clash = await tx.fabricIssue.findUnique({ where: { issueNo }, select: { id: true } });
+  if (clash) throw ApiError.conflict('This issue number already exists', { field: 'issueNo' });
+
+  const issueDate = input.issueDate ? new Date(input.issueDate) : new Date();
+  const postedAt = new Date();
+
+  const issue = await tx.fabricIssue.create({
+    data: {
+      issueNo,
+      issueDate,
+      vendorId: vendor?.id ?? null,
+      rollId: locked.id,
+      purpose: input.purpose,
+      orderId: order.id,
+      styleId,
+      issuedByEmployeeId: employee?.id ?? null,
+      issuedByName: employee?.empName ?? input.issuedByName,
+      fabricQtyIssued: qty,
+      // Excel: "Fabric name" and "Color Code" are attributes of the roll, not
+      // of the issue. Copied from it rather than retyped on a phone.
+      fabricName: input.fabricName ?? locked.fabricName,
+      colorCode: input.colorCode ?? locked.colorCode,
+      uom: input.uom ?? locked.uom,
+      status: 'IN_PROGRESS',
+      remarks: input.remarks ?? null,
+      deliveryDate: input.deliveryDate ? new Date(input.deliveryDate) : null,
+      location: from,
+      // C5 - the requirement this issue fulfils.
+      cuttingChallanLineId: needsChallanLine ? input.cuttingChallanLineId : null,
+      // The roll's shade and lot as issued, and the reason if this issue
+      // knowingly mixed them on its line.
+      shade: locked.shade ?? null,
+      dyeLot: locked.dyeLot ?? null,
+      shadeMixReason: shadeCheck.mixReason,
+      // The rolls posted together with this one, when there were any.
+      batchNo,
+      // The job work order (PO) this challan draws on.
+      jobWorkId: authorised?.id ?? null,
+      // C3 / C6 - where the fabric goes TO, when it is going somewhere the
+      // company still owns it. Null on a return and on the purposes that
+      // genuinely consume stock.
+      inProcessLocation: inward ? null : (inProcessTo ?? null),
+      inventoryItemId: locked.inventoryItemId,
+      postedAt,
+      postedById: actor.userId,
+      postedByName: actor.fullName,
+      createdById: actor.userId,
+      updatedById: actor.userId,
+    },
+  });
+
+  // THE stock ledger movement - OUT for an issue, IN for a return.
+  // postMovement re-checks availability itself on an OUT, and recomputes the
+  // balance from the ledger afterwards either way.
+  const leg1 = await postMovement(tx, {
+    itemId: locked.inventoryItemId,
+    rollId: locked.id,
+    direction: inward ? 'IN' : 'OUT',
+    qty,
+    rate: locked.rate ?? 0,
+    entryDate: issueDate,
+    location: from,
+    documentType: 'FABRIC_ISSUE',
+    documentId: issue.id,
+    documentNo: issue.issueNo,
+    orderId: order.id,
+    snapshot: {
+      itemCategory: locked.inventoryItem?.itemCategory ?? 'Fabric',
+      colorCode: locked.colorCode,
+      gsm: locked.gsm,
+      content: locked.content,
+      uom: locked.uom,
+    },
+    // The batch number is the challan number the fabric travelled under, and
+    // the one a vendor quotes back - so the ledger has to be searchable by it.
+    remarks:
+      (inward
+        ? `Returned to ${from} against ${order.orderNo}`
+        : `Issued for ${input.purpose.toLowerCase()} against ${order.orderNo}` +
+          (vendor ? ` to ${vendor.vendorName}` : '')) + (batchNo ? ` on challan ${batchNo}` : ''),
+    actor,
+  });
+
+  /**
+   * C3 / C6 - THE SECOND LEG.
+   *
+   * The fabric has left the store; this puts it where it actually is. Same
+   * transaction, same quantity, same roll, so the two legs commit together
+   * or not at all and the ledger can never show cloth that left one place
+   * without arriving at another.
+   *
+   * The consequence is the one C3 asks for: fabric at a dye house stays
+   * visible in total on hand, and stays out of available-for-issue, because
+   * `postMovement()` checks availability per location and nobody can issue
+   * from AT DYEING VENDOR.
+   */
+  if (inProcessTo) {
+    await postMovement(tx, {
       itemId: locked.inventoryItemId,
       rollId: locked.id,
-      direction: inward ? 'IN' : 'OUT',
+      direction: 'IN',
       qty,
       rate: locked.rate ?? 0,
+      // FIFO - a transfer, not a purchase: the cloth arrives at the floor or
+      // the dye house at the cost and age it left the store with.
+      carryCost: leg1.consumed,
       entryDate: issueDate,
-      location: from,
+      location: inProcessTo,
       documentType: 'FABRIC_ISSUE',
       documentId: issue.id,
       documentNo: issue.issueNo,
@@ -1084,179 +1291,259 @@ export async function create(input, actor) {
         content: locked.content,
         uom: locked.uom,
       },
-      remarks: inward
-        ? `Returned to ${from} against ${order.orderNo}`
-        : `Issued for ${input.purpose.toLowerCase()} against ${order.orderNo}` +
-          (vendor ? ` to ${vendor.vendorName}` : ''),
+      remarks:
+        `Received at ${inProcessTo} from ${from} on ${issue.issueNo}` +
+        (vendor ? ` (${vendor.vendorName})` : ''),
       actor,
     });
+  }
 
-    /**
-     * C3 / C6 - THE SECOND LEG.
+  /**
+   * C5 - the challan line's issued total, RE-DERIVED from the issues that
+   * quote it, inside this transaction. An issue that rolls back takes its
+   * contribution with it.
+   */
+  if (needsChallanLine) {
+    await recomputeLineFulfilment(tx, input.cuttingChallanLineId);
+  }
+
+  /**
+   * C3 - the job work order is now at the vendor. Stamped and moved to
+   * POSTED in the same transaction as the movement that put it there, so
+   * `stockPostedAt` is never true of a lot whose fabric did not move.
+   */
+  if (authorised) {
+    // What has gone out on this order - RE-DERIVED from its challans, this
+    // one included, never incremented from a number a caller supplied.
+    const sent = await tx.fabricIssue.aggregate({
+      where: { jobWorkId: authorised.id, deletedAt: null },
+      _sum: { fabricQtyIssued: true },
+    });
+    const issuedQty = D(sent._sum.fabricQtyIssued ?? 0);
+    const firstChallan = authorised.workflowState === 'APPROVED';
+
+    /*
+     * C16 - the ROLL's running total, re-derived the same way.
      *
-     * The fabric has left the store; this puts it where it actually is. Same
-     * transaction, same quantity, same roll, so the two legs commit together
-     * or not at all and the ledger can never show cloth that left one place
-     * without arriving at another.
-     *
-     * The consequence is the one C3 asks for: fabric at a dye house stays
-     * visible in total on hand, and stays out of available-for-issue, because
-     * `postMovement()` checks availability per location and nobody can issue
-     * from AT DYEING VENDOR.
+     * Counted from the challans for this job AND this roll, never
+     * incremented, for the reason the header total is re-derived: a
+     * reversed or deleted challan has to take its quantity back with it,
+     * and an increment cannot. This is the figure
+     * assertJobWorkAuthorised() measures the next challan against, so
+     * getting it from the challans themselves is what keeps the
+     * authorisation honest.
      */
-    if (inProcessTo) {
-      await postMovement(tx, {
-        itemId: locked.inventoryItemId,
-        rollId: locked.id,
-        direction: 'IN',
-        qty,
-        rate: locked.rate ?? 0,
-        // FIFO - a transfer, not a purchase: the cloth arrives at the floor or
-        // the dye house at the cost and age it left the store with.
-        carryCost: leg1.consumed,
-        entryDate: issueDate,
-        location: inProcessTo,
-        documentType: 'FABRIC_ISSUE',
-        documentId: issue.id,
-        documentNo: issue.issueNo,
-        orderId: order.id,
-        snapshot: {
-          itemCategory: locked.inventoryItem?.itemCategory ?? 'Fabric',
-          colorCode: locked.colorCode,
-          gsm: locked.gsm,
-          content: locked.content,
-          uom: locked.uom,
-        },
-        remarks:
-          `Received at ${inProcessTo} from ${from} on ${issue.issueNo}` +
-          (vendor ? ` (${vendor.vendorName})` : ''),
-        actor,
-      });
-    }
-
-    /**
-     * C5 - the challan line's issued total, RE-DERIVED from the issues that
-     * quote it, inside this transaction. An issue that rolls back takes its
-     * contribution with it.
-     */
-    if (needsChallanLine) {
-      await recomputeLineFulfilment(tx, input.cuttingChallanLineId);
-    }
-
-    /**
-     * C3 - the job work order is now at the vendor. Stamped and moved to
-     * POSTED in the same transaction as the movement that put it there, so
-     * `stockPostedAt` is never true of a lot whose fabric did not move.
-     */
-    if (authorised) {
-      // What has gone out on this order - RE-DERIVED from its challans, this
-      // one included, never incremented from a number a caller supplied.
-      const sent = await tx.fabricIssue.aggregate({
-        where: { jobWorkId: authorised.id, deletedAt: null },
-        _sum: { fabricQtyIssued: true },
-      });
-      const issuedQty = D(sent._sum.fabricQtyIssued ?? 0);
-      const firstChallan = authorised.workflowState === 'APPROVED';
-
-      /*
-       * C16 - the ROLL's running total, re-derived the same way.
-       *
-       * Counted from the challans for this job AND this roll, never
-       * incremented, for the reason the header total is re-derived: a
-       * reversed or deleted challan has to take its quantity back with it,
-       * and an increment cannot. This is the figure
-       * assertJobWorkAuthorised() measures the next challan against, so
-       * getting it from the challans themselves is what keeps the
-       * authorisation honest.
-       */
-      const sentOnRoll = await tx.fabricIssue.aggregate({
-        where: { jobWorkId: authorised.id, rollId: locked.id, deletedAt: null },
-        _sum: { fabricQtyIssued: true },
-      });
-      await tx.dyeIssueRoll.updateMany({
-        where: { dyeIssueId: authorised.id, rollId: locked.id, deletedAt: null },
-        data: {
-          issuedQty: D(sentOnRoll._sum.fabricQtyIssued ?? 0),
-          updatedById: actor.userId ?? null,
-        },
-      });
-
-      await tx.dyeIssue.update({
-        where: { id: authorised.id },
-        data: {
-          issuedQty,
-          ...(firstChallan
-            ? {
-                fabricIssueId: issue.id,
-                inventoryItemId: locked.inventoryItemId,
-                jobWorkerLocation: inProcessTo ?? destination ?? 'WITH JOB WORKER',
-                stockPostedAt: postedAt,
-                stockPostedById: actor.userId ?? null,
-                stockPostedByName: actor.fullName ?? null,
-              }
-            : {}),
-          updatedById: actor.userId ?? null,
-        },
-      });
-
-      // The first challan puts the order at the vendor. Later ones add to it.
-      if (firstChallan) {
-        await engine.post(tx, {
-          documentType: 'DYE_ISSUE',
-          documentId: authorised.id,
-          actor,
-          remarks:
-            `${qty.toFixed(4)} ${locked.uom} of roll ${locked.rollNo} issued on ` +
-            `${issue.issueNo} and now held at ${inProcessTo ?? destination}.`,
-        });
-      }
-    }
-
-    // The roll follows the fabric: what is left on it, where it now is, and
-    // what stage of the pipeline it has reached.
-    const remaining = inward
-      ? D(locked.balanceQty).plus(qty)
-      : D(locked.balanceQty).minus(qty);
-
-    await tx.fabricRoll.update({
-      where: { id: locked.id },
+    const sentOnRoll = await tx.fabricIssue.aggregate({
+      where: { jobWorkId: authorised.id, rollId: locked.id, deletedAt: null },
+      _sum: { fabricQtyIssued: true },
+    });
+    await tx.dyeIssueRoll.updateMany({
+      where: { dyeIssueId: authorised.id, rollId: locked.id, deletedAt: null },
       data: {
-        /*
-         * ATOMIC, NOT AN ABSOLUTE WRITE.
-         *
-         * `remaining` above is correct - the roll row is locked, so the balance
-         * it was computed from cannot have moved. This is written as a relative
-         * change anyway, and the reason is what happens if that lock is ever
-         * removed or bypassed.
-         *
-         * An absolute write says "the balance is now 40". Two of them racing
-         * both say 40, both are accepted, and 120 Mtrs leave a 100 Mtr roll
-         * with every CHECK constraint satisfied - 40 is a legal balance. A
-         * relative write says "take 60 off whatever is there", which PostgreSQL
-         * serialises on the row, and the second one drives the balance to -20
-         * where `fabric_rolls_balance_non_negative` refuses it.
-         *
-         * So the lock keeps this correct and the atomic form keeps the database
-         * able to notice if it ever stops being. See
-         * test/concurrency.stock.test.js, which asserts both halves.
-         */
-        balanceQty: inward ? { increment: qty } : { decrement: qty },
-        // A roll at zero has been consumed - but only if it got there by being
-        // issued out. A return can never leave a roll empty, and must never
-        // mark one CONSUMED.
-        stage:
-          !inward && remaining.isZero()
-            ? (STAGE_FOR_PURPOSE[input.purpose] ?? 'CONSUMED')
-            : (STAGE_FOR_PURPOSE[input.purpose] ?? locked.stage),
-        location: LOCATION_FOR_PURPOSE[input.purpose] ?? locked.location,
-        updatedById: actor.userId,
+        issuedQty: D(sentOnRoll._sum.fabricQtyIssued ?? 0),
+        updatedById: actor.userId ?? null,
       },
     });
 
-    return issue.id;
+    await tx.dyeIssue.update({
+      where: { id: authorised.id },
+      data: {
+        issuedQty,
+        ...(firstChallan
+          ? {
+              fabricIssueId: issue.id,
+              inventoryItemId: locked.inventoryItemId,
+              jobWorkerLocation: inProcessTo ?? destination ?? 'WITH JOB WORKER',
+              stockPostedAt: postedAt,
+              stockPostedById: actor.userId ?? null,
+              stockPostedByName: actor.fullName ?? null,
+            }
+          : {}),
+        updatedById: actor.userId ?? null,
+      },
+    });
+
+    // The first challan puts the order at the vendor. Later ones add to it.
+    if (firstChallan) {
+      await engine.post(tx, {
+        documentType: 'DYE_ISSUE',
+        documentId: authorised.id,
+        actor,
+        remarks:
+          `${qty.toFixed(4)} ${locked.uom} of roll ${locked.rollNo} issued on ` +
+          `${issue.issueNo} and now held at ${inProcessTo ?? destination}.`,
+      });
+    }
+  }
+
+  // The roll follows the fabric: what is left on it, where it now is, and
+  // what stage of the pipeline it has reached.
+  const remaining = inward
+    ? D(locked.balanceQty).plus(qty)
+    : D(locked.balanceQty).minus(qty);
+
+  await tx.fabricRoll.update({
+    where: { id: locked.id },
+    data: {
+      /*
+       * ATOMIC, NOT AN ABSOLUTE WRITE.
+       *
+       * `remaining` above is correct - the roll row is locked, so the balance
+       * it was computed from cannot have moved. This is written as a relative
+       * change anyway, and the reason is what happens if that lock is ever
+       * removed or bypassed.
+       *
+       * An absolute write says "the balance is now 40". Two of them racing
+       * both say 40, both are accepted, and 120 Mtrs leave a 100 Mtr roll
+       * with every CHECK constraint satisfied - 40 is a legal balance. A
+       * relative write says "take 60 off whatever is there", which PostgreSQL
+       * serialises on the row, and the second one drives the balance to -20
+       * where `fabric_rolls_balance_non_negative` refuses it.
+       *
+       * So the lock keeps this correct and the atomic form keeps the database
+       * able to notice if it ever stops being. See
+       * test/concurrency.stock.test.js, which asserts both halves.
+       */
+      balanceQty: inward ? { increment: qty } : { decrement: qty },
+      // A roll at zero has been consumed - but only if it got there by being
+      // issued out. A return can never leave a roll empty, and must never
+      // mark one CONSUMED.
+      stage:
+        !inward && remaining.isZero()
+          ? (STAGE_FOR_PURPOSE[input.purpose] ?? 'CONSUMED')
+          : (STAGE_FOR_PURPOSE[input.purpose] ?? locked.stage),
+      location: LOCATION_FOR_PURPOSE[input.purpose] ?? locked.location,
+      updatedById: actor.userId,
+    },
   });
 
+  return issue.id;
+}
+
+export async function create(input, actor) {
+  const ctx = await prepareIssue(input);
+  const issueId = await prisma.$transaction((tx) => postIssue(tx, input, ctx, actor));
   return getById(issueId);
+}
+
+/** The most rolls one batch may carry - a trolley-load, not a warehouse. */
+export const MAX_BATCH_ROLLS = 30;
+
+/**
+ * SEVERAL ROLLS, ONE POSTING.
+ *
+ * ---------------------------------------------------------------------------
+ *  The store issues three or four rolls to the cutting floor at a time. Each
+ *  roll is still its own issue - its own FI number, ledger legs, challan-line
+ *  fulfilment and job work draw - because everything downstream is built on
+ *  one roll per issue. What this adds is that they post in ONE transaction
+ *  under one batch number (FIB-0001): all of them, or none.
+ *
+ *  The order, purpose, challan line, job worker, issuer and remarks are shared;
+ *  only the roll and its quantity differ.
+ *
+ *  Rolls post in the order given, so the shade check on the second roll is
+ *  judged against the first one as well as against what was already on the
+ *  line - the same answer `preview()` gives when told the batch's earlier
+ *  rolls. One `shadeMixReason` covers every roll in the batch that needs it.
+ *
+ *  Every roll is locked up front in id order, so two batches that share a
+ *  roll queue behind each other instead of deadlocking.
+ * ---------------------------------------------------------------------------
+ *
+ * @param {object} input  the shared fields plus `rolls: [{rollId, fabricQtyIssued}]`
+ * @param {{userId: string, fullName: string}} actor
+ */
+export async function createBatch(input, actor) {
+  const { rolls, ...shared } = input;
+  const ids = rolls.map((r) => r.rollId);
+
+  if (new Set(ids).size !== ids.length) {
+    throw ApiError.badRequest('The same roll is listed twice. Each roll is issued once per batch.', {
+      field: 'rolls',
+    });
+  }
+
+  // For prefixing a refusal with the roll it is about, where it does not
+  // already say so.
+  const named = await prisma.fabricRoll.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, rollNo: true, uom: true },
+  });
+  const rollNoOf = new Map(named.map((r) => [r.id, r.rollNo]));
+
+  // One sheet, one total: a batch that mixed metres and kilos would print a
+  // sum of the two. Rolls in another unit go out as their own batch.
+  const uoms = [...new Set(named.map((r) => r.uom))];
+  if (uoms.length > 1) {
+    throw ApiError.badRequest(
+      'These rolls are in different units (' + uoms.join(', ') + '). Issue each unit as its own batch.',
+      { field: 'rolls', uoms },
+    );
+  }
+  const aboutRoll = (rollId, err) => {
+    const rollNo = rollNoOf.get(rollId);
+    if (rollNo && err?.message && !err.message.includes(rollNo)) {
+      err.message = `Roll ${rollNo}: ${err.message}`;
+    }
+    return err;
+  };
+
+  const prepared = [];
+  for (const line of rolls) {
+    const lineInput = { ...shared, rollId: line.rollId, fabricQtyIssued: line.fabricQtyIssued };
+    try {
+      prepared.push({ input: lineInput, ctx: await prepareIssue(lineInput) });
+    } catch (err) {
+      throw aboutRoll(line.rollId, err);
+    }
+  }
+
+  // Each roll passed the challan line on its own; the batch has to fit as a
+  // whole. Fast refusal only - the transaction re-checks roll by roll.
+  const { needsChallanLine } = prepared[0].ctx;
+  if (needsChallanLine) {
+    const total = prepared.reduce((sum, p) => sum.plus(p.ctx.qty), ZERO);
+    await assertLineCanTake(prisma, shared.cuttingChallanLineId, total);
+  }
+
+  const batchNo = await prisma.$transaction(
+    async (tx) => {
+      const sorted = [...ids].sort();
+      await tx.$executeRaw`SELECT id FROM fabric_rolls WHERE id = ANY(${sorted}::uuid[]) ORDER BY id FOR UPDATE`;
+
+      const no = await nextNumber('FABRIC_ISSUE', { scopeKey: 'BATCH', tx });
+      for (const p of prepared) {
+        try {
+          await postIssue(tx, p.input, p.ctx, actor, { batchNo: no });
+        } catch (err) {
+          throw aboutRoll(p.input.rollId, err);
+        }
+      }
+      return no;
+    },
+    // Each roll is an issue's worth of writes; see the same allowance in GRN.
+    { timeout: 30_000 + 15_000 * (prepared.length - 1), maxWait: 10_000 },
+  );
+
+  return getBatch(batchNo);
+}
+
+/** The issues posted together under one batch number, in posting order. */
+export async function getBatch(batchNo) {
+  const rows = await prisma.fabricIssue.findMany({
+    where: { batchNo, deletedAt: null },
+    orderBy: { issueNo: 'asc' },
+    include: LIST_INCLUDE,
+  });
+  if (!rows.length) throw ApiError.notFound('Fabric issue batch');
+  const total = rows.reduce((sum, r) => sum.plus(D(r.fabricQtyIssued)), ZERO);
+  return {
+    batchNo,
+    issues: rows.map(project),
+    totalQty: total.toFixed(4),
+    uom: rows[0].uom,
+  };
 }
 
 /**
@@ -1272,19 +1559,37 @@ export async function update(id, input, actorId) {
 
   await validateDropdowns(input);
 
-  const updated = await prisma.fabricIssue.update({
-    where: { id },
-    data: {
-      ...(input.issueDate !== undefined ? { issueDate: new Date(input.issueDate) } : {}),
-      ...(input.fabricName !== undefined ? { fabricName: input.fabricName } : {}),
-      ...(input.colorCode !== undefined ? { colorCode: input.colorCode } : {}),
-      ...(input.remarks !== undefined ? { remarks: input.remarks } : {}),
-      ...(input.deliveryDate !== undefined
-        ? { deliveryDate: input.deliveryDate ? new Date(input.deliveryDate) : null }
-        : {}),
-      updatedById: actorId,
-    },
-    include: LIST_INCLUDE,
+  /*
+   * The date and the remarks belong to the CHALLAN, which a batch shares: the
+   * sheet prints them off whichever roll it was opened from, so changing them
+   * on one roll alone would print a different challan from each roll. They
+   * move for the whole batch. Fabric name and colour are the roll's own.
+   */
+  const shared = {
+    ...(input.issueDate !== undefined ? { issueDate: new Date(input.issueDate) } : {}),
+    ...(input.remarks !== undefined ? { remarks: input.remarks } : {}),
+    ...(input.deliveryDate !== undefined
+      ? { deliveryDate: input.deliveryDate ? new Date(input.deliveryDate) : null }
+      : {}),
+  };
+
+  const updated = await prisma.$transaction(async (tx) => {
+    if (issue.batchNo && Object.keys(shared).length) {
+      await tx.fabricIssue.updateMany({
+        where: { batchNo: issue.batchNo, deletedAt: null, id: { not: id } },
+        data: { ...shared, updatedById: actorId },
+      });
+    }
+    return tx.fabricIssue.update({
+      where: { id },
+      data: {
+        ...shared,
+        ...(input.fabricName !== undefined ? { fabricName: input.fabricName } : {}),
+        ...(input.colorCode !== undefined ? { colorCode: input.colorCode } : {}),
+        updatedById: actorId,
+      },
+      include: LIST_INCLUDE,
+    });
   });
 
   return project(updated);
@@ -1362,7 +1667,14 @@ export async function remove(id, actorId) {
  * Also returns everything the form should fill in from the roll, so a storeman
  * on a phone types a quantity and nothing else.
  */
-export async function preview({ rollId, fabricQtyIssued, purpose, location, cuttingChallanLineId }) {
+export async function preview({
+  rollId,
+  fabricQtyIssued,
+  purpose,
+  location,
+  cuttingChallanLineId,
+  batchRollIds = [],
+}) {
   const roll = await resolveRoll(rollId);
   const inward = isReturn(purpose);
   const from = location ?? (inward ? DEFAULT_LOCATION : roll.location) ?? DEFAULT_LOCATION;
@@ -1404,10 +1716,25 @@ export async function preview({ rollId, fabricQtyIssued, purpose, location, cutt
       orderBy: { createdAt: 'asc' },
       select: { issueNo: true, shade: true, dyeLot: true, roll: { select: { rollNo: true } } },
     });
-    shade = assessShadeMix(
-      roll,
-      established.map((e) => ({ issueNo: e.issueNo, rollNo: e.roll?.rollNo, shade: e.shade, dyeLot: e.dyeLot })),
-    );
+    /*
+     * In a batch the rolls ahead of this one will be on the line by the time
+     * this one posts - `createBatch()` posts them in order - so they count as
+     * established here too, and the phone asks for a mix reason before the
+     * posting would refuse without one.
+     */
+    const ahead = batchRollIds.length
+      ? await prisma.fabricRoll.findMany({
+          where: { id: { in: batchRollIds.filter((id) => id !== rollId) }, deletedAt: null },
+          select: { id: true, rollNo: true, shade: true, dyeLot: true },
+        })
+      : [];
+    const aheadInOrder = batchRollIds
+      .map((id) => ahead.find((r) => r.id === id))
+      .filter(Boolean);
+    shade = assessShadeMix(roll, [
+      ...established.map((e) => ({ issueNo: e.issueNo, rollNo: e.roll?.rollNo, shade: e.shade, dyeLot: e.dyeLot })),
+      ...aheadInOrder.map((r) => ({ issueNo: 'this batch', rollNo: r.rollNo, shade: r.shade, dyeLot: r.dyeLot })),
+    ]);
   }
 
   return {

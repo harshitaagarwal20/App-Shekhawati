@@ -1,9 +1,12 @@
 # Shekhawati ERP - Android app
 
 A Capacitor wrapper that opens the live site
-(`server.url` in `capacitor.config.json`). Web deployments reach the app
-automatically; a blue "New version available - Refresh" bar appears at the top
-after each deploy (see `client/src/components/UpdateBanner.jsx`).
+(`server.url` in `capacitor.config.json`) - the Static Web App, so deploy with
+`tools/azure-deploy.ps1 -Swa` or the app keeps the previous build. Web
+deployments then reach the app automatically: within a minute a blue bar
+announces the new version, and the app reloads onto it by itself at the next
+screen change, or once it is idle with nothing typed (see
+`client/src/components/UpdateBanner.jsx`).
 
 A new APK is only needed if the site URL, app name or icon changes.
 

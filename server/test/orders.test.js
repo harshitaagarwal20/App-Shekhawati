@@ -17,6 +17,7 @@ import bcrypt from 'bcryptjs';
 import { createApp } from '../src/app.js';
 import prisma from '../src/config/prisma.js';
 import { calculateEffectiveQty, calculateRequirement } from '../src/services/buyerOrder.service.js';
+import { peekNumber } from '../src/services/documentNumber.service.js';
 
 const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD || 'Admin@123';
 const USER_PASSWORD = process.env.SEED_DEFAULT_USER_PASSWORD || 'Shekhawati@123';
@@ -197,16 +198,45 @@ describe('order creation', () => {
     assert.equal((await makeOrder({ orderQty: '-5' })).status, 422);
   });
 
+  test("a typed order number does not become a colleague's clash", async () => {
+    // Somebody types the very number the counter would hand out next...
+    const next = await peekNumber('BUYER_ORDER');
+    assert.ok(next, 'a BUYER_ORDER sequence is seeded');
+    const typed = await makeOrder({ orderNo: next });
+    assert.equal(typed.status, 201, JSON.stringify(typed.body));
+    assert.equal(typed.body.data.orderNo, next);
+
+    // ...and the next person, who typed nothing, is not refused for it.
+    const drawn = await makeOrder();
+    assert.equal(drawn.status, 201, JSON.stringify(drawn.body));
+    assert.notEqual(drawn.body.data.orderNo, next);
+  });
+
+  test('an order number is letters and digits, not markup or a path', async () => {
+    for (const orderNo of ['../../x<b>', 'SO 1<script>', '..', '-SO-1']) {
+      const res = await makeOrder({ orderNo });
+      assert.equal(res.status, 422, `${orderNo}: ${JSON.stringify(res.body)}`);
+      assert.ok(res.body.error.details.fields.orderNo);
+    }
+    // A buyer PO number in its usual shapes is still fine.
+    const ok = await makeOrder({ orderNo: `PO/2026/${Date.now()}` });
+    assert.equal(ok.status, 201, JSON.stringify(ok.body));
+  });
+
   test('refuses a colour that is not in the ColorCode list', async () => {
     const res = await makeOrder({ colorCode: 'Invisible Mauve' });
     assert.equal(res.status, 400);
-    assert.match(res.body.error.message, /ColorCode/);
+    assert.match(res.body.error.message, /not one of the Color Code values/);
   });
 
+  // 5%: above the seeded 2% band, so it goes to the Director and needs a case.
   test('an excess request needs a justification', async () => {
-    const res = await makeOrder({ excessPct: '0.02' });
-    assert.equal(res.status, 422);
-    assert.ok(res.body.error.details.fields.excessJustification);
+    const res = await makeOrder({ excessPct: '0.05' });
+    // Refused by the service, which knows the buyer's band - not by the schema,
+    // which would refuse a 2% excess the band grants on entry.
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error.details.field, 'excessJustification');
+    assert.match(res.body.error.message, /needs a justification/);
   });
 });
 
@@ -304,10 +334,11 @@ describe('excess approval workflow', () => {
   let orderId;
 
   before(async () => {
+    // Above the 2% band, so this one waits for the Director.
     const res = await makeOrder({
       orderQty: '5000',
-      excessPct: '0.02',
-      excessJustification: 'Standard 2% cutting allowance',
+      excessPct: '0.05',
+      excessJustification: 'Gusseted style, 5% cutting allowance',
     });
     orderId = res.body.data.id;
   });
@@ -346,7 +377,7 @@ describe('excess approval workflow', () => {
     const order = res.body.data;
 
     assert.equal(order.excessApprovalStatus, 'APPROVED');
-    assert.equal(Number(order.excessPct), 0.02, 'the request is kept as it was made');
+    assert.equal(Number(order.excessPct), 0.05, 'the request is kept as it was made');
     assert.equal(Number(order.excessApprovedPct), 0.01);
     assert.equal(Number(order.effectiveQty), 5050, '5000 x 1.01');
     assert.equal(Number(order.excessQty), 50);
@@ -399,14 +430,14 @@ describe('editing before approval', () => {
   test('changing the quantity sends an approved excess back to the Director', async () => {
     const made = await makeOrder({
       orderQty: '1000',
-      excessPct: '0.02',
+      excessPct: '0.05',
       excessJustification: 'Cutting allowance',
     });
     const id = made.body.data.id;
 
     await call('POST', `/api/orders/${id}/excess/approve`, { token: directorToken, body: {} });
     let detail = await call('GET', `/api/orders/${id}`, { token: adminToken });
-    assert.equal(Number(detail.body.data.effectiveQty), 1020);
+    assert.equal(Number(detail.body.data.effectiveQty), 1050);
 
     const edited = await call('PATCH', `/api/orders/${id}`, {
       token: merchToken,
@@ -427,7 +458,7 @@ describe('editing before approval', () => {
   test('editing only a remark leaves the excess decision alone', async () => {
     const made = await makeOrder({
       orderQty: '800',
-      excessPct: '0.02',
+      excessPct: '0.05',
       excessJustification: 'Allowance',
     });
     const id = made.body.data.id;
@@ -439,8 +470,68 @@ describe('editing before approval', () => {
     });
     assert.equal(edited.status, 200);
     assert.equal(edited.body.data.excessApprovalStatus, 'APPROVED');
-    assert.equal(Number(edited.body.data.effectiveQty), 816);
+    assert.equal(Number(edited.body.data.effectiveQty), 840);
   });
+});
+
+/*
+ * THE BAND AND THE CEILING COME FROM THE EXCESS RULES.
+ *
+ * They were a constant in buyerOrder.service.js while the Excess Rules screen
+ * showed a BUYER_ORDER rule nothing read. These pin that the seeded rule (2%
+ * band, 10% ceiling) is what decides, and that a buyer's own rule overrides it.
+ */
+describe('order excess follows the excess rules', () => {
+  let buyerRuleId;
+
+  after(async () => {
+    if (buyerRuleId) await prisma.excessRule.delete({ where: { id: buyerRuleId } });
+  });
+
+  test('an excess up to the band is granted on entry, with no justification', async () => {
+    const res = await makeOrder({ orderQty: '1000', excessPct: '0.02' });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.equal(res.body.data.excessApprovalStatus, 'APPROVED');
+    assert.equal(Number(res.body.data.effectiveQty), 1020);
+  });
+
+  test('an excess past the ceiling is refused, not queued for the Director', async () => {
+    const res = await makeOrder({
+      orderQty: '1000',
+      excessPct: '0.15',
+      excessJustification: 'More than any approval may grant',
+    });
+    assert.equal(res.status, 400);
+    assert.match(res.body.error.message, /ceiling/i);
+  });
+
+  test('the policy endpoint reports the band and ceiling the form uses', async () => {
+    const res = await call('GET', `/api/orders/excess-policy?buyerId=${buyer.id}`, { token: merchToken });
+    assert.equal(res.status, 200);
+    assert.equal(Number(res.body.data.autoApprovedPct), 0.02);
+    assert.equal(Number(res.body.data.hardCeilingPct), 0.1);
+  });
+
+  test("a buyer's own rule widens the band for that buyer", async () => {
+    const rule = await prisma.excessRule.create({
+      data: {
+        scope: 'BUYER',
+        scopeKey: buyer.id,
+        documentType: 'BUYER_ORDER',
+        excessPct: '0.04',
+        hardCeilingPct: '0.10',
+        basis: 'test - contracted 4% for this buyer',
+      },
+    });
+    buyerRuleId = rule.id;
+
+    const res = await makeOrder({ orderQty: '1000', excessPct: '0.04' });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.equal(res.body.data.excessApprovalStatus, 'APPROVED', '4% is inside this buyer\'s band');
+  });
+});
+
+describe('editing an order with downstream documents', () => {
 
   test('a seeded order with downstream documents refuses a structural edit', async () => {
     const seeded = await prisma.buyerOrder.findFirst({ where: { orderNo: 'B9641IS' } });

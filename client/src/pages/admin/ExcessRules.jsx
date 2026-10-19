@@ -16,6 +16,12 @@
  *
  * so a user can see WHY a particular percentage applied to a particular
  * transaction, instead of wondering where the number came from.
+ *
+ * ONLY WHAT IS READ IS OFFERED. Rules can be made for the four documents that
+ * read them (RULE_CONSUMERS in excess.service.js), purchase orders and
+ * receipts take the percentage alone, and item-category tolerances belong on
+ * the Tolerance Rules screen. An older row that nothing reads says so in the
+ * list instead of passing for policy.
  */
 
 import { useState } from 'react';
@@ -57,14 +63,25 @@ const SCOPES = ['GLOBAL', 'DOCUMENT_TYPE', 'ITEM_CATEGORY', 'BUYER', 'ORDER'].ma
   label: fmtEnum(v),
 }));
 
-const DOCUMENT_TYPES = [
-  'BUYER_ORDER',
-  'PURCHASE_ORDER',
-  'GRN',
-  'DYE_ISSUE',
-  'FABRIC_ISSUE',
-  'CUTTING_ISSUE',
-].map((v) => ({ value: v, label: fmtEnum(v) }));
+/** New rules: item category is set on the Tolerance Rules screen instead. */
+const CREATE_SCOPES = SCOPES.filter((s) => s.value !== 'ITEM_CATEGORY');
+
+/** The documents that read an excess rule - the server refuses any other. */
+const DOCUMENT_TYPES = ['BUYER_ORDER', 'CUTTING_ISSUE', 'PURCHASE_ORDER', 'GRN'].map((v) => ({
+  value: v,
+  label: fmtEnum(v),
+}));
+
+/** What the percentage does on each document, for the form's hint. */
+const PCT_MEANING = {
+  BUYER_ORDER: 'An order excess up to this is granted on entry; above it the Director decides.',
+  CUTTING_ISSUE: 'Cutting past this over the approved plan needs an authorisation.',
+  PURCHASE_ORDER: 'The order tolerance for a category with no Tolerance Rules row. A PO over it is refused.',
+  GRN: 'The receipt tolerance for a category with no Tolerance Rules row. A receipt over it is flagged.',
+};
+
+/** Purchase orders and receipts read the percentage alone. */
+const PCT_ONLY = ['PURCHASE_ORDER', 'GRN'];
 
 export default function ExcessRules() {
   const { can } = useAuth();
@@ -230,10 +247,15 @@ function RulesTab({ can }) {
 
               {!list.loading &&
                 list.rows.map((r) => (
-                  <tr key={r.id} className={!r.isActive ? 'inactive' : ''}>
+                  <tr key={r.id} className={!r.isActive || r.inEffect === false ? 'inactive' : ''}>
                     <td>
                       <strong>{fmtEnum(r.scope)}</strong>
                       <div className="faint">rank {r.precedenceRank + 1}</div>
+                      {r.notInEffectReason && (
+                        <div style={{ color: 'var(--warning)', fontSize: 12, maxWidth: 220 }}>
+                          Not in effect: {r.notInEffectReason}
+                        </div>
+                      )}
                     </td>
                     <td className="code">{r.scopeKey || '(everything)'}</td>
                     <td>{r.documentType ? fmtEnum(r.documentType) : 'any'}</td>
@@ -241,9 +263,15 @@ function RulesTab({ can }) {
                       <strong>{r.excessPctDisplay}%</strong>
                     </td>
                     <td className="num">
-                      {r.hardCeilingPctDisplay ? `${r.hardCeilingPctDisplay}%` : 'none'}
+                      {r.fieldsInEffect && !r.fieldsInEffect.includes('hardCeilingPct')
+                        ? <span className="faint">not used</span>
+                        : r.hardCeilingPctDisplay ? `${r.hardCeilingPctDisplay}%` : 'none'}
                     </td>
-                    <td>{r.requiresApproval ? 'Required over the limit' : 'Advisory only'}</td>
+                    <td>
+                      {r.fieldsInEffect && !r.fieldsInEffect.includes('requiresApproval')
+                        ? <span className="faint">not used</span>
+                        : r.requiresApproval ? 'Required over the limit' : 'Not required up to the ceiling'}
+                    </td>
                     <td className="num">{r.priority}</td>
                     <td className="muted" style={{ maxWidth: 320 }}>
                       {r.basis ?? '-'}
@@ -333,6 +361,11 @@ function RuleForm({ rule, onSaved, onCancel }) {
   });
 
   const scope = form.watch('scope');
+  const documentType = form.watch('documentType');
+  const scopeKey = form.watch('scopeKey');
+  // The document this rule is for - named directly, or as a DOCUMENT_TYPE key.
+  const forDocument = documentType || (scope === 'DOCUMENT_TYPE' ? scopeKey?.trim() : '') || '';
+  const pctOnly = PCT_ONLY.includes(forDocument);
 
   const { submit, busy, banner, setBanner } = useSubmit(
     form,
@@ -340,7 +373,7 @@ function RuleForm({ rule, onSaved, onCancel }) {
       const body = {
         excessPct: String(Number(values.excessPctDisplay) / 100),
         hardCeilingPct:
-          values.hardCeilingPctDisplay === '' || values.hardCeilingPctDisplay === undefined
+          pctOnly || values.hardCeilingPctDisplay === '' || values.hardCeilingPctDisplay === undefined
             ? null
             : String(Number(values.hardCeilingPctDisplay) / 100),
         requiresApproval: values.requiresApproval,
@@ -381,8 +414,9 @@ function RuleForm({ rule, onSaved, onCancel }) {
             label="Scope"
             required
             includeBlank={false}
-            options={SCOPES}
+            options={isNew ? CREATE_SCOPES : SCOPES}
             disabled={!isNew}
+            hint={isNew ? 'Item-category tolerances are set on the Tolerance Rules screen.' : undefined}
           />
           <RHFInput
             form={form}
@@ -394,7 +428,7 @@ function RuleForm({ rule, onSaved, onCancel }) {
                 : scope === 'ITEM_CATEGORY'
                   ? 'An item category, e.g. Accessories.'
                   : scope === 'DOCUMENT_TYPE'
-                    ? 'A document type, e.g. PURCHASE_ORDER.'
+                    ? `One of ${DOCUMENT_TYPES.map((d) => d.value).join(', ')}.`
                     : 'The id of the buyer or order.'
             }
             disabled={!isNew || scope === 'GLOBAL'}
@@ -426,7 +460,7 @@ function RuleForm({ rule, onSaved, onCancel }) {
             step="any"
             min="0"
             required
-            hint="Beyond this, a transaction needs an authorisation."
+            hint={PCT_MEANING[forDocument] ?? 'Beyond this, a transaction needs an authorisation.'}
           />
           <RHFInput
             form={form}
@@ -435,12 +469,28 @@ function RuleForm({ rule, onSaved, onCancel }) {
             type="number"
             step="any"
             min="0"
-            hint="Past this, no authorisation can help — only a smaller quantity. Blank means no ceiling."
+            disabled={pctOnly}
+            hint={
+              pctOnly
+                ? 'Not used: this document is judged on the percentage alone.'
+                : 'Past this, no authorisation can help — only a smaller quantity. Blank means no ceiling.'
+            }
           />
-          <Field label="Approval">
-            <label className="row" style={{ gap: 8, cursor: 'pointer' }}>
-              <input type="checkbox" {...form.register('requiresApproval')} style={{ width: 18, height: 18 }} />
-              <span>Exceeding the threshold requires an authorisation</span>
+          <Field
+            label="Approval"
+            hint={pctOnly ? 'Not used: this document is judged on the percentage alone.' : undefined}
+          >
+            <label className="row" style={{ gap: 8, cursor: pctOnly ? 'default' : 'pointer' }}>
+              <input
+                type="checkbox"
+                disabled={pctOnly}
+                {...form.register('requiresApproval')}
+                style={{ width: 18, height: 18 }}
+              />
+              <span>
+                Exceeding the threshold requires an authorisation (unticked: allowed up to the
+                ceiling without one)
+              </span>
             </label>
           </Field>
           <RHFTextArea

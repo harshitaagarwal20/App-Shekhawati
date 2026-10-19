@@ -168,7 +168,6 @@ export default function GrnReversalDetail() {
       )}
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-header">GRN Reversal</div>
         <div className="card-body">
           <div className="value" style={{ fontSize: 18 }}>
             <StatusBadge status={row.workflowState} />

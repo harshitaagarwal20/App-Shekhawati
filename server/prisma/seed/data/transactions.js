@@ -251,16 +251,19 @@ export const cuttingIssues = [
  *
  * hardCeilingPct is the point past which an excess cannot be authorised at
  * all, only refused. Null means an approver may allow any excess with a
- * reason.
+ * reason. Purchase orders and receipts read the percentage alone, so their
+ * rules carry no ceiling.
+ *
+ * Only document types something reads are here (RULE_CONSUMERS in
+ * excess.service.js). Item-category tolerances - accessories 1% order / 3%
+ * receipt - live in the tolerance master (C2), and job-work shrinkage in the
+ * shrinkage master (C3); rows for them here were shadowed and never read.
  */
 export const excessRules = [
   { scope: 'GLOBAL',        scopeKey: '',               documentType: null,             excessPct: '0.02', hardCeilingPct: '0.05', requiresApproval: true,  priority: 0,  basis: 'Default tolerance. Process Documentation s.5: a 2% excess variation is accepted generally.' },
-  { scope: 'DOCUMENT_TYPE', scopeKey: 'PURCHASE_ORDER', documentType: 'PURCHASE_ORDER', excessPct: '0.03', hardCeilingPct: '0.05', requiresApproval: true,  priority: 10, basis: 'PO sheet, note beside the Excess Allowed column: "2-3%".' },
-  { scope: 'ITEM_CATEGORY', scopeKey: 'Accessories',    documentType: 'PURCHASE_ORDER', excessPct: '0.01', hardCeilingPct: '0.03', requiresApproval: true,  priority: 20, basis: 'Process Documentation s.5: accessories may be ordered only 1% over requirement.' },
-  { scope: 'DOCUMENT_TYPE', scopeKey: 'GRN',            documentType: 'GRN',            excessPct: '0.02', hardCeilingPct: '0.05', requiresApproval: true,  priority: 10, basis: 'Process Documentation s.5: a 2% excess variation is accepted on material generally.' },
-  { scope: 'ITEM_CATEGORY', scopeKey: 'Accessories',    documentType: 'GRN',            excessPct: '0.03', hardCeilingPct: '0.03', requiresApproval: true,  priority: 20, basis: 'Process Documentation s.5: accessories may be received up to 3% in excess and no more.' },
-  { scope: 'DOCUMENT_TYPE', scopeKey: 'DYE_ISSUE',      documentType: 'DYE_ISSUE',      excessPct: '0.03', hardCeilingPct: '0.10', requiresApproval: false, priority: 10, basis: 'Process Documentation: 2-3% shrinkage is normal on a dye lot. Advisory - an out-of-tolerance return goes to scrutiny rather than being refused.' },
-  { scope: 'DOCUMENT_TYPE', scopeKey: 'BUYER_ORDER',    documentType: 'BUYER_ORDER',    excessPct: '0.02', hardCeilingPct: '0.10', requiresApproval: true,  priority: 10, basis: 'Order sheet, note on the Excess column: "Approval from dinesh sir".' },
+  { scope: 'DOCUMENT_TYPE', scopeKey: 'PURCHASE_ORDER', documentType: 'PURCHASE_ORDER', excessPct: '0.03', hardCeilingPct: null,   requiresApproval: true,  priority: 10, basis: 'PO sheet, note beside the Excess Allowed column: "2-3%".' },
+  { scope: 'DOCUMENT_TYPE', scopeKey: 'GRN',            documentType: 'GRN',            excessPct: '0.02', hardCeilingPct: null,   requiresApproval: true,  priority: 10, basis: 'Process Documentation s.5: a 2% excess variation is accepted on material generally.' },
+  { scope: 'DOCUMENT_TYPE', scopeKey: 'BUYER_ORDER',    documentType: 'BUYER_ORDER',    excessPct: '0.02', hardCeilingPct: '0.10', requiresApproval: true,  priority: 10, basis: 'Order sheet, note on the Excess column: "Approval from dinesh sir". Up to 2% is granted on entry; above it the Director decides.' },
   { scope: 'DOCUMENT_TYPE', scopeKey: 'CUTTING_ISSUE',  documentType: 'CUTTING_ISSUE',  excessPct: '0.02', hardCeilingPct: '0.05', requiresApproval: true,  priority: 10, basis: 'Cutting beyond the approved plan needs the same authority as ordering beyond the style.' },
 ];
 
@@ -308,6 +311,7 @@ export const documentSequences = [
   { documentType: 'MATERIAL_PLAN',   scopeKey: '', prefix: 'MP',  separator: '-', padLength: 4, nextNumber: 1, description: 'Material Plan - MP-0001 (migration 20260831000200)' },
   { documentType: 'GRN_REVERSAL',    scopeKey: '', prefix: 'GRV', separator: '-', padLength: 4, nextNumber: 1, description: 'GRN Reversal - GRV-0001 (migration 20260901000200)' },
   { documentType: 'OPENING_BALANCE', scopeKey: '', prefix: 'OB',  separator: '-', padLength: 4, nextNumber: 1, description: 'Opening stock posting - OB-0001 (migration 20261005000200)' },
+  { documentType: 'FABRIC_ISSUE',    scopeKey: 'BATCH', prefix: 'FIB', separator: '-', padLength: 4, nextNumber: 1, description: 'Rolls issued together - FIB-0001 (migration 20261015000100)' },
   // PO IDs run one counter per vendor: "Vendor initial + no" (PO sheet, row 3).
   { documentType: 'PURCHASE_ORDER',   scopeKey: 'RF', prefix: 'RF', separator: '-', padLength: 3, nextNumber: 5, description: 'PO - Rajasthan Fabrics' },
   { documentType: 'PURCHASE_ORDER',   scopeKey: 'MA', prefix: 'MA', separator: '-', padLength: 3, nextNumber: 4, description: 'PO - Metro Accessories' },

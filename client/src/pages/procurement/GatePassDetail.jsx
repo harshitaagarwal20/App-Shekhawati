@@ -221,7 +221,6 @@ export default function GatePassDetail() {
       />
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-header">Gate Pass</div>
         <div className="card-body">
           <div className="value" style={{ fontSize: 18 }}>
             <StatusBadge status={gp.status} />
@@ -231,7 +230,6 @@ export default function GatePassDetail() {
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-header">Gate pass</div>
         <div className="card-body">
           <DetailGrid>
             <Detail label="Gate Pass No" value={gp.gatePassNo} mono />

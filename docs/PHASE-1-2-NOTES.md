@@ -77,10 +77,12 @@ first request rather than silently allowing everyone.
 
 Also implemented:
 
-- **Forced first password change.** Every seeded and admin-created account is
-  flagged `mustChangePassword`. `requirePasswordChanged` blocks the whole API
-  except `/auth/me`, `/auth/change-password` and the logout routes, so the user
-  can complete exactly the one action that is open to them.
+- **Forced first password change - RETIRED.** Phase 1 flagged every seeded
+  and admin-created account `mustChangePassword`, and `requirePasswordChanged`
+  blocked the API until the password was changed. Both are gone: accounts are
+  created with the flag off and nothing blocks on it. The column and the
+  client's Change Password screen remain; a person changes their password
+  there when they choose to.
 - **Login rate limiting** — 10 attempts per 15 minutes, keyed on username.
   In-process and dependency-free, because the fixed stack has no rate-limit
   package or Redis. Adequate for one on-premise API process; move it to a shared

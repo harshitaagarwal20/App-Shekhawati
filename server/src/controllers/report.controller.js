@@ -1,6 +1,7 @@
 import * as service from '../services/report.service.js';
 import { ApiError } from '../utils/ApiError.js';
 import { asyncHandler, ok } from '../utils/http.js';
+import { istIsoDate } from '../utils/dates.js';
 
 /**
  * A UTF-8 byte-order mark on the CSV.
@@ -64,7 +65,7 @@ export const csv = asyncHandler(async (req, res) => {
   // `runForExport`, not `run`: an export is the whole report, never a page of
   // it. The screen pages; the file does not.
   const report = await service.runForExport(req.params.key, req.query);
-  const stamp = new Date().toISOString().slice(0, 10);
+  const stamp = istIsoDate();
 
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', `attachment; filename="${req.params.key}-${stamp}.csv"`);

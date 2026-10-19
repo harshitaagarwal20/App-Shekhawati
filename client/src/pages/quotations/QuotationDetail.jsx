@@ -170,7 +170,6 @@ export default function QuotationDetail() {
 
       {/* --- Quotation details -------------------------------------------- */}
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-header">Quotation</div>
         <div className="card-body">
           <div className="form-grid">
             <Detail label="Quotation No" value={quotation.quotationNo} mono />

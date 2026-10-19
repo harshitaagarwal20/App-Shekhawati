@@ -66,6 +66,12 @@ const receiveFile = (req, res, next) =>
 // Static paths first, so "options" and "preview" are not read as an order id.
 router.get('/options', can('BUYER_ORDER.VIEW'), c.options);
 router.post('/preview', can('BUYER_ORDER.VIEW'), validate({ body: previewSchema }), c.preview);
+router.get(
+  '/excess-policy',
+  can('BUYER_ORDER.VIEW'),
+  validate({ query: z.object({ buyerId: uuid.optional(), orderId: uuid.optional() }) }),
+  c.excessPolicy,
+);
 
 router.get('/', can('BUYER_ORDER.VIEW'), validate({ query: orderListQuery }), c.list);
 router.post('/', can('BUYER_ORDER.CREATE'), validate({ body: createOrderSchema }), c.create);

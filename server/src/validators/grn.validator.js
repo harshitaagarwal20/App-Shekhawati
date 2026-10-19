@@ -269,6 +269,28 @@ export const rollListQuery = listQuery.extend({
     .enum(['true', 'false'])
     .optional()
     .transform((v) => (v === undefined ? undefined : v === 'true')),
+  inspectionStatus: z.enum(['PENDING', 'PASSED', 'FAILED']).optional(),
+});
+
+/**
+ * Inward inspection of one roll. Only the result is required; each
+ * measurement is optional, because an inspector who did not measure has
+ * nothing to put there.
+ */
+export const inspectRollSchema = z.object({
+  status: z.enum(['PASSED', 'FAILED']),
+  inspectedQty: decimal('Measured length', { allowZero: false }).nullable().optional(),
+  inspectedWidth: decimal('Measured width', { allowZero: false }).nullable().optional(),
+  inspectedGsm: decimal('Measured GSM', { allowZero: false }).nullable().optional(),
+  defectQty: decimal('Faulty length').nullable().optional(),
+  remarks: optionalText(1000),
+});
+
+/** One result over several rolls - no measurements, which are per roll. */
+export const inspectRollBatchSchema = z.object({
+  rollIds: z.array(uuid).min(1).max(200),
+  status: z.enum(['PASSED', 'FAILED']),
+  remarks: optionalText(1000),
 });
 
 /**

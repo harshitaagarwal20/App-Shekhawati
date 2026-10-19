@@ -643,12 +643,22 @@ describe('C9 - avg_utilisation_per_piece', () => {
     assert.equal(byName.effective_from.is_nullable, 'NO');
   });
 
-  test('a utilisation of zero is refused - a requirement is never silently zero', { skip: skipIfNoDb() }, async () => {
+  // Zero is allowed since migration 20260924000000_style_utilisation_zero_allowed:
+  // it means "sampling has not decided it yet", and the requirement - not the
+  // write - is where a zero is refused (reason NO_UTILISATION).
+  test('a utilisation of zero is accepted - it means "not decided yet"', { skip: skipIfNoDb() }, async () => {
     const line = await prisma.styleBomLine.findFirst({ select: { id: true } });
     if (!line) return;
-    await refusedBy(
-      'style_bom_lines_utilisation_positive',
-      `UPDATE style_bom_lines SET avg_utilisation_per_piece = 0 WHERE id = '${line.id}'`,
+    const rollback = new Error('rollback');
+    await assert.rejects(
+      prisma.$transaction(async (tx) => {
+        await tx.$executeRawUnsafe(
+          `UPDATE style_bom_lines SET avg_utilisation_per_piece = 0 WHERE id = '${line.id}'`,
+        );
+        throw rollback;
+      }),
+      (e) => e === rollback,
+      'the write succeeds, and is rolled back so the seeded line is untouched',
     );
   });
 
@@ -656,7 +666,7 @@ describe('C9 - avg_utilisation_per_piece', () => {
     const line = await prisma.styleBomLine.findFirst({ select: { id: true } });
     if (!line) return;
     await refusedBy(
-      'style_bom_lines_utilisation_positive',
+      'style_bom_lines_utilisation_non_negative',
       `UPDATE style_bom_lines SET avg_utilisation_per_piece = -1 WHERE id = '${line.id}'`,
     );
   });

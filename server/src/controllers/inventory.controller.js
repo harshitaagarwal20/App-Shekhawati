@@ -156,6 +156,20 @@ export const markRollShade = asyncHandler(async (req, res) =>
   ),
 );
 
+/** An inspection is signed by name, so the actor carries one. */
+const inspector = (req) => ({
+  userId: req.auth.userId,
+  fullName: req.auth.fullName ?? req.auth.username ?? null,
+});
+
+export const inspectRoll = asyncHandler(async (req, res) =>
+  ok(res, await service.inspectRoll(req.params.id, req.body, inspector(req))),
+);
+
+export const inspectRollBatch = asyncHandler(async (req, res) =>
+  ok(res, await service.inspectRollBatch(req.body, inspector(req))),
+);
+
 export const relocateRoll = asyncHandler(async (req, res) =>
   ok(res, await service.relocateRoll(req.params.id, req.body, actor(req))),
 );

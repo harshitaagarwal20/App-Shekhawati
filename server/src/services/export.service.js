@@ -38,6 +38,7 @@ import { Prisma } from '@prisma/client';
 import { ApiError } from '../utils/ApiError.js';
 import { CSV_BOM, toCsv } from '../utils/csv.js';
 import { allDatasets, datasetFor, filterKeysOf } from './dataset.registry.js';
+import { istIsoDate } from '../utils/dates.js';
 
 /**
  * The most rows one export will produce.
@@ -356,5 +357,5 @@ export function toCsvFile(result) {
 
 /** `buyers-2026-09-04.csv` */
 export function fileNameFor(result) {
-  return `${result.key}-${new Date().toISOString().slice(0, 10)}.csv`;
+  return `${result.key}-${istIsoDate()}.csv`;
 }

@@ -66,6 +66,20 @@ const SEED_EPOCH = '2026-08-01';
 
 const MAIN_STORE = 'MAIN STORE';
 
+/**
+ * When the Cutting Challan (C5) came in. `fabric_issues_new_rows_need_challan`
+ * requires every cutting issue CREATED after it to quote a challan line, and
+ * exempts the issues that predate it. The workbook's issues are that history,
+ * so they are stamped as created on their own date - and never later than
+ * this, or a run of the seed after the cut-off would be refused for paperwork
+ * that did not exist when the fabric went out.
+ */
+const C5_CUT_OFF = new Date('2026-08-27T00:00:00.000Z');
+
+/** When the C3 migration started the shrinkage rules. */
+const C3_START = new Date('2026-08-27T00:00:00.000Z');
+const beforeC5 = (d) => (d < C5_CUT_OFF ? d : new Date(C5_CUT_OFF.getTime() - 60_000));
+
 /** General material receipt tolerance and the tighter accessories tolerance. */
 const TOLERANCE = { DEFAULT: 0.02, ACCESSORIES: 0.03 };
 
@@ -77,7 +91,12 @@ function log(step) {
 //  0. WIPE  (reverse dependency order)
 // ---------------------------------------------------------------------------
 async function wipe() {
+  // Every table the seed writes has to be here, children before parents: a
+  // table left off is still full on the second run, and its foreign keys
+  // refuse the delete of whatever it points at.
   const order = [
+    'stockLayerConsumption',
+    'stockCostLayer',
     'stockLedger',
     'stockBalance',
     'cuttingIssue',
@@ -92,8 +111,11 @@ async function wipe() {
     'fabricIssue',
     'fabricRoll',
     'grn',
+    'grnHeader',
     'purchaseOrder',
+    'purchaseOrderHeader',
     'vendorQuotation',
+    'vendorQuotationHeader',
     'planningLine',
     'planning',
     'buyerOrder',
@@ -337,7 +359,21 @@ async function seedOrdersAndPlanning(ctx) {
         effectiveQty: dec(o.orderQty).mul(dec(1).plus(dec(o.excessPct))),
         buyerId: ctx.buyerByName.get(buyerName).id,
         styleId: ctx.styleByNo.get(styleNo).id,
+        // C13 - every order is a set of lines, one per style; the header
+        // figures above are their sum. A workbook row is one style, so one
+        // line - which is what the C13 migration made of every order.
+        lines: {
+          create: [{
+            lineNo: 1,
+            styleId: ctx.styleByNo.get(styleNo).id,
+            colorCode: o.colorCode ?? null,
+            sizeGroup: o.sizeGroup ?? null,
+            orderQty: dec(o.orderQty),
+            effectiveQty: dec(o.orderQty).mul(dec(1).plus(dec(o.excessPct))),
+          }],
+        },
       },
+      include: { lines: true },
     });
     orderByNo.set(row.orderNo, row);
   }
@@ -355,8 +391,11 @@ async function seedOrdersAndPlanning(ctx) {
         planDepartment: p.planDepartment,
         containerNo: p.containerNo,
         orderId: order.id,
-        styleNo: order.styleId ? buyerOrders.find((b) => b.orderNo === p.orderNo).styleNo : '',
-        orderQty: order.orderQty,
+        // A plan is for ONE line of the order: its style and its quantity.
+        orderLineId: order.lines[0].id,
+        styleId: order.lines[0].styleId,
+        styleNo: buyerOrders.find((b) => b.orderNo === p.orderNo).styleNo,
+        orderQty: order.lines[0].orderQty,
         planDate: date(p.planDate),
         status: p.status,
         remarks: p.remarks,
@@ -807,6 +846,7 @@ async function seedProduction(ctx) {
         inventoryItemId: issuedItem ? issuedItem.id : null,
         postedAt: issuedItem ? date(f.issueDate) : null,
         postedByName: issuedItem ? 'Seeded from the workbook' : null,
+        createdAt: beforeC5(date(f.issueDate)),
       },
     });
     issueByNo.set(row.issueNo, row);
@@ -820,19 +860,25 @@ async function seedProduction(ctx) {
     const returned = dyeingReceipts
       .filter((r) => r.dyeIssueNo === d.dyeIssueNo)
       .reduce((sum, r) => sum.plus(dec(r.qtyReceived)), dec(0));
-    const shrinkage = returned.isZero() || issued.isZero()
+    const jobIssued = d.issueNo || returned.greaterThan(0) ? issued : dec(0);
+    // Measured against what was SENT (dye_issues_shrinkage_is_the_formula).
+    const shrinkage = returned.isZero() || jobIssued.isZero()
       ? dec(0)
-      : issued.minus(returned).div(issued).toDecimalPlaces(6);
+      : jobIssued.minus(returned).div(jobIssued).toDecimalPlaces(6);
 
     // C3 - the shrinkage tolerance, resolved from shrinkage_rules exactly as
     // jobWork.create() does, and the expected return computed from it. The
     // column no longer carries a default, which is the point: no lot inherits
     // a tolerance nobody chose.
     const jobVendorId = ctx.vendorByName.get(d.vendorName).id;
+    // The workbook's jobs predate shrinkage_rules, which the C3 migration
+    // started on 27-08-2026 with the figures the code had been enforcing all
+    // along. Resolved on the job's own date, an August job finds no rule and
+    // the seed fails; so a job from before C3 takes the rule as it started.
     const jobShrinkage = await resolveShrinkage(null, {
       process: d.process,
       vendorId: jobVendorId,
-      on: date(d.issueDate),
+      on: date(d.issueDate) < C3_START ? C3_START : date(d.issueDate),
     });
 
     const row = await prisma.dyeIssue.create({
@@ -867,9 +913,25 @@ async function seedProduction(ctx) {
         // sampled row; the Printing sheet is where after-stitching work
         // appears, and it has its own register.
         fabricStage: 'BEFORE_STITCHING',
+        // What went out on the job. These are pre-C3 jobs - work recorded on
+        // fabric already issued - so, as the partial-challans migration
+        // decided for every such job, the whole quantity went out.
+        issuedQty: jobIssued,
         receivedQty: returned,
         shrinkagePct: shrinkage,
         status: d.status,
+        // C16 - a job is a set of rolls; a workbook row is one roll, which is
+        // what the C16 migration made of every job that already existed.
+        rolls: {
+          create: [{
+            lineNo: 1,
+            rollId: ctx.rollByNo.get(d.rollNo).id,
+            qty: dec(d.qty),
+            issuedQty: jobIssued,
+            receivedQty: returned,
+            expectedReturnQty: expectedReturnQty(dec(d.qty), jobShrinkage.tolerance),
+          }],
+        },
       },
     });
     dyeIssueByNo.set(row.dyeIssueNo, row);
@@ -935,12 +997,20 @@ async function seedProduction(ctx) {
   }
   log(`printings: ${printings.length}`);
 
+  // The workbook names one defect per scrutiny; C4 wants it as a defect line.
+  const defectCategory = (t) =>
+    /dye|shade/i.test(t) ? 'DYEING' : /weav|loom/i.test(t) ? 'WEAVING' : 'OTHER';
+
   for (const s of fabricScrutinies) {
-    await prisma.fabricScrutiny.create({
+    const rollId = ctx.rollByNo.get(s.rollNo).id;
+    // Written unlocked, given its defect line, then locked: C4's trigger
+    // refuses a REWORK or REJECT locked in with nothing found, and it checks
+    // on the insert - before a nested defect line would exist.
+    const scrutiny = await prisma.fabricScrutiny.create({
       data: {
         scrutinyNo: s.scrutinyNo,
         scrutinyDate: date(s.scrutinyDate),
-        rollId: ctx.rollByNo.get(s.rollNo).id,
+        rollId,
         orderId: ctx.orderByNo.get(s.orderNo).id,
         styleId: ctx.styleByNo.get(s.styleNo).id,
         defectType: s.defectType,
@@ -956,9 +1026,22 @@ async function seedProduction(ctx) {
         // go through the amendment path, like any other finalised record.
         decidedAt: date(s.scrutinyDate),
         decidedByName: s.authorisedBy,
-        isLocked: true,
-        lockedAt: date(s.scrutinyDate),
+        defects: {
+          create: [{
+            lineNo: 1,
+            category: defectCategory(s.defectType),
+            defectType: s.defectType,
+            rollId,
+            qty: dec(s.qtyAffected),
+            uom: 'Mtrs',
+            remarks: s.remarks,
+          }],
+        },
       },
+    });
+    await prisma.fabricScrutiny.update({
+      where: { id: scrutiny.id },
+      data: { isLocked: true, lockedAt: date(s.scrutinyDate) },
     });
   }
   log(`fabric scrutinies: ${fabricScrutinies.length}`);
@@ -1470,10 +1553,15 @@ async function main() {
   const masterCtx = await seedMasters();
   await seedUsers(masterCtx.employeeByEmpId);
 
+  // Configuration before transactions: a purchase order with no tolerance-
+  // master row for its category (fabric, packaging) falls back to these rules
+  // as it is seeded, and an order reads its excess band from them. Seeded
+  // last, they did not exist yet when the first fabric PO asked.
+  await seedExcessRules();
+
   // A live deployment starts with users, masters and configuration only - no
   // sample orders, purchases or stock.
   if (process.env.SEED_ESSENTIALS_ONLY === 'true') {
-    await seedExcessRules();
     await seedWorkflowStates();
     await seedSequences();
     await printRowCounts();
@@ -1508,7 +1596,6 @@ async function main() {
 
   await seedStock(ctx8);
   await seedApprovalHistory(ctx8);
-  await seedExcessRules();
   await seedWorkflowStates();
   await seedSequences();
 
