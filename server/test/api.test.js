@@ -104,11 +104,11 @@ after(async () => {
   const hash = await bcrypt.hash(ADMIN_PASSWORD, 10);
   await prisma.user.updateMany({
     where: { username: 'admin' },
-    data: { passwordHash: hash, mustChangePassword: true },
+    data: { passwordHash: hash, mustChangePassword: false },
   });
   await prisma.user.updateMany({
     where: { username: { in: ['sunita', 'ravi', 'merch'] } },
-    data: { mustChangePassword: true },
+    data: { mustChangePassword: false },
   });
   await prisma.userSession.deleteMany({});
   server?.close();
@@ -203,20 +203,27 @@ describe('authentication', () => {
     assert.equal(after.body.error.code, 'SESSION_REVOKED');
   });
 
-  test('a user flagged mustChangePassword is blocked from the rest of the API', async () => {
+  /*
+   * The forced first password change was retired: new and reset accounts are
+   * no longer flagged, and the API no longer locks a flagged user out. A flag
+   * set by hand is still reported, so the client can offer the change form.
+   */
+  test('a user flagged mustChangePassword is told so, and is not locked out of the API', async () => {
     await prisma.user.updateMany({ where: { username: 'merch' }, data: { mustChangePassword: true } });
-    const login = await call('POST', '/api/auth/login', {
-      body: { username: 'merch', password: USER_PASSWORD },
-    });
-    assert.equal(login.status, 200);
-    assert.equal(login.body.data.user.mustChangePassword, true);
+    try {
+      const login = await call('POST', '/api/auth/login', {
+        body: { username: 'merch', password: USER_PASSWORD },
+      });
+      assert.equal(login.status, 200);
+      assert.equal(login.body.data.user.mustChangePassword, true);
 
-    const blocked = await call('GET', '/api/buyers', { token: login.body.data.accessToken });
-    assert.equal(blocked.status, 403);
-    assert.equal(blocked.body.error.code, 'PASSWORD_CHANGE_REQUIRED');
-
-    // ...but /auth/me stays reachable so the client can render the change form.
-    assert.equal((await call('GET', '/api/auth/me', { token: login.body.data.accessToken })).status, 200);
+      const me = await call('GET', '/api/auth/me', { token: login.body.data.accessToken });
+      assert.equal(me.status, 200);
+      const buyers = await call('GET', '/api/buyers', { token: login.body.data.accessToken });
+      assert.equal(buyers.status, 200);
+    } finally {
+      await prisma.user.updateMany({ where: { username: 'merch' }, data: { mustChangePassword: false } });
+    }
   });
 
   test('a deactivated user cannot use an already-issued token', async () => {
@@ -345,7 +352,9 @@ describe('List Master drives every dropdown', () => {
       body: { vendorName: 'Bad Category Vendor', category: 'Not A Real Category' },
     });
     assert.equal(status, 400);
-    assert.match(body.error.message, /VendorCategory/);
+    // The message names the list by its display name, and lists what is allowed.
+    assert.match(body.error.message, /Vendor Category/);
+    assert.match(body.error.message, /Not A Real Category/);
   });
 
   test('a system list cannot be deleted', async () => {
@@ -573,7 +582,7 @@ describe('user administration', () => {
     }
   });
 
-  test('a new user is always forced to change the password an admin set', async () => {
+  test('a new user signs in with the password an admin set', async () => {
     const username = `test.user.${Date.now()}`;
     const res = await call('POST', '/api/users', {
       token,
@@ -586,7 +595,8 @@ describe('user administration', () => {
     });
     assert.equal(res.status, 201, JSON.stringify(res.body));
     createdUserId = res.body.data.id;
-    assert.equal(res.body.data.mustChangePassword, true);
+    // The forced first change was retired; the admin's password stands.
+    assert.equal(res.body.data.mustChangePassword, false);
     assert.deepEqual(res.body.data.roleCodes, ['QC']);
   });
 

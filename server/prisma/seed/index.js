@@ -76,50 +76,46 @@ function log(step) {
 // ---------------------------------------------------------------------------
 //  0. WIPE  (reverse dependency order)
 // ---------------------------------------------------------------------------
+/**
+ * Tables the migrations fill with configuration that the seed does not
+ * re-create. Everything else is cleared.
+ */
+const KEPT_ON_WIPE = ['tolerance_rules', 'shrinkage_rules'];
+
 async function wipe() {
-  const order = [
-    'stockLedger',
-    'stockBalance',
-    'cuttingIssue',
-    'excessApproval',
-    'excessRule',
-    'planApproval',
-    'fabricScrutiny',
-    'printing',
-    'dyeingReceipt',
-    'gatePass',
-    'dyeIssue',
-    'fabricIssue',
-    'fabricRoll',
-    'grn',
-    'purchaseOrder',
-    'vendorQuotation',
-    'planningLine',
-    'planning',
-    'buyerOrder',
-    'inventoryItem',
-    'styleBomLine',
-    'style',
-    'userSession',
-    'userRole',
-    'rolePermission',
-    'user',
-    'role',
-    'permission',
-    'employee',
-    'vendor',
-    'buyer',
-    'masterListValue',
-    'masterList',
-    'approvalHistory',
-    'documentAmendment',
-    'auditLog',
-    'documentSequence',
-  ];
-  for (const model of order) {
-    await prisma[model].deleteMany({});
-  }
-  log(`cleared ${order.length} tables`);
+  // Every table in the schema, read from the database rather than kept as a
+  // hand-written list. A hand-written list goes stale the moment a migration
+  // adds a table - purchase_order_headers was left behind that way, and its
+  // rows then blocked the vendor delete further down the list.
+  const rows = await prisma.$queryRaw`
+    SELECT tablename FROM pg_tables WHERE schemaname = current_schema()`;
+  const tables = rows
+    .map((r) => r.tablename)
+    .filter((t) => t !== '_prisma_migrations' && !KEPT_ON_WIPE.includes(t));
+  await prisma.$transaction(async (tx) => {
+    // A kept table can still hang off a cleared one (a vendor-specific
+    // shrinkage rule off its vendor), and TRUNCATE ... CASCADE would empty it
+    // too. Hold on to the rows that belong to no cleared table and put them
+    // back. A vendor-specific shrinkage rule goes with its vendor, as it
+    // always did.
+    await tx.$executeRawUnsafe(
+      'CREATE TEMP TABLE kept_tolerance_rules ON COMMIT DROP AS SELECT * FROM "tolerance_rules"',
+    );
+    await tx.$executeRawUnsafe(
+      'CREATE TEMP TABLE kept_shrinkage_rules ON COMMIT DROP AS ' +
+        'SELECT * FROM "shrinkage_rules" WHERE "vendor_id" IS NULL',
+    );
+    await tx.$executeRawUnsafe(
+      `TRUNCATE TABLE ${tables.map((t) => `"${t}"`).join(', ')} RESTART IDENTITY CASCADE`,
+    );
+    await tx.$executeRawUnsafe(
+      'INSERT INTO "tolerance_rules" SELECT * FROM kept_tolerance_rules ON CONFLICT DO NOTHING',
+    );
+    await tx.$executeRawUnsafe(
+      'INSERT INTO "shrinkage_rules" SELECT * FROM kept_shrinkage_rules ON CONFLICT DO NOTHING',
+    );
+  });
+  log(`cleared ${tables.length} tables`);
 }
 
 // ---------------------------------------------------------------------------
@@ -337,7 +333,23 @@ async function seedOrdersAndPlanning(ctx) {
         effectiveQty: dec(o.orderQty).mul(dec(1).plus(dec(o.excessPct))),
         buyerId: ctx.buyerByName.get(buyerName).id,
         styleId: ctx.styleByNo.get(styleNo).id,
+        // C13 - an order is its lines. A workbook row names one style, so
+        // each seeded order is a one-line order, exactly as the C13
+        // migration backfilled the orders that already existed.
+        lines: {
+          create: [
+            {
+              lineNo: 1,
+              styleId: ctx.styleByNo.get(styleNo).id,
+              colorCode: o.colorCode ?? null,
+              sizeGroup: o.sizeGroup ?? null,
+              orderQty: dec(o.orderQty),
+              effectiveQty: dec(o.orderQty).mul(dec(1).plus(dec(o.excessPct))),
+            },
+          ],
+        },
       },
+      include: { lines: true },
     });
     orderByNo.set(row.orderNo, row);
   }
@@ -355,7 +367,9 @@ async function seedOrdersAndPlanning(ctx) {
         planDepartment: p.planDepartment,
         containerNo: p.containerNo,
         orderId: order.id,
-        styleNo: order.styleId ? buyerOrders.find((b) => b.orderNo === p.orderNo).styleNo : '',
+        orderLineId: order.lines[0].id,
+        styleId: order.styleId,
+        styleNo: buyerOrders.find((b) => b.orderNo === p.orderNo).styleNo,
         orderQty: order.orderQty,
         planDate: date(p.planDate),
         status: p.status,
@@ -776,6 +790,57 @@ async function seedFabricRolls(ctx) {
 //  9. FABRIC ISSUE / DYEING / PRINTING / SCRUTINY
 // ---------------------------------------------------------------------------
 async function seedProduction(ctx) {
+  // C5 - fabric goes to the cutting floor only against an approved Cutting
+  // Challan line. The workbook has no challan sheet, so each order that has
+  // cutting issues gets one approved challan with a single fabric line,
+  // asking for exactly what those issues then draw.
+  const challanLineByOrderNo = new Map();
+  const cuttingByOrder = new Map();
+  for (const f of fabricIssues.filter((x) => x.purpose === 'CUTTING')) {
+    cuttingByOrder.set(f.orderNo, [...(cuttingByOrder.get(f.orderNo) ?? []), f]);
+  }
+  let challanCount = 0;
+  for (const [orderNo, issues] of cuttingByOrder) {
+    challanCount += 1;
+    const first = issues.reduce((a, b) => (a.issueDate <= b.issueDate ? a : b));
+    const plan = ctx.planningByOrderNo.get(orderNo);
+    if (!plan) throw new Error(`Cutting issues for ${orderNo} need a cutting plan in the seed data`);
+    const required = issues.reduce((a, f) => a.plus(dec(f.fabricQtyIssued)), dec(0));
+    const challan = await prisma.cuttingChallan.create({
+      data: {
+        challanNo: `CC-${String(challanCount).padStart(4, '0')}`,
+        challanDate: date(first.issueDate),
+        orderId: ctx.orderByNo.get(orderNo).id,
+        styleId: ctx.styleByNo.get(first.styleNo).id,
+        planningId: plan.id,
+        containerNo: plan.containerNo,
+        workflowState: 'APPROVED',
+        status: 'COMPLETED',
+        approvedByName: 'Vinay ji (GM)',
+        approvedAt: date(first.issueDate),
+        decidedAt: date(first.issueDate),
+        lines: {
+          create: [
+            {
+              lineNo: 1,
+              itemCategory: 'Fabric',
+              category: 'FABRIC',
+              colorCode: first.colorCode,
+              description: first.fabricName,
+              requiredQty: required,
+              uom: 'Mtrs',
+              issuedQty: required,
+              status: 'COMPLETED',
+            },
+          ],
+        },
+      },
+      include: { lines: true },
+    });
+    challanLineByOrderNo.set(orderNo, challan.lines[0]);
+  }
+  log(`cutting challans: ${challanCount}`);
+
   const issueByNo = new Map();
   for (const f of fabricIssues) {
     // The stock item behind the roll. postedAt is only stamped where one
@@ -802,6 +867,8 @@ async function seedProduction(ctx) {
         status: f.status,
         remarks: f.remarks,
         location: MAIN_STORE,
+        cuttingChallanLineId:
+          f.purpose === 'CUTTING' ? challanLineByOrderNo.get(f.orderNo).id : null,
         // The seeder writes each issue's ledger OUT itself further down, so
         // these issues ARE out of stock, and are stamped as posted.
         inventoryItemId: issuedItem ? issuedItem.id : null,
@@ -820,6 +887,7 @@ async function seedProduction(ctx) {
     const returned = dyeingReceipts
       .filter((r) => r.dyeIssueNo === d.dyeIssueNo)
       .reduce((sum, r) => sum.plus(dec(r.qtyReceived)), dec(0));
+    const sent = d.issueNo || returned.greaterThan(0) ? issued : dec(0);
     const shrinkage = returned.isZero() || issued.isZero()
       ? dec(0)
       : issued.minus(returned).div(issued).toDecimalPlaces(6);
@@ -867,9 +935,27 @@ async function seedProduction(ctx) {
         // sampled row; the Printing sheet is where after-stitching work
         // appears, and it has its own register.
         fabricStage: 'BEFORE_STITCHING',
+        // What actually went out on the order. The workbook's job work was
+        // done on fabric already issued, so the whole quantity was sent -
+        // the same rule the partial-challan migration backfilled with.
+        issuedQty: sent,
         receivedQty: returned,
         shrinkagePct: shrinkage,
         status: d.status,
+        // C16 - an order lists the rolls it covers. Each workbook row is one
+        // roll, so line 1 carries the whole order, as the C16 backfill did.
+        rolls: {
+          create: [
+            {
+              lineNo: 1,
+              rollId: ctx.rollByNo.get(d.rollNo).id,
+              qty: dec(d.qty),
+              issuedQty: sent,
+              receivedQty: returned,
+              expectedReturnQty: expectedReturnQty(dec(d.qty), jobShrinkage.tolerance),
+            },
+          ],
+        },
       },
     });
     dyeIssueByNo.set(row.dyeIssueNo, row);
@@ -935,8 +1021,13 @@ async function seedProduction(ctx) {
   }
   log(`printings: ${printings.length}`);
 
+  // C4 - a REWORK or REJECT is not locked in without a defect line saying
+  // what was found. The workbook records one defect per row, so each seeded
+  // scrutiny carries that one line, and is locked only once the line exists.
+  const defectCategory = (type) =>
+    /dye|shade/i.test(type) ? 'DYEING' : /weav/i.test(type) ? 'WEAVING' : 'OTHER';
   for (const s of fabricScrutinies) {
-    await prisma.fabricScrutiny.create({
+    const scrutiny = await prisma.fabricScrutiny.create({
       data: {
         scrutinyNo: s.scrutinyNo,
         scrutinyDate: date(s.scrutinyDate),
@@ -956,14 +1047,28 @@ async function seedProduction(ctx) {
         // go through the amendment path, like any other finalised record.
         decidedAt: date(s.scrutinyDate),
         decidedByName: s.authorisedBy,
-        isLocked: true,
-        lockedAt: date(s.scrutinyDate),
+        defects: {
+          create: [
+            {
+              lineNo: 1,
+              category: defectCategory(s.defectType),
+              defectType: s.defectType,
+              rollId: ctx.rollByNo.get(s.rollNo).id,
+              qty: dec(s.qtyAffected),
+              uom: 'Mtrs',
+            },
+          ],
+        },
       },
+    });
+    await prisma.fabricScrutiny.update({
+      where: { id: scrutiny.id },
+      data: { isLocked: true, lockedAt: date(s.scrutinyDate) },
     });
   }
   log(`fabric scrutinies: ${fabricScrutinies.length}`);
 
-  return { issueByNo, dyeIssueByNo };
+  return { issueByNo, dyeIssueByNo, challanCount };
 }
 
 // ---------------------------------------------------------------------------
@@ -1344,6 +1449,38 @@ async function seedExcessRules() {
   log(`excess rules: ${excessRules.length}`);
 }
 
+/**
+ * The process-wide shrinkage tolerances come from a migration and take effect
+ * on the day it ran, which is later than most of the workbook's job work. Each
+ * process gets a version covering SEED_EPOCH up to that day, at the same
+ * figure, so the sample history resolves a tolerance the way a live job work
+ * order would. The migration's own versions are left as they are.
+ */
+async function seedShrinkageHistory() {
+  const epoch = date(SEED_EPOCH);
+  const standards = await prisma.shrinkageRule.findMany({
+    where: { vendorId: null, deletedAt: null },
+    orderBy: { effectiveFrom: 'asc' },
+  });
+  const earliest = new Map();
+  for (const r of standards) if (!earliest.has(r.process)) earliest.set(r.process, r);
+  let added = 0;
+  for (const r of earliest.values()) {
+    if (r.effectiveFrom <= epoch) continue;
+    await prisma.shrinkageRule.create({
+      data: {
+        process: r.process,
+        shrinkageTolerancePct: r.shrinkageTolerancePct,
+        effectiveFrom: epoch,
+        effectiveTo: new Date(r.effectiveFrom.getTime() - 24 * 60 * 60 * 1000),
+        basis: 'Sample data: the standard figure, back-dated to cover the seeded job work',
+      },
+    });
+    added += 1;
+  }
+  log(`shrinkage history: ${added} back-dated versions`);
+}
+
 // ---------------------------------------------------------------------------
 //  12c. WORKFLOW STATE  (Phase 18 - explicit, and derived from the decisions
 //       each module had already recorded)
@@ -1398,8 +1535,16 @@ async function seedWorkflowStates() {
 // ---------------------------------------------------------------------------
 //  13. DOCUMENT SEQUENCES
 // ---------------------------------------------------------------------------
-async function seedSequences() {
-  await prisma.documentSequence.createMany({ data: documentSequences });
+async function seedSequences({ challanCount = 0 } = {}) {
+  // The seeded plans and challans took PLN-001 and CC-0001 onwards; the next
+  // one raised in the app starts after them.
+  const seeded = { PLANNING: plannings.length, CUTTING_CHALLAN: challanCount };
+  const data = documentSequences.map((seq) =>
+    seq.documentType in seeded
+      ? { ...seq, nextNumber: Math.max(seq.nextNumber, seeded[seq.documentType] + 1) }
+      : seq,
+  );
+  await prisma.documentSequence.createMany({ data });
   log(`document sequences: ${documentSequences.length}`);
 }
 
@@ -1481,6 +1626,11 @@ async function main() {
     return;
   }
 
+  // Configuration before documents: a purchase order resolves its tolerance
+  // through the excess rules, so they have to exist before the first one.
+  await seedExcessRules();
+  await seedShrinkageHistory();
+
   const orderCtx = await seedOrdersAndPlanning(masterCtx);
   const ctx1 = { ...masterCtx, ...orderCtx };
 
@@ -1508,9 +1658,8 @@ async function main() {
 
   await seedStock(ctx8);
   await seedApprovalHistory(ctx8);
-  await seedExcessRules();
   await seedWorkflowStates();
-  await seedSequences();
+  await seedSequences(ctx8);
 
   await printRowCounts();
   process.stdout.write('Seed complete.\n\n');

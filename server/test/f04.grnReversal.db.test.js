@@ -83,11 +83,13 @@ before(async () => {
   maker = { userId: users[0].id, fullName: `F04 maker ${users[0].username}` };
   checker = { userId: users[1].id, fullName: `F04 checker ${users[1].username}` };
 
+  // Goods are received only against an APPROVED order, so "not cancelled or
+  // rejected" was not enough: it picked up the seed's pending PO.
   po = await prisma.purchaseOrder.findFirst({
-    where: { deletedAt: null, workflowState: { notIn: ['CANCELLED', 'REJECTED'] } },
+    where: { deletedAt: null, workflowState: 'APPROVED', approvalStatus: 'APPROVED' },
     orderBy: { createdAt: 'desc' },
   });
-  assert.ok(po, 'seed must provide a purchase order');
+  assert.ok(po, 'seed must provide an approved purchase order');
 
   // The order's figures as they stood, so `after()` can put them back exactly.
   poBefore = { receivedQty: po.receivedQty, payableQty: po.payableQty, status: po.status };
@@ -299,22 +301,16 @@ describe('F-04 - a posted receipt can be corrected', { skip: skipIfNoDb() }, () 
 });
 
 describe('F-04 - what a reversal refuses', { skip: skipIfNoDb() }, () => {
-  test('the person who raised it cannot also sign it', async () => {
+  // Maker-checker is switched off (domain/makerChecker.js), including here:
+  // the person who raised the reversal may sign it, and the signature posts it.
+  test('the person who raised it may also sign it, and signing posts it', async () => {
     const grn = await receive({ qty: 6 });
     const rev = await raise(grn, 'Rate was taken from the previous bill by mistake.');
 
-    await assert.rejects(
-      () => revSvc.approve(rev.id, {}, maker),
-      (e) => /cannot also approve|maker and checker/i.test(e.message),
-      'this is the one document whose whole purpose is to undo the raiser\'s own work, so ' +
-        'self-approval would leave no maker-checker at all',
-    );
+    await revSvc.approve(rev.id, {}, maker);
 
-    // And the refusal left the ledger alone.
     const after = await prisma.grnReversal.findUnique({ where: { id: rev.id } });
-    assert.equal(after.postedAt, null, 'a refused approval must not have posted anything');
-
-    await revSvc.approve(rev.id, {}, checker);
+    assert.ok(after.postedAt, 'the approval posted the reversal');
   });
 
   test('a receipt is reversed once', async () => {

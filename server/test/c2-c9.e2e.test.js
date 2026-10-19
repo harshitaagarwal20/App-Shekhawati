@@ -126,6 +126,10 @@ async function cleanUp() {
     `DELETE FROM plan_approval_lines WHERE plan_approval_id IN (SELECT id FROM plan_approvals WHERE approval_no LIKE 'C2C9%')`,
     `DELETE FROM plan_approvals WHERE approval_no LIKE 'C2C9%'`,
     `DELETE FROM grns WHERE grn_no LIKE 'C2C9%'`,
+    // Multi-line documents: a receipt line and a PO line each sit under a
+    // header row. Deleting the lines alone left the headers behind, and the
+    // next run's C2C9-PO-1 was refused as "This PO ID already exists".
+    `DELETE FROM grn_headers WHERE grn_no LIKE 'C2C9%'`,
     `DELETE FROM gate_passes WHERE gate_pass_no LIKE 'C2C9%'`,
     // Orphaned cache rows: a stock_balances row with no movements behind it
     // is drift by definition, not data. Deleting the ledger rows above leaves
@@ -141,6 +145,7 @@ async function cleanUp() {
       )`,
     `DELETE FROM fabric_rolls WHERE roll_no LIKE 'C2C9%'`,
     `DELETE FROM purchase_orders WHERE po_id LIKE 'C2C9%'`,
+    `DELETE FROM purchase_order_headers WHERE po_no LIKE 'C2C9%'`,
     `DELETE FROM plannings WHERE plan_no LIKE 'C2C9%'`,
     `DELETE FROM excess_approvals WHERE document_no LIKE 'C2C9%'`,
     `DELETE FROM buyer_orders WHERE order_no LIKE 'C2C9%'`,
@@ -535,11 +540,13 @@ describe('E2E - job work', () => {
     assert.equal(row.stockPostedAt, null, 'raising the order moves no stock');
   });
 
-  test('C3: the maker cannot approve their own job work order', { skip: skipIfNoDb() }, async () => {
+  // Maker-checker is switched off (domain/makerChecker.js), so what stops an
+  // approval here is the workflow: a draft has to be submitted first.
+  test('C3: a job work order cannot be approved while it is still a draft', { skip: skipIfNoDb() }, async () => {
     await assert.rejects(
       jobWork.approveJob(made.job, {}, maker),
-      /cannot also approve it/i,
-      'maker-checker',
+      /is draft and cannot move to approved/i,
+      'a draft goes to submitted before it can be approved',
     );
   });
 
@@ -773,8 +780,8 @@ describe('E2E - cutting challan and fabric issue', () => {
 
     await assert.rejects(
       cuttingChallan.approve(made.challan, {}, maker),
-      /cannot also approve it/i,
-      'maker-checker on the challan too',
+      /is draft and cannot move to approved/i,
+      'a draft challan goes to submitted before it can be approved',
     );
 
     await cuttingChallan.submit(made.challan, { submittedTo: 'Dinesh Sir' }, maker);
@@ -1003,7 +1010,7 @@ describe('E2E - closing assertions', () => {
     }
   });
 
-  test('approval transitions were valid, and makers did not approve their own work', { skip: skipIfNoDb() }, async () => {
+  test('approval transitions were valid, and each is attributed to the person who made it', { skip: skipIfNoDb() }, async () => {
     const events = await engine.stageEvents('CUTTING_CHALLAN', made.challan);
     const approved = events.find((e) => e.toState === 'APPROVED');
     assert.ok(approved, 'the challan reached APPROVED');

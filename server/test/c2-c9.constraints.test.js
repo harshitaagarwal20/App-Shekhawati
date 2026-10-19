@@ -643,12 +643,27 @@ describe('C9 - avg_utilisation_per_piece', () => {
     assert.equal(byName.effective_from.is_nullable, 'NO');
   });
 
-  test('a utilisation of zero is refused - a requirement is never silently zero', { skip: skipIfNoDb() }, async () => {
+  /*
+   * Zero means "sampling has not decided it yet" and is accepted
+   * (migration 20260924000000_style_utilisation_zero_allowed). The
+   * "never silently zero" rule moved to the documents that need a figure:
+   * requirementFor() treats zero as no requirement, and the PO and the
+   * cutting challan refuse it. Only a negative figure is refused here.
+   */
+  test('a utilisation of zero is accepted - it means not decided yet', { skip: skipIfNoDb() }, async () => {
     const line = await prisma.styleBomLine.findFirst({ select: { id: true } });
     if (!line) return;
-    await refusedBy(
-      'style_bom_lines_utilisation_positive',
-      `UPDATE style_bom_lines SET avg_utilisation_per_piece = 0 WHERE id = '${line.id}'`,
+    // Inside a transaction that is always rolled back: the seeded figure must
+    // survive the test.
+    const rollback = new Error('rollback');
+    await assert.rejects(
+      prisma.$transaction(async (tx) => {
+        await tx.$executeRawUnsafe(
+          `UPDATE style_bom_lines SET avg_utilisation_per_piece = 0 WHERE id = '${line.id}'`,
+        );
+        throw rollback;
+      }),
+      (e) => e === rollback,
     );
   });
 
@@ -656,7 +671,7 @@ describe('C9 - avg_utilisation_per_piece', () => {
     const line = await prisma.styleBomLine.findFirst({ select: { id: true } });
     if (!line) return;
     await refusedBy(
-      'style_bom_lines_utilisation_positive',
+      'style_bom_lines_utilisation_non_negative',
       `UPDATE style_bom_lines SET avg_utilisation_per_piece = -1 WHERE id = '${line.id}'`,
     );
   });

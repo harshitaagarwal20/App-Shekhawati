@@ -41,6 +41,7 @@ let order;
 
 const stamp = Date.now();
 const createdPoIds = [];
+const createdHeaderIds = [];
 const createdOrderIds = [];
 
 async function call(method, path, { token, body } = {}) {
@@ -78,10 +79,14 @@ async function signIn(username, password) {
  * would quietly assert the old behaviour, in which the PO ceiling capped
  * procurement below the figure the order screen showed.
  */
-function fabricRequirement(on = order) {
-  const fabricLine = (style.bomLines ?? []).find(
+function fabricLineOf(s) {
+  return (s.bomLines ?? []).find(
     (b) => b.itemCategory === 'Fabric' && b.deletedAt == null && b.isActive !== false,
   );
+}
+
+function fabricRequirement(on = order) {
+  const fabricLine = fabricLineOf(style);
   return new Prisma.Decimal(style.avgFabricUtilizationPerPc)
     .mul(new Prisma.Decimal(on.effectiveQty))
     .mul(new Prisma.Decimal(1).plus(new Prisma.Decimal(fabricLine?.wastagePct ?? 0)))
@@ -151,7 +156,17 @@ before(async () => {
 after(async () => {
   if (createdPoIds.length) {
     await prisma.approvalHistory.deleteMany({ where: { documentId: { in: createdPoIds } } });
+    // A PO line is written under a PO document. Deleting the lines alone left
+    // the headers behind, still holding the vendor and the buyer order.
+    const lines = await prisma.purchaseOrder.findMany({
+      where: { id: { in: createdPoIds } },
+      select: { headerId: true },
+    });
+    createdHeaderIds.push(...lines.map((l) => l.headerId));
     await prisma.purchaseOrder.deleteMany({ where: { id: { in: createdPoIds } } });
+  }
+  if (createdHeaderIds.length) {
+    await prisma.purchaseOrderHeader.deleteMany({ where: { id: { in: createdHeaderIds } } });
   }
   if (createdOrderIds.length) {
     await prisma.buyerOrder.deleteMany({ where: { id: { in: createdOrderIds } } });
@@ -175,8 +190,12 @@ after(async () => {
  * `amount` is computed rather than passed: another CHECK asserts it equals
  * ROUND(order_qty * rate, 2), and a test tripping over that one while aiming
  * at a different one proves nothing.
+ *
+ * `header_id` likewise: since multi-line documents every PO line belongs to a
+ * PO document, and a row without one fails NOT NULL before any CHECK runs.
+ * The header is written through Prisma - it is not what is under test.
  */
-function insertPoRaw({
+async function insertPoRaw({
   poId,
   orderQty = 1000,
   rate = 100,
@@ -187,15 +206,20 @@ function insertPoRaw({
   const qty = new Prisma.Decimal(orderQty);
   const amount = qty.mul(rate).toDecimalPlaces(2);
 
+  const header = await prisma.purchaseOrderHeader.create({
+    data: { poNo: poId, poDate: new Date(), vendorId: vendor.id },
+  });
+  createdHeaderIds.push(header.id);
+
   return prisma.$executeRaw`
     INSERT INTO purchase_orders (
-      id, po_id, po_date, item, category, uom, order_qty, rate, amount,
+      id, header_id, line_no, po_id, po_date, item, category, uom, order_qty, rate, amount,
       excess_allowed, order_tolerance_pct, receipt_tolerance_pct,
       vendor_id, order_mode, computed_requirement_qty,
       status, approval_status, workflow_state, received_qty,
       created_at, updated_at
     ) VALUES (
-      gen_random_uuid(), ${poId}, CURRENT_DATE, 'Fabric', 'FABRIC', 'Mtrs',
+      gen_random_uuid(), ${header.id}::uuid, 1, ${poId}, CURRENT_DATE, 'Fabric', 'FABRIC', 'Mtrs',
       ${qty}, ${new Prisma.Decimal(rate)}, ${amount},
       ${new Prisma.Decimal(excessAllowed)}, 0.03, 0.02,
       ${vendor.id}::uuid, ${orderMode}::"PoOrderMode", ${new Prisma.Decimal(requirement)},
@@ -213,7 +237,10 @@ async function makePo(body, on) {
       orderId: (on ?? order).id,
       styleId: style.id,
       item: 'Fabric',
-      subCategory: '10 oz',
+      // The style's own fabric. The server resolves the BOM line - and so the
+      // wastage - by sub-category; a hardcoded '10 oz' matched only some
+      // seeded styles, and findFirst() does not promise which one it returns.
+      subCategory: fabricLineOf(style)?.subCategory ?? '10 oz',
       uom: 'Mtrs',
       rate: '100',
       hsnCode: '52081290',

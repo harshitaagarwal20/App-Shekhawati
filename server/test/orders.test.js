@@ -140,7 +140,7 @@ after(async () => {
   }
   await prisma.user.updateMany({
     where: { username: { in: ['merch', 'dinesh'] } },
-    data: { mustChangePassword: true },
+    data: { mustChangePassword: false },
   });
   server?.close();
   await prisma.$disconnect();
@@ -200,7 +200,8 @@ describe('order creation', () => {
   test('refuses a colour that is not in the ColorCode list', async () => {
     const res = await makeOrder({ colorCode: 'Invisible Mauve' });
     assert.equal(res.status, 400);
-    assert.match(res.body.error.message, /ColorCode/);
+    // The message names the list by its display name.
+    assert.match(res.body.error.message, /Invisible Mauve.*Color Code/);
   });
 
   test('an excess request needs a justification', async () => {
@@ -303,13 +304,31 @@ describe('quantities are calculated on the server', () => {
 describe('excess approval workflow', () => {
   let orderId;
 
+  // Up to 2% is granted on entry (AUTO_APPROVED_EXCESS_PCT), so the Director
+  // only sees an excess above it - 4% here.
   before(async () => {
     const res = await makeOrder({
       orderQty: '5000',
+      excessPct: '0.04',
+      excessJustification: 'Extra cutting allowance for a new fabric',
+    });
+    orderId = res.body.data.id;
+  });
+
+  test('an excess within the 2% tolerance is granted on entry, and says so on the trail', async () => {
+    const made = await makeOrder({
+      orderQty: '1000',
       excessPct: '0.02',
       excessJustification: 'Standard 2% cutting allowance',
     });
-    orderId = res.body.data.id;
+    assert.equal(made.status, 201, JSON.stringify(made.body));
+    assert.equal(made.body.data.excessApprovalStatus, 'APPROVED');
+    assert.equal(Number(made.body.data.effectiveQty), 1020);
+
+    const detail = await call('GET', `/api/orders/${made.body.data.id}`, { token: adminToken });
+    const approved = detail.body.data.approvals.filter((a) => a.action === 'APPROVED');
+    assert.equal(approved.length, 1);
+    assert.match(approved[0].remarks, /approved automatically/i);
   });
 
   test('the request is logged on the approval trail at creation', async () => {
@@ -346,7 +365,7 @@ describe('excess approval workflow', () => {
     const order = res.body.data;
 
     assert.equal(order.excessApprovalStatus, 'APPROVED');
-    assert.equal(Number(order.excessPct), 0.02, 'the request is kept as it was made');
+    assert.equal(Number(order.excessPct), 0.04, 'the request is kept as it was made');
     assert.equal(Number(order.excessApprovedPct), 0.01);
     assert.equal(Number(order.effectiveQty), 5050, '5000 x 1.01');
     assert.equal(Number(order.excessQty), 50);
@@ -397,16 +416,18 @@ describe('excess approval workflow', () => {
 
 describe('editing before approval', () => {
   test('changing the quantity sends an approved excess back to the Director', async () => {
+    // Above the 2% that is granted on entry, so a Director's decision exists
+    // to be revisited.
     const made = await makeOrder({
       orderQty: '1000',
-      excessPct: '0.02',
+      excessPct: '0.04',
       excessJustification: 'Cutting allowance',
     });
     const id = made.body.data.id;
 
     await call('POST', `/api/orders/${id}/excess/approve`, { token: directorToken, body: {} });
     let detail = await call('GET', `/api/orders/${id}`, { token: adminToken });
-    assert.equal(Number(detail.body.data.effectiveQty), 1020);
+    assert.equal(Number(detail.body.data.effectiveQty), 1040);
 
     const edited = await call('PATCH', `/api/orders/${id}`, {
       token: merchToken,
@@ -619,6 +640,6 @@ describe('search, filter and detail', () => {
       403,
     );
 
-    await prisma.user.updateMany({ where: { username: 'sunita' }, data: { mustChangePassword: true } });
+    await prisma.user.updateMany({ where: { username: 'sunita' }, data: { mustChangePassword: false } });
   });
 });

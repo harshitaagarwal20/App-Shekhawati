@@ -67,6 +67,16 @@ export const plannings = [
       { lineDate: '2026-08-29', unit: 'Unit 1 - Anil Kumar', deliverableSize: '3000', cuttingPcsAllotted: null, status: 'PENDING', remark: null },
     ],
   },
+  // Not on the workbook's Planning sheet, but FI-007 and FI-010 issue fabric to
+  // cutting against this order, and an issue to cutting quotes a cutting
+  // challan, which is raised against an approved plan (C5).
+  {
+    orderNo: 'B9670IS', planDepartment: 'CUTTING', containerNo: null, planDate: '2026-08-20',
+    status: 'PENDING', remarks: 'Jute handle - single lot', approvalStatus: 'APPROVED', version: 1,
+    lines: [
+      { lineDate: '2026-08-21', unit: 'Unit 3 - Ramesh', deliverableSize: '3500', cuttingPcsAllotted: null, status: 'PENDING', remark: null },
+    ],
+  },
 ];
 
 /** Vendor Quotation-Approval sheet - rows 7..13. Amount = Rate x Qty. */
@@ -77,7 +87,7 @@ export const vendorQuotations = [
   { quotationNo: 'QT-004', quotationDate: '2026-08-08', item: 'Fabric', subCategory: '12 oz', vendorName: 'Rajasthan Fabrics', rateQuoted: '182', uom: 'Mtrs', qty: '6200', authorisedBy: 'Dinesh Sir', authorisationStatus: 'APPROVED', remarks: 'For B9646IS', orderNo: 'B9646IS' },
   { quotationNo: 'QT-005', quotationDate: '2026-08-09', item: 'Accessories', accessoriesItem: 'Zipper', vendorName: 'Metro Accessories', rateQuoted: '4', uom: 'Pcs', qty: '12000', authorisedBy: 'Dinesh Sir', authorisationStatus: 'PENDING', remarks: 'Zippers - awaiting sample', orderNo: 'B9658IS' },
   { quotationNo: 'QT-006', quotationDate: '2026-08-11', item: 'Fabric', subCategory: '10 oz', vendorName: 'Rajasthan Fabrics', rateQuoted: '165', uom: 'Mtrs', qty: '3400', authorisedBy: 'Dinesh Sir', authorisationStatus: 'APPROVED', remarks: 'Recycled cotton', orderNo: 'B9658IS' },
-  { quotationNo: 'QT-007', quotationDate: '2026-08-13', item: 'Label', accessoriesItem: 'Woven Label', vendorName: 'Metro Accessories', rateQuoted: '3', uom: 'Pcs', qty: '20000', authorisedBy: 'Dinesh Sir', authorisationStatus: 'APPROVED', remarks: 'Woven labels', orderNo: 'B9646IS' },
+  { quotationNo: 'QT-007', quotationDate: '2026-08-13', item: 'Accessories', accessoriesItem: 'Woven Label', vendorName: 'Metro Accessories', rateQuoted: '3', uom: 'Pcs', qty: '20000', authorisedBy: 'Dinesh Sir', authorisationStatus: 'APPROVED', remarks: 'Woven labels', orderNo: 'B9646IS' },
 ];
 
 /**
