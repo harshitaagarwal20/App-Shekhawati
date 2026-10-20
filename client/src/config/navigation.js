@@ -159,7 +159,7 @@ export const NAV_GROUPS = [
      * them; styles after the parties; the tolerances last.
      */
     items: [
-      { to: '/masters/list-master', label: 'Dropdown Lists', permission: 'MASTER_LIST.VIEW', hint: 'Colours, units, categories' },
+      { to: '/masters/list-master', label: 'Dropdown Lists', permission: 'MASTER_LIST.VIEW', hint: 'Colors, units, categories' },
       { to: '/masters/buyers', label: 'Buyers', permission: 'BUYER.VIEW', hint: 'Customers who give orders' },
       { to: '/masters/vendors', label: 'Vendors', permission: 'VENDOR.VIEW', hint: 'Suppliers, dyers, printers' },
       { to: '/masters/employees', label: 'Employees', permission: 'EMPLOYEE.VIEW', hint: 'Staff named on documents' },

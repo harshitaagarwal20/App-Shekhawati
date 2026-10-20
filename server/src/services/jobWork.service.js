@@ -425,7 +425,7 @@ async function assertDyeingWanted(process, orderId, tx = prisma) {
   if ((order.colorCode ?? '').trim().toLowerCase() === 'natural') {
     throw ApiError.badRequest(
       `Order ${order.orderNo} is for Natural fabric, which is not dyed. A dyeing job ` +
-        `can only be raised where the order calls for a colour.`,
+        `can only be raised where the order calls for a color.`,
       { field: 'process', orderNo: order.orderNo, orderColour: order.colorCode },
     );
   }

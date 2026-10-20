@@ -143,7 +143,7 @@ function MaterialCells({ line, set }) {
         )}
       </td>
       <td style={{ minWidth: 120 }}>
-        <MasterSelect listCode="ColorCode" value={line.colorCode} currentValue={line.colorCode} aria-label="Colour"
+        <MasterSelect listCode="ColorCode" value={line.colorCode} currentValue={line.colorCode} aria-label="Color"
           onChange={(e) => set({ colorCode: e.target.value })} />
       </td>
       <td style={{ minWidth: 90 }}>
@@ -291,7 +291,7 @@ export function PoDocumentForm() {
                   and back again. They are one fact - "this material, for that
                   order" - so they sit together.
                 */}
-                <th>#</th><th>Order</th><th>Item</th><th>Detail</th><th>Colour</th><th>UOM</th><th>Size</th>
+                <th>#</th><th>Order</th><th>Item</th><th>Detail</th><th>Color</th><th>UOM</th><th>Size</th>
                 <th className="num">Qty</th><th className="num">Rate</th><th className="num">Amount</th>
                 <th>Mode</th><th>Container</th><th>HSN</th><th />
               </tr>
@@ -483,7 +483,7 @@ export function PoDocumentDetail() {
           <table className="data">
             <thead>
               <tr>
-                <th>Line</th><th>Item</th><th>Colour</th><th>UOM</th>
+                <th>Line</th><th>Item</th><th>Color</th><th>UOM</th>
                 <th className="num">Ordered</th><th className="num">Received</th><th className="num">Pending</th>
                 <th className="num">Rate</th><th className="num">Amount</th><th>Order</th><th>Container</th><th>Approval</th><th>Status</th>
               </tr>
@@ -661,7 +661,7 @@ export function QuotationDocumentForm() {
           uom: l.uom,
           qty: String(l.qty),
           rateQuoted: String(l.rateQuoted),
-          remarks: [l.colorCode && `Colour ${l.colorCode}`, l.remarks].filter(Boolean).join('; ') || undefined,
+          remarks: [l.colorCode && `Color ${l.colorCode}`, l.remarks].filter(Boolean).join('; ') || undefined,
         })),
       });
       navigate(`/quotations/documents/${doc.id}`);
@@ -709,7 +709,7 @@ export function QuotationDocumentForm() {
         <TableWrap>
           <table className="data">
             <thead>
-              <tr><th>#</th><th>Item</th><th>Detail</th><th>Colour</th><th>UOM</th><th className="num">Qty</th><th className="num">Rate</th><th className="num">Amount</th><th /></tr>
+              <tr><th>#</th><th>Item</th><th>Detail</th><th>Color</th><th>UOM</th><th className="num">Qty</th><th className="num">Rate</th><th className="num">Amount</th><th /></tr>
             </thead>
             <tbody>
               {lines.map((l, i) => (

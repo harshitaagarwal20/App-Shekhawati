@@ -60,7 +60,7 @@ const COLUMNS = [
   { key: 'date', label: 'Date' },
   { key: 'process', label: 'Process' },
   { key: 'roll', label: 'Roll', optional: true },
-  { key: 'colour', label: 'Colour', optional: true },
+  { key: 'colour', label: 'Color', optional: true },
   { key: 'vendor', label: 'Vendor' },
   { key: 'sent', label: 'Sent' },
   { key: 'returned', label: 'Returned' },
@@ -187,7 +187,7 @@ export default function JobWorkList() {
               <TextInput
                 id="jw-search"
                 type="search"
-                placeholder="Search job no, colour, content, construction..."
+                placeholder="Search job no, color, content, construction..."
                 value={list.search}
                 onChange={(e) => list.setSearch(e.target.value)}
               />
@@ -225,7 +225,7 @@ export default function JobWorkList() {
                 <SortableTh field="issueDate" label="Date" sortBy={list.sortBy} sortDir={list.sortDir} onSort={list.toggleSort} />
                 <SortableTh field="process" label="Process" sortBy={list.sortBy} sortDir={list.sortDir} onSort={list.toggleSort} />
                 {cols.show('roll') && <th>Roll</th>}
-                {cols.show('colour') && <th>Colour</th>}
+                {cols.show('colour') && <th>Color</th>}
                 <th>Vendor</th>
                 <SortableTh field="qty" label="Sent" sortBy={list.sortBy} sortDir={list.sortDir} onSort={list.toggleSort} className="num" />
                 <SortableTh field="receivedQty" label="Returned" sortBy={list.sortBy} sortDir={list.sortDir} onSort={list.toggleSort} className="num" />

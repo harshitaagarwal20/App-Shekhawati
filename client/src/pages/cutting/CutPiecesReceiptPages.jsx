@@ -104,7 +104,7 @@ export function CutPiecesReceiptList() {
             <TextInput
               value={list.search}
               onChange={(e) => list.setSearch(e.target.value)}
-              placeholder="Receipt no, order, style, cutting master, colour, lot"
+              placeholder="Receipt no, order, style, cutting master, color, lot"
             />
           </Field>
         </div>
@@ -139,7 +139,7 @@ export function CutPiecesReceiptList() {
                 <th>Style</th>
                 <th>Challan</th>
                 <th>Cutting master</th>
-                <th>Colour</th>
+                <th>Color</th>
                 <SortableTh field="pcsReceived" label="Good pcs" className="num" sortBy={list.sortBy} sortDir={list.sortDir} onSort={list.toggleSort} />
                 <th className="num">Rejected</th>
                 <th className="num">Handles</th>
@@ -294,7 +294,7 @@ export function CutPiecesReceiptDetail() {
               }
             />
             <Detail label="Cutting master" value={row.cuttingMasterName} sub={row.cuttingMaster?.empId} />
-            <Detail label="Colour" value={row.colorCode} />
+            <Detail label="Color" value={row.colorCode} />
             <Detail label="Lot No" value={row.lotNo} />
             <Detail label="Good pieces" value={fmtNum(row.pcsReceived)} />
             <Detail label="Rejected pieces" value={fmtNum(row.pcsRejected)} />
@@ -1007,7 +1007,7 @@ function ReceiptModal({ existing, onClose, onSaved }) {
           </Field>
         )}
 
-        <Field label="Colour">
+        <Field label="Color">
           <TextInput value={form.colorCode} onChange={(e) => set({ colorCode: e.target.value })} maxLength={60} />
         </Field>
 

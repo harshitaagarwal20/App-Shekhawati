@@ -93,7 +93,7 @@ function BomEditor({ form, editing, isNew }) {
               <th style={{ minWidth: 140 }}>Accessories Item</th>
               <th style={{ minWidth: 150 }}>Description</th>
               <th style={{ minWidth: 150 }}>Variety / Size</th>
-              <th style={{ minWidth: 110 }}>Colour</th>
+              <th style={{ minWidth: 110 }}>Color</th>
               <th style={{ minWidth: 100 }}>UOM</th>
               <th style={{ minWidth: 110 }}>HSN</th>
               <th className="actions" />

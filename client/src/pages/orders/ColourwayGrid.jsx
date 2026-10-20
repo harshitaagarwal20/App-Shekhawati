@@ -85,7 +85,7 @@ export const gridTotal = (grid) =>
 export function gridProblem(grid) {
   const colours = grid.rows.map((r) => r.colorCode || '');
   if (new Set(colours).size !== colours.length) {
-    return 'The same colour is on two rows. Put its quantities on one row.';
+    return 'The same color is on two rows. Put its quantities on one row.';
   }
   if (new Set(grid.sizes).size !== grid.sizes.length) return 'The same size is in two columns.';
   if (gridTotal(grid) <= 0) return 'Enter a quantity in at least one cell.';
@@ -112,7 +112,7 @@ export default function ColourwayGrid({ grid, onChange, currency, disabled }) {
         <table className="bom-table">
           <thead>
             <tr>
-              <th style={{ minWidth: 150 }}>Colourway</th>
+              <th style={{ minWidth: 150 }}>Colorway</th>
               {grid.sizes.map((s) => (
                 <th key={s || 'style'} className="num" style={{ minWidth: 100 }}>
                   {sizeLabel(s)}
@@ -162,7 +162,7 @@ export default function ColourwayGrid({ grid, onChange, currency, disabled }) {
                       value={r.qty[s] ?? ''}
                       disabled={disabled}
                       onChange={(e) => setCell(i, s, e.target.value)}
-                      aria-label={`${r.colorCode || 'Colour'} ${sizeLabel(s)} pieces`}
+                      aria-label={`${r.colorCode || 'Color'} ${sizeLabel(s)} pieces`}
                     />
                   </td>
                 ))}
@@ -175,7 +175,7 @@ export default function ColourwayGrid({ grid, onChange, currency, disabled }) {
                     value={r.unitPrice}
                     disabled={disabled}
                     onChange={(e) => setRow(i, { unitPrice: e.target.value })}
-                    aria-label={`${r.colorCode || 'Colour'} price per piece`}
+                    aria-label={`${r.colorCode || 'Color'} price per piece`}
                   />
                 </td>
                 <td className="actions">
@@ -185,7 +185,7 @@ export default function ColourwayGrid({ grid, onChange, currency, disabled }) {
                       className="btn btn-sm btn-ghost"
                       style={{ color: 'var(--danger)' }}
                       onClick={() => onChange({ ...grid, rows: grid.rows.filter((_, j) => j !== i) })}
-                      aria-label={`Remove colourway ${i + 1}`}
+                      aria-label={`Remove colorway ${i + 1}`}
                     >
                       &times;
                     </button>
@@ -212,7 +212,7 @@ export default function ColourwayGrid({ grid, onChange, currency, disabled }) {
             className="btn btn-sm"
             onClick={() => onChange({ ...grid, rows: [...grid.rows, { colorCode: '', unitPrice: '', qty: {} }] })}
           >
-            Add colourway
+            Add colorway
           </button>
           {unusedSizes.length > 0 && (
             <div style={{ minWidth: 180 }}>

@@ -427,7 +427,7 @@ export default function GrnDetail() {
                   <th className="num">Received</th>
                   <th className="num">Balance</th>
                   <th>UOM</th>
-                  <th>Colour</th>
+                  <th>Color</th>
                   <th>GSM</th>
                   <th className="num">Width</th>
                   <th>Stage</th>

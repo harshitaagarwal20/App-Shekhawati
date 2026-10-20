@@ -292,7 +292,7 @@ export default function JobWorkDetail() {
             ) : (
               <Detail label="Roll No" value={job.roll?.rollNo} mono />
             )}
-            <Detail label="Colour" value={job.colourCode} />
+            <Detail label="Color" value={job.colourCode} />
             <Detail label="Content" value={job.content} />
             <Detail label="Count" value={job.count} />
             <Detail label="Construction" value={job.construction} />

@@ -525,7 +525,7 @@ async function resolveLines(input, buyer) {
     const identity = `${style.id}|${colorCode ?? ''}|${sizeGroup ?? ''}`;
     if (seen.has(identity)) {
       throw ApiError.badRequest(
-        `Style ${style.styleNo} appears twice on this order in the same colour and size. ` +
+        `Style ${style.styleNo} appears twice on this order in the same color and size. ` +
           'Combine them into one line with the total quantity.',
         { field },
       );

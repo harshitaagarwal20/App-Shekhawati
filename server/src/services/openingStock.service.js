@@ -118,7 +118,7 @@ function normaliseRow(raw, i) {
 
   if (rollTracked) {
     if (!subCategory) throw ApiError.badRequest('Fabric type is required', at('subCategory'));
-    if (!colorCode) throw ApiError.badRequest('Colour is required', at('colorCode'));
+    if (!colorCode) throw ApiError.badRequest('Color is required', at('colorCode'));
   } else {
     if (!accessoriesItem) {
       throw ApiError.badRequest(
@@ -272,7 +272,7 @@ export async function preview(rows) {
     // Two rows for the same cloth are one stock figure. Posting both would
     // leave the second refused by the guard after the first had committed.
     if (seen.has(key)) {
-      problems.push(`Same fabric and colour as line ${seen.get(key)}. Combine them into one row.`);
+      problems.push(`Same fabric and color as line ${seen.get(key)}. Combine them into one row.`);
     } else {
       seen.set(key, row.lineNo);
     }

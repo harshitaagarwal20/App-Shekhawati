@@ -267,7 +267,7 @@ export const EXTRA_REPORTS = {
     filters: ['itemCategory', 'location', 'dateFrom', 'dateTo'],
     columns: [
       col('item', 'Item'),
-      col('colorCode', 'Colour'),
+      col('colorCode', 'Color'),
       col('location', 'Location'),
       col('layerDate', 'Received', 'date'),
       col('ageDays', 'Age (days)', 'qty'),

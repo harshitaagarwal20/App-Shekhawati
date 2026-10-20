@@ -319,7 +319,7 @@ export default function OpeningStockPage() {
             </Field>
           )}
           <Field
-            label={isTrim ? 'Item, variety, quantity, unit' : 'Fabric type, colour, quantity'}
+            label={isTrim ? 'Item, variety, quantity, unit' : 'Fabric type, color, quantity'}
             hint={
               isTrim
                 ? 'Copy the columns straight out of Excel. The quantity is the first number after the item; anything between is the variety. A header row is ignored.'
@@ -377,7 +377,7 @@ export default function OpeningStockPage() {
                 <th>#</th>
                 {isTrim ? <th>Item</th> : <th>Fabric type</th>}
                 {isTrim && <th>Variety</th>}
-                <th>Colour</th>
+                <th>Color</th>
                 <th className="num">Qty</th>
                 {isTrim && <th>UOM</th>}
                 <th className="num">Rate</th>
@@ -429,7 +429,7 @@ export default function OpeningStockPage() {
                       </td>
                     )}
                     <td style={{ minWidth: 160 }}>
-                      <TextInput aria-label="Colour" value={r.color}
+                      <TextInput aria-label="Color" value={r.color}
                         placeholder={isTrim ? 'optional' : 'Black'}
                         onChange={(e) => change(r.key, { color: e.target.value })} />
                     </td>

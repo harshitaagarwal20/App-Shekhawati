@@ -458,7 +458,7 @@ export default function JobWorkForm({ processes = [], onSaved, onCancel }) {
         </FieldGroup>
 
         <FieldGroup title="Fabric" hint="copied from the roll — edit only if the roll record is wrong">
-          <RHFMasterSelect form={form} name="colourCode" label="Colour" listCode="ColorCode" />
+          <RHFMasterSelect form={form} name="colourCode" label="Color" listCode="ColorCode" />
           <RHFMasterSelect form={form} name="content" label="Content" listCode="FabricContent" />
           <RHFMasterSelect form={form} name="gsm" label="GSM" listCode="GSM" />
           <RHFMasterSelect form={form} name="uom" label="UOM" listCode="UOM" />

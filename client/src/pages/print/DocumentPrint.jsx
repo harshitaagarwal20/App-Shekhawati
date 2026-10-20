@@ -767,7 +767,7 @@ function GrnBody({ doc }) {
               <th>Roll No</th>
               <th className="num">Qty</th>
               <th>UOM</th>
-              <th>Colour</th>
+              <th>Color</th>
               <th>GSM</th>
               <th className="num">Width</th>
               <th>Location</th>
@@ -815,7 +815,7 @@ function GrnBody({ doc }) {
 /** A fabric roll's particulars, on one line, the way a job worker reads them. */
 function fabricSpec(f) {
   return [
-    f.colourCode && `Colour ${f.colourCode}`,
+    f.colourCode && `Color ${f.colourCode}`,
     f.content,
     f.count && `Count ${f.count}`,
     f.construction,

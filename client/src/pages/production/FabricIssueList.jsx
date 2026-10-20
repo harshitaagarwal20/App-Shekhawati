@@ -52,7 +52,7 @@ const COLUMNS = [
   { key: 'date', label: 'Date' },
   { key: 'roll', label: 'Roll' },
   { key: 'fabric', label: 'Fabric' },
-  { key: 'colour', label: 'Colour', optional: true },
+  { key: 'colour', label: 'Color', optional: true },
   { key: 'purpose', label: 'Purpose', optional: true },
   { key: 'qtyIssued', label: 'Qty Issued' },
   { key: 'order', label: 'Order', optional: true },
@@ -116,7 +116,7 @@ export function FabricIssueList() {
               <TextInput
                 id="fi-search"
                 type="search"
-                placeholder="Search issue or batch no, fabric, colour, issuer..."
+                placeholder="Search issue or batch no, fabric, color, issuer..."
                 value={list.search}
                 onChange={(e) => list.setSearch(e.target.value)}
               />
@@ -164,7 +164,7 @@ export function FabricIssueList() {
                 <SortableTh field="issueDate" label="Date" sortBy={list.sortBy} sortDir={list.sortDir} onSort={list.toggleSort} />
                 <th>Roll</th>
                 <th>Fabric</th>
-                {cols.show('colour') && <th>Colour</th>}
+                {cols.show('colour') && <th>Color</th>}
                 {cols.show('purpose') && <SortableTh field="purpose" label="Purpose" sortBy={list.sortBy} sortDir={list.sortDir} onSort={list.toggleSort} />}
                 <SortableTh field="fabricQtyIssued" label="Qty Issued" sortBy={list.sortBy} sortDir={list.sortDir} onSort={list.toggleSort} className="num" />
                 {cols.show('order') && <th>Order</th>}
@@ -339,7 +339,7 @@ export function FabricIssueDetail() {
             {issue.deliveryDate && <Detail label="Delivery Date" value={fmtDate(issue.deliveryDate)} />}
             <Detail label="Roll No" value={issue.roll?.rollNo} mono />
             <Detail label="Fabric name" value={issue.fabricName} />
-            <Detail label="Colour" value={issue.colorCode} />
+            <Detail label="Color" value={issue.colorCode} />
             <Detail label="Purpose" value={fmtEnum(issue.purpose)} />
             <Detail label="Order No" value={issue.order?.orderNo} mono />
             <Detail label="Style No" value={issue.style?.styleNo} mono />

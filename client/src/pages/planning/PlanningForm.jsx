@@ -466,7 +466,7 @@ export default function PlanningForm({ plan, onSaved, onCancel }) {
 
           {/*
             WHICH STYLE THIS PLAN IS FOR.
-            An order carries a line per style / colour / size and planning is
+            An order carries a line per style / color / size and planning is
             done style by style, so the plan names one of them. Its quantity and
             its ceiling come from that line - not from the order total, which on
             a multi-style order belongs to every style at once.

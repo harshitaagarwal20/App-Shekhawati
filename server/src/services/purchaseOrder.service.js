@@ -789,7 +789,7 @@ const APPROVAL_REQUIREMENTS = [
   ['hsnCode', 'an HSN code', () => true],
   ['gsm', 'a GSM', (po) => po.item === 'Fabric'],
   ['content', 'a fabric content', (po) => po.item === 'Fabric'],
-  ['colorCode', 'a colour', (po) => po.item === 'Fabric'],
+  ['colorCode', 'a color', (po) => po.item === 'Fabric'],
   ['subCategory', 'a sub-category', (po) => po.item === 'Fabric'],
   ['accessoriesItem', 'an accessory item', (po) => po.item === 'Accessories'],
   ['subCategory', 'a stationery item', (po) => isStationery(po.item)],

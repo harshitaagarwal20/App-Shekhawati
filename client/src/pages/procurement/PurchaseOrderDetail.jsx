@@ -528,7 +528,7 @@ function MaterialSpec({ po }) {
     ['Accessories Item', po.accessoriesItem],
     ['Variety', po.accessoryType],
     ['Size', po.size],
-    ['Colour', po.colorCode],
+    ['Color', po.colorCode],
     ['Content', po.content],
     ['GSM', po.gsm],
     ['Count', po.count],

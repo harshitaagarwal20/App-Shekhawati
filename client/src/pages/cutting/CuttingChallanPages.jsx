@@ -491,7 +491,7 @@ function CreateChallanModal({ onClose, onSaved }) {
               <th>#</th>
               <th>Item</th>
               <th>Sub-category</th>
-              <th>Colour</th>
+              <th>Color</th>
               <th className="num">Required qty</th>
               <th>UOM</th>
               <th />

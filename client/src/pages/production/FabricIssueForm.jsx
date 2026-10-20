@@ -464,7 +464,7 @@ export default function FabricIssueForm() {
         items={rolls}
         loading={rollsLoading}
         onSelect={addRoll}
-        searchPlaceholder="Scan or search a roll number, colour or fabric..."
+        searchPlaceholder="Scan or search a roll number, color or fabric..."
         searchKeys={['rollNo', 'fabricName', 'colorCode', 'gsm', 'orderNo', 'poId']}
         emptyMessage="No rolls with any balance left."
         render={(r) => (

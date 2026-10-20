@@ -591,7 +591,7 @@ export function ScrutinyDetail() {
             <Detail label="Date" value={fmtDate(s.scrutinyDate)} />
             <Detail label="Roll No" value={s.roll?.rollNo} mono />
             <Detail label="Fabric" value={s.roll?.fabricName} />
-            <Detail label="Colour" value={s.roll?.colorCode} />
+            <Detail label="Color" value={s.roll?.colorCode} />
             <Detail label="Defect type" value={s.defectType} />
             <Detail label="Order No" value={s.order?.orderNo} mono />
             <Detail label="Style No" value={s.style?.styleNo} mono />

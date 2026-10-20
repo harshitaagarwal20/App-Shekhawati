@@ -52,7 +52,7 @@ const COLUMNS = [
   { key: 'orderQty', label: 'Order Qty' },
   { key: 'effectiveQty', label: 'Effective Qty', optional: true },
   { key: 'excess', label: 'Excess', optional: true },
-  { key: 'colour', label: 'Colour', optional: true },
+  { key: 'colour', label: 'Color', optional: true },
   { key: 'currency', label: 'Currency', optional: true },
   { key: 'buyerPoNo', label: 'Buyer PO', optional: true },
   { key: 'containerNo', label: 'Container', optional: true },
@@ -158,7 +158,7 @@ export default function OrderList() {
               <TextInput
                 id="o-search"
                 type="search"
-                placeholder="Search order no, description, colour, container, remarks..."
+                placeholder="Search order no, description, color, container, remarks..."
                 value={list.search}
                 onChange={(e) => list.setSearch(e.target.value)}
               />
@@ -220,7 +220,7 @@ export default function OrderList() {
                 <SortableTh field="orderQty" label="Order Qty" sortBy={list.sortBy} sortDir={list.sortDir} onSort={list.toggleSort} className="num" />
                 {cols.show('effectiveQty') && <th className="num">Effective Qty</th>}
                 {cols.show('excess') && <th>Excess</th>}
-                {cols.show('colour') && <th>Colour</th>}
+                {cols.show('colour') && <th>Color</th>}
                 {cols.show('currency') && <th>Curr.</th>}
                 {cols.show('buyerPoNo') && <th>Buyer PO</th>}
                 {cols.show('containerNo') && <th>Container</th>}

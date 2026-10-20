@@ -380,7 +380,7 @@ export const styleMaster = {
   titleField: 'styleNo',
   defaultSort: 'styleNo',
   modalSize: 'wide',
-  searchPlaceholder: 'Search style no, description, category, colour...',
+  searchPlaceholder: 'Search style no, description, category, color...',
   filters: [{ name: 'category', label: 'Category', listCode: 'StyleCategory' }],
   columns: [
     { field: 'styleNo', label: 'Style No', sortable: true, className: 'code' },

@@ -58,7 +58,7 @@ const FILTER_LABEL = {
   location: 'Location',
   firmName: 'Unit',
   itemCategory: 'Item category',
-  colorCode: 'Colour',
+  colorCode: 'Color',
   purpose: 'Purpose',
   stage: 'Roll stage',
   status: 'Status',

@@ -707,7 +707,7 @@ export const INVENTORY_ANALYSIS_REPORTS = {
     columns: [
       col('vendorName', 'Supplier'),
       col('itemName', 'Item'),
-      col('colorCode', 'Colour'),
+      col('colorCode', 'Color'),
       col('lastReceived', 'Last received', 'date'),
       col('rollsReceived', 'Rolls received', 'qty'),
       col('receivedQty', 'Received', 'qty'),
@@ -740,7 +740,7 @@ export const INVENTORY_ANALYSIS_REPORTS = {
     filters: ['vendorId', 'itemId', 'colorCode', 'dateFrom', 'dateTo'],
     columns: [
       col('itemName', 'Item'),
-      col('colorCode', 'Colour'),
+      col('colorCode', 'Color'),
       col('rank', 'Rank in item', 'qty'),
       col('vendorName', 'Supplier'),
       col('firstReceived', 'First received', 'date'),
@@ -786,7 +786,7 @@ export const INVENTORY_ANALYSIS_REPORTS = {
       col('vendorName', 'Supplier'),
       col('itemName', 'Item'),
       col('rollNo', 'Roll'),
-      col('colorCode', 'Colour'),
+      col('colorCode', 'Color'),
       col('inspectionStatus', 'Inspection'),
       col('daysWaiting', 'Waiting (days)', 'qty'),
       col('billedQty', 'Billed', 'qty'),

@@ -593,11 +593,11 @@ export default function OrderForm({ order, onSaved, onCancel }) {
                     setGridMode(on);
                   }}
                 />
-                Enter as a colourway grid
+                Enter as a colorway grid
               </label>
               <span className="hint">
                 {styleId
-                  ? 'One style in several colours and sizes - each filled cell becomes an order line.'
+                  ? 'One style in several colors and sizes - each filled cell becomes an order line.'
                   : 'Pick a style first.'}
               </span>
             </div>
@@ -734,7 +734,7 @@ export default function OrderForm({ order, onSaved, onCancel }) {
             error={errors.unitPrice?.message}
             hint={
               gridMode
-                ? 'Priced per colourway in the grid above.'
+                ? 'Priced per colorway in the grid above.'
                 : multiLine
                 ? 'This order has several styles - price each line from the order screen.'
                 : valuePreview

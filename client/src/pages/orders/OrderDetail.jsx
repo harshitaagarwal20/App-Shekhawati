@@ -198,7 +198,7 @@ export default function OrderDetail() {
 
           {!editable.canEditStructural && usage.total > 0 && (
             <p className="faint" style={{ fontSize: 12, marginBottom: 0 }}>
-              Quantity, style, buyer, colour, size group and excess are locked: this order already
+              Quantity, style, buyer, color, size group and excess are locked: this order already
               has {editable.lockedBy.join(', ')}. Use <strong>Amend</strong> to change them with a
               recorded reason.
             </p>
@@ -243,7 +243,7 @@ export default function OrderDetail() {
               <tr>
                 <th>#</th>
                 <th>Style</th>
-                <th>Colour</th>
+                <th>Color</th>
                 <th className="num">Order qty</th>
                 <th className="num">Unit price</th>
                 <th className="num">Line value</th>

@@ -83,7 +83,7 @@ const COLUMNS = [
   { key: 'item', label: 'Item' },
   { key: 'category', label: 'Category', optional: true },
   { key: 'roll', label: 'Roll', optional: true },
-  { key: 'colour', label: 'Colour', optional: true },
+  { key: 'colour', label: 'Color', optional: true },
   { key: 'gsm', label: 'GSM', optional: true },
   { key: 'content', label: 'Content', optional: true },
   { key: 'uom', label: 'UOM', optional: true },
@@ -150,7 +150,7 @@ export default function StockLedgerPage() {
             <TextInput
               id="led-search"
               type="search"
-              placeholder="Search document no, remarks, category, colour..."
+              placeholder="Search document no, remarks, category, color..."
               value={list.search}
               onChange={(e) => list.setSearch(e.target.value)}
             />
@@ -207,7 +207,7 @@ export default function StockLedgerPage() {
               <th>Item</th>
               {cols.show('category') && <th>Category</th>}
               {cols.show('roll') && <th>Roll</th>}
-              {cols.show('colour') && <th>Colour</th>}
+              {cols.show('colour') && <th>Color</th>}
               {cols.show('gsm') && <th>GSM</th>}
               {cols.show('content') && <th>Content</th>}
               {cols.show('uom') && <th>UOM</th>}

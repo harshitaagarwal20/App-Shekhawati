@@ -80,7 +80,7 @@ const INSPECTION = [
 const COLUMNS = [
   { key: 'rollNo', label: 'Roll No' },
   { key: 'fabric', label: 'Fabric' },
-  { key: 'colour', label: 'Colour' },
+  { key: 'colour', label: 'Color' },
   { key: 'shade', label: 'Shade / Lot', optional: true },
   { key: 'gsm', label: 'GSM', optional: true },
   { key: 'count', label: 'Count', optional: true },
@@ -207,7 +207,7 @@ export default function RollList() {
               <TextInput
                 id="roll-search"
                 type="search"
-                placeholder="Search roll no, fabric, colour, shade, lot..."
+                placeholder="Search roll no, fabric, color, shade, lot..."
                 value={list.search}
                 onChange={(e) => list.setSearch(e.target.value)}
               />
@@ -296,7 +296,7 @@ export default function RollList() {
                 )}
                 <SortableTh field="rollNo" label="Roll No" sortBy={list.sortBy} sortDir={list.sortDir} onSort={list.toggleSort} />
                 <th>Fabric</th>
-                <th>Colour</th>
+                <th>Color</th>
                 {cols.show('shade') && <th>Shade / Lot</th>}
                 {cols.show('gsm') && <th>GSM</th>}
                 {cols.show('count') && <th>Count</th>}

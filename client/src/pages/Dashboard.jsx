@@ -488,8 +488,8 @@ function ApprovalsSection({ approvals }) {
 
       {/* Emphasis, not categorical: the reader's own queue is the series that
           matters and the rest is context, so it is one hue against a grey
-          rather than a colour per document type. Two series, so there is a
-          legend - identity is never carried by colour alone. */}
+          rather than a color per document type. Two series, so there is a
+          legend - identity is never carried by color alone. */}
       <div className="chart-legend">
         <span className="legend-item"><i className="swatch sw-mine" />Yours to decide</span>
         <span className="legend-item"><i className="swatch sw-other" />Waiting on someone else</span>

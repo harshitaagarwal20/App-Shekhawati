@@ -154,7 +154,7 @@ export const masterLists = [
   {
     code: 'ColorCode',
     name: 'Color Code',
-    description: 'Order / PO / Fabric Issue / Dye issue - Colour dropdown (L_ColorCode)',
+    description: 'Order / PO / Fabric Issue / Dye issue - Color dropdown (L_ColorCode)',
     values: [
       'Natural',
       'Night Black',

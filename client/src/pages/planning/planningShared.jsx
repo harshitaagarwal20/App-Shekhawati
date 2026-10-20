@@ -106,7 +106,7 @@ export function FabricStockPanel({ stock }) {
           <table className="data">
             <thead>
               <tr>
-                <th>Colour</th>
+                <th>Color</th>
                 <th className="num">Available to issue</th>
                 <th className="num">On hold</th>
                 <th className="num">At job worker / cutting floor</th>
@@ -116,7 +116,7 @@ export function FabricStockPanel({ stock }) {
             <tbody>
               {rows.map((r) => (
                 <tr key={r.colorCode ?? ''}>
-                  <td>{r.colorCode ?? <span className="faint">No colour</span>}</td>
+                  <td>{r.colorCode ?? <span className="faint">No color</span>}</td>
                   <td className="num"><strong>{fmtQty(r.availableQty)}</strong></td>
                   <td className="num">{fmtQty(r.heldQty)}</td>
                   <td className="num">{fmtQty(r.inProcessQty)}</td>

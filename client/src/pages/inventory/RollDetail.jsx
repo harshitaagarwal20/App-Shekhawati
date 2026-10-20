@@ -187,7 +187,7 @@ export default function RollDetail() {
           <DetailGrid>
             <Detail label="Roll No" value={roll.rollNo} mono />
             <Detail label="Fabric name" value={chain.characteristics.fabricName} />
-            <Detail label="Colour" value={chain.characteristics.colorCode} />
+            <Detail label="Color" value={chain.characteristics.colorCode} />
             <Detail label="Content" value={chain.characteristics.content} />
             <Detail label="Count" value={chain.characteristics.count} />
             <Detail label="Construction" value={chain.characteristics.construction} />
@@ -641,7 +641,7 @@ function ReverseOpeningBalanceDialog({ roll, onCancel, onDone }) {
         <p style={{ marginTop: 0 }}>
           This takes {fmtNum(roll.balanceQty)} {roll.uom} of {roll.rollNo} back out and writes the
           roll off. It only works while nothing has been issued against it yet, and it cannot be
-          undone - the fabric type and colour will be free to load an opening balance for again
+          undone - the fabric type and color will be free to load an opening balance for again
           afterwards.
         </p>
         <Field label="Reason" required hint="Why this roll should not have been loaded.">
