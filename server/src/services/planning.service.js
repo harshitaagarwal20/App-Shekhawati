@@ -1052,6 +1052,9 @@ export async function submit(id, { submittedTo, remarks }, actor) {
       where: { id },
       data: {
         approvalStatus: 'PENDING',
+        // The approval queue and the dashboard count read this column, not
+        // `approvalStatus`, so a submit that leaves it on DRAFT is invisible.
+        workflowState: 'PENDING_APPROVAL',
         submittedTo: recipient,
         submittedAt: new Date(),
         submittedById: actor.userId,
@@ -1100,7 +1103,7 @@ export async function recall(id, { reason }, actor) {
   const [updated] = await prisma.$transaction([
     prisma.planning.update({
       where: { id },
-      data: { submittedAt: null, submittedById: null, updatedById: actor.userId },
+      data: { workflowState: 'DRAFT', submittedAt: null, submittedById: null, updatedById: actor.userId },
       include: LIST_INCLUDE,
     }),
     ...(open
@@ -1364,6 +1367,7 @@ export async function revise(id, { remarks }, actor) {
     data: {
       version: plan.version + 1,
       approvalStatus: 'PENDING',
+      workflowState: 'DRAFT',
       submittedAt: null,
       submittedById: null,
       rejectionReason: null,

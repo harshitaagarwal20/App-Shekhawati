@@ -338,7 +338,6 @@ export const styles = [
     bom: [
       { itemCategory: 'Fabric', subCategory: '10 oz', content: 'Canvas Cotton', gsm: '280 GSM', count: '10x6', uom: 'Mtrs', qtyPerPc: '1.1', wastagePct: '0.03', hsnCode: '52081290', description: 'Canvas body + gusset' },
       { itemCategory: 'Accessories', accessoriesItem: 'Cotton Handle', uom: 'Pcs', qtyPerPc: '2', wastagePct: '0.01', hsnCode: '63079090', description: 'Shopper handle' },
-      { itemCategory: 'Packaging Material', uom: 'Pcs', qtyPerPc: '1', wastagePct: '0.01', description: 'Base board' },
     ],
   },
   {

@@ -688,20 +688,63 @@ export async function update(id, input, actor = {}) {
   return getById(id);
 }
 
-/** Hands the plan in for approval. */
-export async function submit(id, { submittedTo, remarks } = {}, actor = {}) {
-  await engine.submit(null, {
+/**
+ * Who a plan goes to when the submitter names nobody. Without a name the engine
+ * stops at SUBMITTED, which cannot be approved or rejected - the plan sat there
+ * with an Approve button that always failed. Same default as the cutting plan.
+ */
+const DEFAULT_APPROVER = 'Director';
+
+/**
+ * Moves a plan still in SUBMITTED on to PENDING_APPROVAL, so it can be decided.
+ * Plans handed in before DEFAULT_APPROVER existed are parked there.
+ */
+async function awaitDecision(tx, id, actor) {
+  const current = await tx.materialPlan.findUnique({ where: { id }, select: { workflowState: true } });
+  if (current?.workflowState !== 'SUBMITTED') return;
+  await engine.transition(tx, {
     documentType: 'MATERIAL_PLAN',
     documentId: id,
-    submittedTo,
+    to: 'PENDING_APPROVAL',
     actor,
-    remarks,
-    data: {
-      submittedTo: submittedTo ?? null,
-      submittedAt: new Date(),
-      submittedById: actor.userId ?? null,
-      submittedByName: actor.fullName ?? null,
-    },
+    remarks: `Awaiting ${DEFAULT_APPROVER}`,
+  });
+}
+
+/** Hands the plan in for approval. A rejected plan goes back to draft first. */
+export async function submit(id, { submittedTo, remarks } = {}, actor = {}) {
+  const recipient = submittedTo?.trim() || DEFAULT_APPROVER;
+  const current = await prisma.materialPlan.findFirst({
+    where: { id, deletedAt: null },
+    select: { workflowState: true },
+  });
+  if (!current) throw ApiError.notFound('Material plan');
+
+  await prisma.$transaction(async (tx) => {
+    // The engine has no REJECTED -> SUBMITTED edge; a rejection goes back to
+    // the author as a draft, and the draft is what is handed in again.
+    if (current.workflowState === 'REJECTED') {
+      await engine.transition(tx, {
+        documentType: 'MATERIAL_PLAN',
+        documentId: id,
+        to: 'DRAFT',
+        actor,
+        remarks: 'Revised after rejection',
+      });
+    }
+    await engine.submit(tx, {
+      documentType: 'MATERIAL_PLAN',
+      documentId: id,
+      submittedTo: recipient,
+      actor,
+      remarks,
+      data: {
+        submittedTo: recipient,
+        submittedAt: new Date(),
+        submittedById: actor.userId ?? null,
+        submittedByName: actor.fullName ?? null,
+      },
+    });
   });
   return getById(id);
 }
@@ -722,29 +765,35 @@ export async function approve(id, { remarks } = {}, actor = {}) {
 
   assertNotSelfApproval(existing, actor, 'material plan');
 
-  await engine.approve(null, {
-    documentType: 'MATERIAL_PLAN',
-    documentId: id,
-    actor,
-    remarks,
-    data: {
-      approvedById: actor.userId ?? null,
-      approvedByName: actor.fullName ?? null,
-      approvedAt: new Date(),
-      decidedAt: new Date(),
-    },
+  await prisma.$transaction(async (tx) => {
+    await awaitDecision(tx, id, actor);
+    await engine.approve(tx, {
+      documentType: 'MATERIAL_PLAN',
+      documentId: id,
+      actor,
+      remarks,
+      data: {
+        approvedById: actor.userId ?? null,
+        approvedByName: actor.fullName ?? null,
+        approvedAt: new Date(),
+        decidedAt: new Date(),
+      },
+    });
   });
   return getById(id);
 }
 
 /** Rejects, with a reason. */
 export async function reject(id, { reason } = {}, actor = {}) {
-  await engine.reject(null, {
-    documentType: 'MATERIAL_PLAN',
-    documentId: id,
-    actor,
-    reason,
-    data: { decidedAt: new Date(), rejectionReason: reason },
+  await prisma.$transaction(async (tx) => {
+    await awaitDecision(tx, id, actor);
+    await engine.reject(tx, {
+      documentType: 'MATERIAL_PLAN',
+      documentId: id,
+      actor,
+      reason,
+      data: { decidedAt: new Date(), rejectionReason: reason },
+    });
   });
   return getById(id);
 }
