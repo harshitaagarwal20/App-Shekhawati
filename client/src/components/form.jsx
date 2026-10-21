@@ -114,6 +114,13 @@ export function focusFirstError(form, fields) {
   const name = fields?.[0];
   if (!name) return;
 
+  // A field in a folded section cannot take focus, so unfold it first.
+  const target =
+    document.getElementById(name) ?? document.querySelector(`[name="${CSS.escape(name)}"]`);
+  for (let d = target?.closest('details'); d; d = d.parentElement?.closest('details')) {
+    d.open = true;
+  }
+
   try {
     form.setFocus(name);
   } catch {
@@ -172,8 +179,10 @@ export function useSubmit(form, action, { onDone } = {}) {
    * cursor moving somewhere off-screen is not something you notice. The banner
    * gives the press an outcome; the field itself still carries the detail.
    */
-  const onInvalid = () => {
+  const onInvalid = (errors) => {
     setBanner('Some entries need checking. The fields with a problem are marked below.');
+    // RHF's own focus cannot reach a field inside a folded section.
+    focusFirstError(form, Object.keys(errors));
   };
 
   const submit = form.handleSubmit(run, onInvalid);

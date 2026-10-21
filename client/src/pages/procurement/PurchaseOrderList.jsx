@@ -35,7 +35,7 @@ import {
   StatusBadge,
   TextInput,
 } from '../../components/ui.jsx';
-import { fmtDate, fmtMoney, fmtNum } from '../../utils/format.js';
+import { fmtDate, fmtMoney, fmtNum, fmtOrder } from '../../utils/format.js';
 import PurchaseOrderForm from './PurchaseOrderForm.jsx';
 import { loadFailed } from '../../services/loadFailures.js';
 import { ExportButton } from '../../components/dataTransfer.jsx';
@@ -183,7 +183,7 @@ export default function PurchaseOrderList() {
             <RecordSelect
               id="po-f-order"
               options={orderOptions}
-              getLabel={(o) => o.orderNo}
+              getLabel={fmtOrder}
               placeholder="All orders"
               value={list.filters.orderId ?? ''}
               onChange={(e) => list.setFilter('orderId', e.target.value)}

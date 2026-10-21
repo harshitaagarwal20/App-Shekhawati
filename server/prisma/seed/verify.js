@@ -356,10 +356,12 @@ for (const r of roles) {
 }
 
 // --- 6. out-of-scope guard --------------------------------------------------
+// Stitching Record and Hourly Monitoring left this list in Production Phase 2;
+// External QC, the Alteration Unit and the Rejected Register in Phase 4;
+// QC Size and QC Defects (as Inline QC) in Phase 3.
 const OUT_OF_SCOPE = [
-  'stitching_record', 'hourly_monitoring', 'qc_size', 'qc_defect',
-  'internal_quality', 'checker_report', 'finished_checker', 'external_secondary',
-  'alter_report', 'spot_rectification', 'rejected', 'packing', 'needle_checking',
+  'internal_quality', 'checker_report', 'finished_checker',
+  'spot_rectification', 'packing', 'needle_checking',
   'dispatch', 'reconciliation',
 ];
 

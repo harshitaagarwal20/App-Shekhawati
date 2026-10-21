@@ -346,6 +346,10 @@ async function sendEmail(row) {
 async function sendWhatsapp(row) {
   const url = absolute(row.link);
   const detail = [row.body, url].filter(Boolean).join(' - ') || '-';
+  // Meta refuses a template parameter holding a line break, a tab or more than
+  // four spaces in a row, and the daily summary's body is several lines. In a
+  // template each line becomes " · "; a plain text message keeps them.
+  const oneLine = detail.replace(/\s*\n+\s*/g, ' · ').replace(/[\t ]{2,}/g, ' ');
   const payload = env.WHATSAPP_TEMPLATE_NAME
     ? {
         messaging_product: 'whatsapp',
@@ -359,7 +363,7 @@ async function sendWhatsapp(row) {
               type: 'body',
               parameters: [
                 { type: 'text', text: row.title.slice(0, 900) },
-                { type: 'text', text: detail.slice(0, 900) },
+                { type: 'text', text: oneLine.slice(0, 900) },
               ],
             },
           ],
@@ -470,6 +474,7 @@ export function stopNotificationDispatcher() {
 export async function listMine(userId, { unreadOnly = false, limit = 30, before } = {}) {
   const where = {
     userId,
+    dismissedAt: null,
     ...(unreadOnly ? { readAt: null } : {}),
     ...(before ? { createdAt: { lt: new Date(before) } } : {}),
   };
@@ -490,13 +495,13 @@ export async function listMine(userId, { unreadOnly = false, limit = 30, before 
         createdAt: true,
       },
     }),
-    prisma.notification.count({ where: { userId, readAt: null } }),
+    prisma.notification.count({ where: { userId, readAt: null, dismissedAt: null } }),
   ]);
   return { rows, unread };
 }
 
 export async function unreadCount(userId) {
-  return { unread: await prisma.notification.count({ where: { userId, readAt: null } }) };
+  return { unread: await prisma.notification.count({ where: { userId, readAt: null, dismissedAt: null } }) };
 }
 
 /** Marks some - or, with no ids, all - of the caller's own notifications read. */
@@ -508,10 +513,25 @@ export async function markRead(userId, { ids } = {}) {
   return { marked: count };
 }
 
+/**
+ * Clears some of the caller's own notifications from the bell - the listed
+ * ids, or with `allRead` every one already read. A dismissed unread one is
+ * marked read too, so it stops counting toward the badge.
+ */
+export async function dismiss(userId, { ids, allRead = false } = {}) {
+  const now = new Date();
+  const where = { userId, dismissedAt: null, ...(allRead ? { readAt: { not: null } } : { id: { in: ids ?? [] } }) };
+  const [{ count }] = await prisma.$transaction([
+    prisma.notification.updateMany({ where, data: { dismissedAt: now } }),
+    prisma.notification.updateMany({ where: { ...where, dismissedAt: now, readAt: null }, data: { readAt: now } }),
+  ]);
+  return { dismissed: count };
+}
+
 export async function getPreferences(userId) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { email: true, notifyByEmail: true, notifyByWhatsapp: true, whatsappNumber: true },
+    select: { email: true, notifyByEmail: true, notifyByWhatsapp: true, whatsappNumber: true, notifyDailySummary: true },
   });
   if (!user) throw ApiError.notFound('User');
   return {
@@ -520,7 +540,7 @@ export async function getPreferences(userId) {
   };
 }
 
-export async function setPreferences(userId, { notifyByEmail, notifyByWhatsapp, whatsappNumber }) {
+export async function setPreferences(userId, { notifyByEmail, notifyByWhatsapp, whatsappNumber, notifyDailySummary }) {
   const number = whatsappNumber === undefined ? undefined : String(whatsappNumber ?? '').replace(/\D/g, '') || null;
   if (number && !/^[0-9]{8,15}$/.test(number)) {
     throw ApiError.badRequest('A WhatsApp number is 8 to 15 digits, with the country code - 919876543210', {
@@ -537,6 +557,7 @@ export async function setPreferences(userId, { notifyByEmail, notifyByWhatsapp, 
       ...(notifyByEmail !== undefined ? { notifyByEmail } : {}),
       ...(notifyByWhatsapp !== undefined ? { notifyByWhatsapp } : {}),
       ...(number !== undefined ? { whatsappNumber: number } : {}),
+      ...(notifyDailySummary !== undefined ? { notifyDailySummary } : {}),
     },
   });
   return getPreferences(userId);

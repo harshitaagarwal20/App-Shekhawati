@@ -19,8 +19,8 @@
  *    4 Stores                    Gate Pass, Goods Received, Inventory (stock +
  *                                movement + rolls), Fabric Issue
  *    5 Job Work                   Job Work (dyeing / printing), Fabric Scrutiny
- *    6 Cutting                   Plan Approval, Cutting Challan, Cut Pieces
- *                                Receipt, Cutting Issue
+ *    6 Cutting                   Cutting Challan, Cut Pieces Receipt,
+ *                                Cutting Issue
  *      Administration            Roles, Users, Audit
  *
  *  which is the pipeline the README states and the dashboard's own STAGES list
@@ -73,9 +73,11 @@
  *  link to a catalogue the server has already filtered by permission, so a user
  *  sees only the reports they may actually run.
  *
- *  The pipeline ends at Cutting Issue. There is deliberately no entry - and no
- *  "coming soon" placeholder - for stitching, hourly monitoring, QC records,
- *  alter, packing, needle checking, dispatch or reconciliation.
+ *  Production Phase 2 adds Stitching as stage 7, after Cutting, and Phase 3's
+ *  Inline QC sits inside it - the checks are taken on the line while the
+ *  tailors stitch. Beyond Finishing there is deliberately no entry - and no
+ *  "coming soon" placeholder - for final QC, packing, needle checking,
+ *  dispatch or reconciliation.
  * ---------------------------------------------------------------------------
  */
 
@@ -112,11 +114,23 @@ export const NAV_GROUPS = [
        * Fourteen operational reports, one per implemented module. Each declares
        * its own permission; the catalogue is filtered by it.
        */
-      { to: '/reports', label: 'Reports', permission: 'REPORT.VIEW', hint: 'View and print reports' },
+      /*
+       * Vendor Performance - the charts of dyers and suppliers - had a link of
+       * its own here. It is a kind of report, so it is opened from the Reports
+       * Center now, for the roles that may see it; `covers` keeps this entry
+       * lit while it is open.
+       */
+      {
+        to: '/reports',
+        label: 'Reports',
+        permission: 'REPORT.VIEW',
+        hint: 'View and print reports, vendor performance',
+        covers: ['/vendor-performance'],
+      },
       /**
-       * Everything waiting on a decision, across every module. Behind
-       * REPORT.VIEW because it is a read across the whole system, and the
-       * Director - who is the last gate nearly everywhere - holds it.
+       * Everything waiting on a decision, across every module. Behind its own
+       * APPROVAL_QUEUE.VIEW: it was REPORT.VIEW, which put it in front of the
+       * QC and finishing desks, who run reports but decide nothing.
        *
        * It sat under Procurement, which made a queue spanning eleven modules
        * look like a procurement screen. An approver arriving at the ERP is
@@ -141,12 +155,18 @@ export const NAV_GROUPS = [
        * The permission is an ARRAY on purpose: `can()` takes any of them, so
        * somebody holding only one of the two still gets the link, and the hub
        * offers them only the register they may actually see.
+       *
+       * This is the ONLY way in to plan approvals. It used to be offered again
+       * at the head of Cutting, and two links to one screen in two groups was
+       * one more thing to wonder about. `covers` keeps this entry lit on
+       * `/plan-approvals/:id`.
        */
       {
         to: '/approvals',
         label: 'Approvals',
-        hint: 'Waiting for a decision',
-        permission: ['REPORT.VIEW', 'PLAN_APPROVAL.VIEW'],
+        hint: 'Waiting for a decision, plan approval',
+        permission: ['APPROVAL_QUEUE.VIEW', 'PLAN_APPROVAL.VIEW'],
+        covers: ['/plan-approvals'],
       },
     ],
   },
@@ -167,10 +187,11 @@ export const NAV_GROUPS = [
       /**
        * Every tolerance in the system, as data. Under Masters rather than under
        * a transaction module because it IS configuration - the same kind of
-       * thing as adding a colour to a dropdown - and it belongs to Head Office
-       * rather than to the store that would benefit from a looser limit.
+       * thing as adding a colour to a dropdown. Its own EXCESS_RULE permission:
+       * the store and ADMIN maintain it, the Director reads it, nobody else
+       * sees it.
        */
-      { to: '/masters/excess-rules', label: 'Excess Rules', permission: 'MASTER_LIST.VIEW', hint: 'Allowed extra % limits' },
+      { to: '/masters/excess-rules', label: 'Excess Rules', permission: 'EXCESS_RULE.VIEW', hint: 'Allowed extra % limits' },
       /*
        * A SETUP ACTION, AND IT SITS WITH THE OTHER SETUP.
        *
@@ -181,8 +202,18 @@ export const NAV_GROUPS = [
        * This is the one place in the application that writes a stock movement
        * without a document behind it, so it is kept where the other one-time
        * setup lives and gated on the permission that actually creates rolls.
+       *
+       * `setupOnce`: once any opening stock has been loaded the link leaves
+       * the sidebar - see visibleNavigation(). The screen is still there for an
+       * item that was missed, behind a button on Stock on Hand.
        */
-      { to: '/masters/opening-stock', label: 'Opening Stock', permission: 'FABRIC_ROLL.CREATE', hint: 'What was already in the store at go-live' },
+      {
+        to: '/masters/opening-stock',
+        label: 'Opening Stock',
+        permission: 'FABRIC_ROLL.CREATE',
+        hint: 'What was already in the store at go-live',
+        setupOnce: true,
+      },
     ],
   },
   {
@@ -242,21 +273,21 @@ export const NAV_GROUPS = [
        * who may count rolls but may not see the value of the stock still gets
        * the link, and the hub offers him only the view he holds.
        */
+      /*
+       * Inventory Analysis had a second link here. It is a card on the hub
+       * like the other views, and its route sits under `/inventory`, so this
+       * entry already owns it.
+       *
+       * Opening Stock is `covered` for when its own Masters link has gone (see
+       * `setupOnce`) and the screen is reached from Stock on Hand. While that
+       * link is showing, it is found first and wins the tie.
+       */
       {
         to: '/inventory',
         label: 'Inventory',
         permission: ['INVENTORY.VIEW', 'STOCK_LEDGER.VIEW', 'FABRIC_ROLL.VIEW'],
-      },
-      /*
-       * Also a card on the Inventory hub, but it is a different question - not
-       * "what is in the store" but "whose fabric, how good is it" - and people
-       * looking for it did not think to open Inventory first.
-       */
-      {
-        to: '/inventory/analysis',
-        label: 'Inventory Analysis',
-        permission: ['INVENTORY.VIEW', 'FABRIC_ROLL.VIEW'],
-        hint: 'Stock by supplier, yield, inward inspection',
+        hint: 'Stock, movement, rolls, analysis by supplier',
+        covers: ['/masters/opening-stock'],
       },
       { to: '/fabric-issues', label: 'Fabric Issue', permission: 'FABRIC_ISSUE.VIEW', hint: 'Send fabric out of the store' },
     ],
@@ -281,11 +312,11 @@ export const NAV_GROUPS = [
        * The tabs stay and still own `?process=`, so a link to a particular
        * process still opens on it. Only the duplicate way in is gone.
        *
-       * Permission is an array: `can()` takes any of them, so somebody who may
-       * see only printing still gets the link, and the register shows them the
-       * processes they hold.
+       * DYE_ISSUE.VIEW alone, because that is what the route and every
+       * /api/job-works endpoint demand. It also offered the link on
+       * PRINTING.VIEW, which only led a printing-only login to Forbidden.
        */
-      { to: '/job-works', label: 'Job Work', permission: ['DYE_ISSUE.VIEW', 'PRINTING.VIEW'], hint: 'Dyeing and printing by vendors' },
+      { to: '/job-works', label: 'Job Work', permission: 'DYE_ISSUE.VIEW', hint: 'Dyeing and printing by vendors' },
       { to: '/scrutinies', label: 'Fabric Scrutiny', permission: 'FABRIC_SCRUTINY.VIEW', hint: 'Quality check after job work' },
     ],
   },
@@ -294,19 +325,63 @@ export const NAV_GROUPS = [
     stage: 6,
     items: [
       /*
-       * Plan Approval is step 13 of the business flow, straight before the
-       * challan: a cutting challan can only be raised against an APPROVED plan
-       * version. So it opens this group rather than hiding behind Dashboard >
-       * Approvals, where the floor staff following the flow did not find it.
-       * Approvals still offers it as a second door.
+       * Plan Approval - step 13, straight before the challan - is reached from
+       * Dashboard > Approvals only. See the note on that entry.
        */
-      { to: '/plan-approvals', label: 'Plan Approval', permission: 'PLAN_APPROVAL.VIEW', hint: 'Approve plan before cutting' },
       /** C5 - the requirement comes first; the issue fulfils it. */
       { to: '/cutting-challans', label: 'Cutting Challan', permission: 'CUTTING_CHALLAN.VIEW', hint: 'What has to be cut' },
       /** Cut pieces counted in from the cutting floor, before they are issued. */
       { to: '/cut-pieces-receipts', label: 'Cut Pieces Receipt', permission: 'CUT_PIECES_RECEIPT.VIEW', hint: 'Count pieces from cutting' },
-      /** The last module in the application. Nothing follows it. */
-      { to: '/cutting-issues', label: 'Cutting Issue', permission: 'CUTTING_ISSUE.VIEW', hint: 'Final cutting record' },
+      /** Cut pieces out to a stitching unit. Stitching draws on these. */
+      { to: '/cutting-issues', label: 'Cutting Issue', permission: 'CUTTING_ISSUE.VIEW', hint: 'Cut pieces sent to a unit' },
+    ],
+  },
+  {
+    /*
+     * Production Phase 2. A supervisor sees these and little else, so they are
+     * written for the floor: each says what it records, not what it is.
+     */
+    label: 'Stitching',
+    stage: 7,
+    items: [
+      /*
+       * Printing after stitching is a tab on this screen, not a link of its
+       * own. It is optional - only for a style printed after it is stitched -
+       * and a sidebar link made it look like a step everybody takes. Its route
+       * sits under `/stitching`, so this entry owns it.
+       */
+      { to: '/stitching', label: 'Stitching Record', permission: 'STITCHING_RECORD.VIEW', hint: "A unit's daily output, printing after stitching" },
+      { to: '/stitching/hourly', label: 'Hourly Monitoring', permission: 'HOURLY_MONITORING.VIEW', hint: 'Pieces per tailor, hour by hour' },
+      /*
+       * Phase 3. Beside stitching, not after it: a checker walks the line.
+       * "Action needed" - the defects sent to a supervisor - is the screen's
+       * second tab, so it has no link of its own.
+       */
+      { to: '/inline-qc', label: 'Inline QC', permission: 'INLINE_QC.VIEW', hint: 'Size and workmanship checks, defects to resolve' },
+    ],
+  },
+  {
+    /*
+     * After stitching. Ironing, then the external agency's check; faulty
+     * pieces go to the Alteration Unit and come back through ironing.
+     */
+    label: 'Finishing',
+    stage: 8,
+    items: [
+      { to: '/ironing', label: 'Ironing', permission: 'IRONING.VIEW', hint: 'Pieces ironed, damaged, waiting' },
+      /*
+       * The Rejected Register is a tab on External QC: it is where the
+       * inspection's rejections end up, and every role that sees one sees the
+       * other.
+       */
+      {
+        to: '/external-qc',
+        label: 'External QC',
+        permission: 'EXTERNAL_QC.VIEW',
+        hint: 'Approved, alteration, rejected register',
+        covers: ['/rejected-register'],
+      },
+      { to: '/alteration', label: 'Alteration Unit', permission: 'ALTERATION.VIEW', hint: 'Bags to repair or clean' },
     ],
   },
   {
@@ -387,10 +462,16 @@ export function navMatch(item, pathname) {
  * `stage` travels with the group, so the sidebar can number the pipeline even
  * when a user's permissions hide whole stages of it - a storeman who cannot see
  * Procurement still sees that Stores is step 4, not step 3.
+ *
+ * `setupDone` drops the `setupOnce` entries - one-time go-live steps that are
+ * clutter once they have been done. The caller asks the server; left out, the
+ * entries are shown, which is what the screens-by-role policy test replays.
  */
-export function visibleNavigation(can) {
+export function visibleNavigation(can, { setupDone = false } = {}) {
   return NAV_GROUPS.map((group) => ({
     ...group,
-    items: group.items.filter((item) => !item.permission || can(item.permission)),
+    items: group.items.filter(
+      (item) => (!item.permission || can(item.permission)) && !(setupDone && item.setupOnce),
+    ),
   })).filter((group) => group.items.length > 0);
 }

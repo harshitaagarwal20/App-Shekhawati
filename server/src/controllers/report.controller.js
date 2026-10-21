@@ -56,15 +56,24 @@ export const requireReportPermission = (req, _res, next) => {
   }
 };
 
+/**
+ * The caller's own permission check, handed to the report.
+ *
+ * A report that spans several registers (defect-reasons) opens under one
+ * permission and then reads each register only for a caller who may view it.
+ * Added after validation, so it can never come from the query string.
+ */
+const withCaller = (req) => ({ ...req.query, can: (code) => req.auth.has(code) });
+
 export const run = asyncHandler(async (req, res) =>
-  ok(res, await service.run(req.params.key, req.query)),
+  ok(res, await service.run(req.params.key, withCaller(req))),
 );
 
 /** The same report, as a CSV download. */
 export const csv = asyncHandler(async (req, res) => {
   // `runForExport`, not `run`: an export is the whole report, never a page of
   // it. The screen pages; the file does not.
-  const report = await service.runForExport(req.params.key, req.query);
+  const report = await service.runForExport(req.params.key, withCaller(req));
   const stamp = istIsoDate();
 
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');

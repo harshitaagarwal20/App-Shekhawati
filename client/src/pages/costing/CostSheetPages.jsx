@@ -18,6 +18,7 @@ import { useResourceList } from '../../hooks/useResourceList.js';
 import { costSheets as api, orders as ordersApi, styles as stylesApi } from '../../services/erp.js';
 import {
   Alert,
+  CollapsibleField,
   EmptyState,
   EnumSelect,
   Field,
@@ -31,7 +32,7 @@ import {
   TextInput,
 } from '../../components/ui.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
-import { fmtDate, fmtDateTime } from '../../utils/format.js';
+import { fmtDate, fmtDateTime, fmtOrder } from '../../utils/format.js';
 import { loadFailed } from '../../services/loadFailures.js';
 
 const STATUS_OPTIONS = [
@@ -263,7 +264,7 @@ function NewCostSheetDialog({ styleOptions, onCancel, onDone }) {
           <RecordSelect
             options={orders}
             getValue={(o) => o.id}
-            getLabel={(o) => o.orderNo}
+            getLabel={fmtOrder}
             placeholder="Style in general"
             value={orderId}
             onChange={(e) => setOrderId(e.target.value)}
@@ -497,7 +498,9 @@ export function CostSheetDetail() {
             <Field label="Rejection %" hint="allowance on cost"><TextInput type="number" step="0.01" value={form.rejectionPct} disabled={!editable} onChange={set('rejectionPct')} /></Field>
             <Field label="Agent commission %" hint="of selling price"><TextInput type="number" step="0.01" value={form.commissionPct} disabled={!editable} onChange={set('commissionPct')} /></Field>
             <Field label="Margin %" hint="of selling price"><TextInput type="number" step="0.01" value={form.marginPct} disabled={!editable} onChange={set('marginPct')} /></Field>
-            <Field label="Remarks" className="span-2"><TextArea rows={2} value={form.remarks} disabled={!editable} onChange={set('remarks')} /></Field>
+            <CollapsibleField className="span-2">
+              <Field label="Remarks"><TextArea rows={2} value={form.remarks} disabled={!editable} onChange={set('remarks')} /></Field>
+            </CollapsibleField>
           </div>
         </div>
       </div>

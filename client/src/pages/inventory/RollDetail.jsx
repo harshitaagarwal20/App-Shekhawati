@@ -21,6 +21,7 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import { inventory as invApi } from '../../services/erp.js';
 import {
   Alert,
+  CollapsibleField,
   EnumSelect,
   Field,
   MasterSelect,
@@ -524,9 +525,11 @@ function InspectDialog({ roll, onCancel, onDone }) {
         <Field label={`Faulty length (${roll.uom})`} hint="Holes, slubs, stains, shade bars.">
           <TextInput type="number" min="0" step="0.01" value={defectQty} onChange={(e) => setDefectQty(e.target.value)} />
         </Field>
-        <Field label="Remarks">
-          <TextArea rows={2} value={remarks} onChange={(e) => setRemarks(e.target.value)} />
-        </Field>
+        <CollapsibleField>
+          <Field label="Remarks">
+            <TextArea rows={2} value={remarks} onChange={(e) => setRemarks(e.target.value)} />
+          </Field>
+        </CollapsibleField>
       </div>
     </Modal>
   );
@@ -581,9 +584,11 @@ function RelocateDialog({ roll, onCancel, onDone }) {
             placeholder={`Currently ${roll.location ?? 'unrecorded'}`}
           />
         </Field>
-        <Field label="Remarks">
-          <TextArea rows={2} value={remarks} onChange={(e) => setRemarks(e.target.value)} />
-        </Field>
+        <CollapsibleField>
+          <Field label="Remarks">
+            <TextArea rows={2} value={remarks} onChange={(e) => setRemarks(e.target.value)} />
+          </Field>
+        </CollapsibleField>
       </div>
     </Modal>
   );

@@ -9,6 +9,7 @@ const ChangePassword = lazy(() => import('../pages/ChangePassword.jsx'));
 const Dashboard = lazy(() => import('../pages/Dashboard.jsx'));
 const ApprovalsHub = lazy(() => import('../pages/ApprovalsHub.jsx'));
 const Reports = lazy(() => import('../pages/reports/Reports.jsx'));
+const VendorPerformance = lazy(() => import('../pages/reports/VendorPerformance.jsx'));
 const Forbidden = lazy(() => import('../pages/Errors.jsx').then((m) => ({ default: m.Forbidden })));
 const NotFound = lazy(() => import('../pages/Errors.jsx').then((m) => ({ default: m.NotFound })));
 
@@ -72,6 +73,28 @@ const CuttingChallanDetail = lazy(() => import('../pages/cutting/CuttingChallanP
 // Cut pieces counted in from the cutting department, before issue to stitching.
 const CutPiecesReceiptList = lazy(() => import('../pages/cutting/CutPiecesReceiptPages.jsx').then((m) => ({ default: m.CutPiecesReceiptList })));
 const CutPiecesReceiptDetail = lazy(() => import('../pages/cutting/CutPiecesReceiptPages.jsx').then((m) => ({ default: m.CutPiecesReceiptDetail })));
+
+// Production Phase 2 - stitching, hourly monitoring, printing after stitching.
+const StitchingList = lazy(() => import('../pages/stitching/StitchingPages.jsx').then((m) => ({ default: m.StitchingList })));
+const StitchingDetail = lazy(() => import('../pages/stitching/StitchingPages.jsx').then((m) => ({ default: m.StitchingDetail })));
+const HourlyMonitoring = lazy(() => import('../pages/stitching/HourlyMonitoring.jsx'));
+// Phase 3 - Inline QC, beside stitching.
+const InlineQcList = lazy(() => import('../pages/stitching/InlineQcPages.jsx').then((m) => ({ default: m.InlineQcList })));
+const InlineQcDetail = lazy(() => import('../pages/stitching/InlineQcPages.jsx').then((m) => ({ default: m.InlineQcDetail })));
+const InlineQcActions = lazy(() => import('../pages/stitching/InlineQcPages.jsx').then((m) => ({ default: m.InlineQcActions })));
+const PrintingList = lazy(() => import('../pages/stitching/PrintingPages.jsx').then((m) => ({ default: m.PrintingList })));
+const PrintingDetail = lazy(() => import('../pages/stitching/PrintingPages.jsx').then((m) => ({ default: m.PrintingDetail })));
+
+const IroningList = lazy(() => import('../pages/stitching/IroningPages.jsx').then((m) => ({ default: m.IroningList })));
+const IroningDetail = lazy(() => import('../pages/stitching/IroningPages.jsx').then((m) => ({ default: m.IroningDetail })));
+
+// Phase 4 - External QC, the Alteration Unit, the Rejected Register.
+const ExternalQcList = lazy(() => import('../pages/finishing/ExternalQcPages.jsx').then((m) => ({ default: m.ExternalQcList })));
+const ExternalQcDetail = lazy(() => import('../pages/finishing/ExternalQcPages.jsx').then((m) => ({ default: m.ExternalQcDetail })));
+const AlterationPending = lazy(() => import('../pages/finishing/AlterationPages.jsx').then((m) => ({ default: m.AlterationPending })));
+const AlterationEntries = lazy(() => import('../pages/finishing/AlterationPages.jsx').then((m) => ({ default: m.AlterationEntries })));
+const AlterationEntryDetail = lazy(() => import('../pages/finishing/AlterationPages.jsx').then((m) => ({ default: m.AlterationEntryDetail })));
+const RejectedRegister = lazy(() => import('../pages/finishing/RejectedRegister.jsx'));
 
 const DocumentPrint = lazy(() => import('../pages/print/DocumentPrint.jsx'));
 
@@ -163,7 +186,7 @@ export default function AppRoutes() {
           <Route
             path="/approvals"
             element={(
-              <RequirePermission permissions={['REPORT.VIEW', 'PLAN_APPROVAL.VIEW']}>
+              <RequirePermission permissions={['APPROVAL_QUEUE.VIEW', 'PLAN_APPROVAL.VIEW']}>
                 <ApprovalsHub />
               </RequirePermission>
             )}
@@ -172,6 +195,16 @@ export default function AppRoutes() {
           {/* Fourteen reports, one generic screen. Each report's own permission
               is checked by the API on every run. */}
           <Route path="/reports" element={guarded('REPORT.VIEW', <Reports />)} />
+          {/* Guarded on any one of its reports' permissions; the screen then
+              offers only the reports the catalogue says this role may run. */}
+          <Route
+            path="/vendor-performance"
+            element={(
+              <RequirePermission permissions={['DYE_ISSUE.VIEW', 'PURCHASE_ORDER.VIEW', 'INVENTORY.VIEW']}>
+                <VendorPerformance />
+              </RequirePermission>
+            )}
+          />
 
           {/* --- Orders ---------------------------------------------------- */}
           <Route path="/orders" element={guarded('BUYER_ORDER.VIEW', <OrderList />)} />
@@ -335,6 +368,27 @@ export default function AppRoutes() {
             path="/cutting-issues"
             element={guarded('CUTTING_ISSUE.VIEW', <CuttingIssueList />)}
           />
+          {/* --- Stitching: Production Phase 2 ---------------------------- */}
+          {/* The literal paths before /stitching/:id, so "hourly" is not read as an id. */}
+          <Route path="/stitching" element={guarded('STITCHING_RECORD.VIEW', <StitchingList />)} />
+          <Route path="/stitching/hourly" element={guarded('HOURLY_MONITORING.VIEW', <HourlyMonitoring />)} />
+          <Route path="/stitching/printing" element={guarded('PRINTING.VIEW', <PrintingList />)} />
+          <Route path="/stitching/printing/:id" element={guarded('PRINTING.VIEW', <PrintingDetail />)} />
+          <Route path="/stitching/:id" element={guarded('STITCHING_RECORD.VIEW', <StitchingDetail />)} />
+          {/* "actions" before :id, for the same reason. */}
+          <Route path="/inline-qc" element={guarded('INLINE_QC.VIEW', <InlineQcList />)} />
+          <Route path="/inline-qc/actions" element={guarded('INLINE_QC.VIEW', <InlineQcActions />)} />
+          <Route path="/inline-qc/:id" element={guarded('INLINE_QC.VIEW', <InlineQcDetail />)} />
+          <Route path="/ironing" element={guarded('IRONING.VIEW', <IroningList />)} />
+          <Route path="/ironing/:id" element={guarded('IRONING.VIEW', <IroningDetail />)} />
+          {/* --- Phase 4: External QC, Alteration Unit, Rejected Register --- */}
+          <Route path="/external-qc" element={guarded('EXTERNAL_QC.VIEW', <ExternalQcList />)} />
+          <Route path="/external-qc/:id" element={guarded('EXTERNAL_QC.VIEW', <ExternalQcDetail />)} />
+          <Route path="/alteration" element={guarded('ALTERATION.VIEW', <AlterationPending />)} />
+          <Route path="/alteration/entries" element={guarded('ALTERATION.VIEW', <AlterationEntries />)} />
+          <Route path="/alteration/entries/:id" element={guarded('ALTERATION.VIEW', <AlterationEntryDetail />)} />
+          <Route path="/rejected-register" element={guarded('REJECTED_REGISTER.VIEW', <RejectedRegister />)} />
+
           <Route
             path="/cutting-issues/:id"
             element={guarded('CUTTING_ISSUE.VIEW', <CuttingIssueDetail />)}
@@ -354,7 +408,7 @@ export default function AppRoutes() {
           <Route path="/masters/styles" element={guarded('STYLE.VIEW', <Styles />)} />
           <Route
             path="/masters/excess-rules"
-            element={guarded('MASTER_LIST.VIEW', <ExcessRules />)}
+            element={guarded('EXCESS_RULE.VIEW', <ExcessRules />)}
           />
 
           {/* --- Administration ----------------------------------------------- */}

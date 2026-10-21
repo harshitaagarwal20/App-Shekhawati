@@ -38,7 +38,7 @@ import {
   useSubmit,
   useZodForm,
 } from '../../components/form.jsx';
-import { Alert, Field, Spinner, TextInput } from '../../components/ui.jsx';
+import { Alert, CollapsibleField, Field, Spinner, TextInput } from '../../components/ui.jsx';
 import { fmtNum, todayInput } from '../../utils/format.js';
 import { loadFailed } from '../../services/loadFailures.js';
 import TableWrap from '../../components/TableWrap.jsx';
@@ -241,7 +241,8 @@ export default function GrnForm({ purchaseOrderId, gatePassId, onSaved, onCancel
             includeBlank={false}
             options={PURPOSES}
           />
-          <RHFInput form={form} name="grnNo" label="GRN No" hint="Left blank, the server issues one." />
+          {/* No GRN No box: this form only creates, and the server issues the
+              number on save. */}
         </>
 
         <FieldGroup title="Quantities">
@@ -308,7 +309,9 @@ export default function GrnForm({ purchaseOrderId, gatePassId, onSaved, onCancel
       )}
 
       <div className="form-grid" style={{ marginTop: 14 }}>
-        <RHFTextArea form={form} name="remarks" label="Remarks" className="span-2" />
+        <CollapsibleField className="span-2">
+          <RHFTextArea form={form} name="remarks" label="Remarks" />
+        </CollapsibleField>
       </div>
     </FormShell>
   );

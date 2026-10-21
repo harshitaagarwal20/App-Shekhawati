@@ -26,7 +26,8 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext.jsx';
 import {
   buyers as buyersApi,
   inventory as inventoryApi,
@@ -65,6 +66,11 @@ const FILTER_LABEL = {
   approvalStatus: 'Approval',
   decision: 'Decision',
   inspectionStatus: 'Inspection',
+  // The Checker Report: the number marked on the bag.
+  checkerCode: 'Checker code',
+  // Vendor performance.
+  process: 'Process',
+  qcStage: 'QC stage',
   dateFrom: 'From',
   dateTo: 'To',
 };
@@ -79,6 +85,8 @@ const ENUM_OPTIONS = {
   approvalStatus: ['PENDING', 'APPROVED', 'REJECTED'],
   decision: ['ACCEPT', 'REJECT', 'REWORK'],
   inspectionStatus: ['PENDING', 'PASSED', 'FAILED'],
+  process: ['DYEING', 'PRINTING', 'WASHING', 'FINISHING'],
+  qcStage: ['FABRIC_SCRUTINY', 'CUT_PIECES', 'INLINE_QC', 'EXTERNAL_QC', 'REJECTED'],
 };
 
 /**
@@ -106,6 +114,8 @@ const CATEGORIES = [
   { value: 'PROCUREMENT', label: 'Procurement' },
   { value: 'INVENTORY', label: 'Inventory' },
   { value: 'STAFF_EFFICIENCY', label: 'Job Work & Quality' },
+  { value: 'PRODUCTION', label: 'Stitching & Finishing' },
+  { value: 'VENDOR', label: 'Vendor Performance' },
 ];
 const categoryLabel = (c) => CATEGORIES.find((x) => x.value === c)?.label ?? fmtEnum(c);
 
@@ -246,6 +256,10 @@ export default function Reports() {
 // ===========================================================================
 
 function ReportsCenter({ catalogue, error, category, onCategory, onOpen }) {
+  const { can } = useAuth();
+  // Its own screen of charts, opened from here now rather than from a sidebar
+  // link. The same permissions its route asks for.
+  const canVendorPerformance = can(['DYE_ISSUE.VIEW', 'PURCHASE_ORDER.VIEW', 'INVENTORY.VIEW']);
   const [query, setQuery] = useState('');
   const [favourites, setFavourites] = useState(readFavourites);
 
@@ -287,18 +301,25 @@ function ReportsCenter({ catalogue, error, category, onCategory, onOpen }) {
         <div>
           <h1 className="rc-title">Reports Center</h1>
         </div>
-        <div className="rc-search">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-            <circle cx="10.5" cy="10.5" r="6" />
-            <line x1="15" y1="15" x2="20" y2="20" />
-          </svg>
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search reports"
-            aria-label="Search reports"
-          />
+        <div className="row">
+          <div className="rc-search">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+              <circle cx="10.5" cy="10.5" r="6" />
+              <line x1="15" y1="15" x2="20" y2="20" />
+            </svg>
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search reports"
+              aria-label="Search reports"
+            />
+          </div>
+          {canVendorPerformance && (
+            <Link to="/vendor-performance" className="btn" title="Which dyers and suppliers to keep">
+              Vendor Performance
+            </Link>
+          )}
         </div>
       </div>
 

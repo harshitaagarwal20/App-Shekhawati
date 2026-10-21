@@ -216,6 +216,7 @@ const STYLE_FIELDS = [
   f('avgUtilizationUom', 'Avg Utilization Uom', { blank: 'omit', hint: 'Mtrs unless the style is bought by weight.' }),
   f('sizeGroup', 'Size Group', { hint: DROPDOWN_HINT }),
   f('qtyPerCarton', 'Qty Per Carton', { hint: 'Finished pieces per export carton. A whole number.' }),
+  f('hourlyTarget', 'Hourly Target', { hint: 'Pieces one tailor should stitch in an hour. Hourly Monitoring shows a slot under it in red.' }),
   f('imageRef', 'Image Ref'),
   f('status', 'Status', { blank: 'omit', hint: STATUS_HINT }),
   f('remarks', 'Remarks'),

@@ -12,6 +12,7 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import { orders as ordersApi } from '../../services/erp.js';
 import {
   Alert,
+  CollapsibleField,
   ConfirmDialog,
   Field,
   Modal,
@@ -726,9 +727,11 @@ function ExcessDecisionDialog({ order, mode, onCancel, onDone }) {
             <p className="faint" style={{ fontSize: 12 }}>
               The new effective quantity is calculated by the server when you approve.
             </p>
-            <Field label="Remarks">
-              <TextArea rows={2} value={text} onChange={(e) => setText(e.target.value)} />
-            </Field>
+            <CollapsibleField>
+              <Field label="Remarks">
+                <TextArea rows={2} value={text} onChange={(e) => setText(e.target.value)} />
+              </Field>
+            </CollapsibleField>
           </>
         ) : (
           <Field label="Reason" required>

@@ -270,7 +270,7 @@ export const excessRules = [
 export const documentSequences = [
   { documentType: 'BUYER_ORDER',      scopeKey: '', prefix: 'SO',  separator: '-', padLength: 5, nextNumber: 1,  description: 'Fallback order number when the buyer PO number is not yet known' },
   { documentType: 'VENDOR',           scopeKey: '', prefix: 'VEN', separator: '-', padLength: 3, nextNumber: 8,  description: 'Vendor Master - VEN-001' },
-  { documentType: 'EMPLOYEE',         scopeKey: '', prefix: 'EMP', separator: '-', padLength: 3, nextNumber: 12, description: 'Employee Master - EMP-001' },
+  { documentType: 'EMPLOYEE',         scopeKey: '', prefix: 'EMP', separator: '-', padLength: 3, nextNumber: 23, description: 'Employee Master - EMP-001' },
   { documentType: 'VENDOR_QUOTATION', scopeKey: '', prefix: 'QT',  separator: '-', padLength: 3, nextNumber: 8,  description: 'Vendor Quotation - QT-001' },
   { documentType: 'GATE_PASS',        scopeKey: '', prefix: 'GP',  separator: '-', padLength: 3, nextNumber: 8,  description: 'Gate Pass - GP-001' },
   { documentType: 'GRN',              scopeKey: '', prefix: 'GRN', separator: '-', padLength: 3, nextNumber: 8,  description: 'Goods Receipt Note - GRN-001' },

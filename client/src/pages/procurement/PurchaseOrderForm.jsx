@@ -37,7 +37,14 @@ import {
   useSubmit,
   useZodForm,
 } from '../../components/form.jsx';
-import { Alert, Field, Spinner, StationerySelect } from '../../components/ui.jsx';
+import {
+  Alert,
+  CollapsibleField,
+  CollapsibleSection,
+  Field,
+  Spinner,
+  StationerySelect,
+} from '../../components/ui.jsx';
 import { fmtNum, todayInput, toDateInput } from '../../utils/format.js';
 import { loadFailed } from '../../services/loadFailures.js';
 
@@ -240,6 +247,17 @@ export default function PurchaseOrderForm({ purchaseOrder, onSaved, onCancel }) 
   const isAccessory = item === 'Accessories' || Boolean(accessoriesItem);
   const isStationery = item === 'Stationery';
 
+  /** What the folded Specification already holds, e.g. "HSN 5208 · 240 GSM · Navy". */
+  const hsnCode = form.watch('hsnCode');
+  const gsm = form.watch('gsm');
+  const specSummary = [
+    hsnCode && `HSN ${hsnCode}`,
+    gsm && `${gsm} GSM`,
+    form.watch('content'),
+    form.watch('colorCode'),
+    form.watch('size'),
+  ].filter(Boolean).join(' · ');
+
   /*
    * A HIDDEN FIELD MUST NOT KEEP ITS VALUE.
    *
@@ -299,6 +317,51 @@ export default function PurchaseOrderForm({ purchaseOrder, onSaved, onCancel }) 
     if (form.getValues('accessoryType')) form.setValue('accessoryType', '', { shouldDirty: true });
   }, [accessoriesItem, form]);
 
+  /*
+   * WHAT THE QUOTATION ALREADY SAYS IS NOT RETYPED.
+   *
+   * Choosing a quotation fills the item, its detail, the UOM, the quantity and
+   * the rate from it. Only on a CHANGE, so a PO opened for edit keeps what it
+   * was saved with.
+   *
+   * The two refs above are moved to the quotation's values first: their
+   * effects clear the sub category and the variety when the item kind changes,
+   * which would otherwise wipe what was just filled in.
+   */
+  const quotationId = form.watch('quotationId');
+  const lastQuotation = useRef(quotationId);
+  useEffect(() => {
+    if (lastQuotation.current === quotationId) return;
+    lastQuotation.current = quotationId;
+    const q = quotationOptions.find((o) => o.id === quotationId);
+    if (!q) return;
+    lastStationery.current = q.item === 'Stationery';
+    lastAccessory.current = q.accessoriesItem ?? '';
+    const opts = { shouldDirty: true, shouldValidate: true };
+    form.setValue('item', q.item ?? '', opts);
+    form.setValue('subCategory', q.subCategory ?? '', opts);
+    form.setValue('accessoriesItem', q.accessoriesItem ?? '', opts);
+    form.setValue('accessoryType', q.accessoryType ?? '', opts);
+    form.setValue('uom', q.uom ?? '', opts);
+    form.setValue('orderQty', q.qty ?? '', opts);
+    form.setValue('rate', q.rateQuoted ?? '', opts);
+  }, [quotationId, quotationOptions, form]);
+
+  /*
+   * The buyer order already carries the container and the color, so choosing
+   * it fills both. Only what the order actually holds is written - a blank on
+   * the order does not erase something typed here.
+   */
+  const lastOrder = useRef(orderId);
+  useEffect(() => {
+    if (lastOrder.current === orderId) return;
+    lastOrder.current = orderId;
+    const o = orderOptions?.find((x) => x.id === orderId);
+    if (!o) return;
+    if (o.containerNo) form.setValue('containerNo', o.containerNo, { shouldDirty: true });
+    if (o.colorCode) form.setValue('colorCode', o.colorCode, { shouldDirty: true });
+  }, [orderId, orderOptions, form]);
+
   return (
     <FormShell
       onSubmit={submit}
@@ -323,12 +386,9 @@ export default function PurchaseOrderForm({ purchaseOrder, onSaved, onCancel }) 
 
       <div className="form-grid">
         <>
-          <RHFInput
-            form={form}
-            name="poId"
-            label="PO ID"
-            hint={isNew ? 'Left blank, the vendor series issues one (RF-001).' : undefined}
-          />
+          {/* A new PO is numbered by the vendor's series (RF-001), so the box
+              only appears once there is a number to correct. */}
+          {!isNew && <RHFInput form={form} name="poId" label="PO ID" />}
           <RHFInput form={form} name="poDate" label="Date" type="date" required />
 
           <RHFRecordSelect
@@ -449,7 +509,6 @@ export default function PurchaseOrderForm({ purchaseOrder, onSaved, onCancel }) 
               hint="Which one - e.g. for a Button: 4-hole horn 18L. Add new ones in Dropdown Lists."
             />
           )}
-          <RHFInput form={form} name="size" label="Size" hint="As the vendor must supply it, e.g. 20 cm, 18L, 12 x 16." />
           <RHFMasterSelect form={form} name="uom" label="UOM" listCode="UOM" required />
           {/* The BOM average is what bounds this box, so it is quoted on it. */}
           <RHFQty
@@ -482,7 +541,8 @@ export default function PurchaseOrderForm({ purchaseOrder, onSaved, onCancel }) 
           />
         </FieldGroup>
 
-        <FieldGroup title="Specification">
+        {/* All optional, so folded; the title line says what is already set. */}
+        <CollapsibleSection title="Specification" summary={specSummary || 'optional'}>
           <RHFInput form={form} name="hsnCode" label="HSN Code" />
           {/* GSM and Content describe cloth. A zip or a pen has neither. */}
           {!isAccessory && !isStationery && (
@@ -492,15 +552,14 @@ export default function PurchaseOrderForm({ purchaseOrder, onSaved, onCancel }) 
             </>
           )}
           <RHFMasterSelect form={form} name="colorCode" label="Color code" listCode="ColorCode" />
-          <RHFTextArea
-            form={form}
-            name="address"
-            label="Address"
-            hint="Left blank, the vendor's current address is snapshotted onto the PO."
-            className="span-2"
-          />
-          <RHFTextArea form={form} name="remarks" label="Remarks" className="span-2" />
-        </FieldGroup>
+          <RHFInput form={form} name="size" label="Size" hint="As the vendor must supply it, e.g. 20 cm, 18L, 12 x 16." />
+        </CollapsibleSection>
+
+        {/* No Address box: the server snapshots the vendor's address onto the
+            PO, and an edited PO keeps the one it was saved with. */}
+        <CollapsibleField className="span-2">
+          <RHFTextArea form={form} name="remarks" label="Remarks" />
+        </CollapsibleField>
       </div>
 
       <ServerFigures preview={preview} loading={previewing} />

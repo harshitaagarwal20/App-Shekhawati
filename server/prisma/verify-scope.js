@@ -1,10 +1,17 @@
 /**
  * Scope guard.
  *
- * The application ENDS at Cutting Issue. This script fails the build if any
+ * The application ends after External QC and the Alteration Unit (Phase 4),
+ * with the Rejected Register they write; Inline QC (Phase 3) runs beside
+ * stitching and carries the workbook's QC Size and QC Defects sheets. The Checker Report is a report over
+ * External QC's checker codes, not a table - its pattern stays forbidden. This
+ * script fails the build if any
  * model, table, enum or field in schema.prisma refers to a module that is
- * explicitly out of scope, so a later phase cannot quietly grow past the
- * agreed boundary.
+ * still out of scope, so a later phase cannot quietly grow past the agreed
+ * boundary.
+ *
+ * Opening the next phase is a deliberate edit to this file: move its module
+ * off FORBIDDEN and onto DELIVERED, in the same commit as its tables.
  *
  *     node prisma/verify-scope.js
  */
@@ -17,22 +24,33 @@ const here = dirname(fileURLToPath(import.meta.url));
 const schema = readFileSync(join(here, 'schema.prisma'), 'utf8');
 
 /**
- * Out-of-scope modules, as listed in the master prompt. Each entry is matched
- * against model names, @@map table names and field names - not against prose
- * in comments, which is allowed to explain why something is absent.
+ * Modules opened since the original Masters -> Cutting Issue boundary, and the
+ * model each one must be present as. A delivered module whose model is
+ * missing is as much a failure as a forbidden one that appears.
+ */
+const DELIVERED = [
+  { module: 'Stitching Record', phase: 'Production Phase 2', model: 'StitchingRecord' },
+  { module: 'Hourly Monitoring', phase: 'Production Phase 2', model: 'HourlyMonitoringEntry' },
+  { module: 'Ironing', phase: 'Ironing', model: 'IroningEntry' },
+  // One register, two check types - see InlineQcEntry in schema.prisma.
+  { module: 'QC Size', phase: 'Phase 3', model: 'InlineQcEntry' },
+  { module: 'QC Defects', phase: 'Phase 3', model: 'InlineQcDefect' },
+  { module: 'External Secondary Checking', phase: 'Phase 4', model: 'ExternalQcEntry' },
+  { module: 'Alter Report (Alteration Unit)', phase: 'Phase 4', model: 'AlterationEntry' },
+  { module: 'Rejected', phase: 'Phase 4', model: 'RejectedRegisterEntry' },
+];
+
+/**
+ * Out-of-scope modules, as listed in the master prompt, less those DELIVERED.
+ * Each entry is matched against model names, @@map table names and field
+ * names - not against prose in comments, which is allowed to explain why
+ * something is absent.
  */
 const FORBIDDEN = [
-  { module: 'Stitching Record', patterns: [/stitching_?record/i, /StitchingRecord/] },
-  { module: 'Hourly Monitoring', patterns: [/hourly_?monitor/i, /HourlyMonitor/] },
-  { module: 'QC Size', patterns: [/qc_?size/i, /QcSize/] },
-  { module: 'QC Defects', patterns: [/qc_?defect/i, /QcDefect/] },
   { module: 'Internal Quality Check', patterns: [/internal_?quality/i, /InternalQuality/] },
   { module: 'Internal / Final Checker Report', patterns: [/checker_?report/i, /CheckerReport/] },
   { module: 'Finished Checker', patterns: [/finished_?checker/i, /FinishedChecker/] },
-  { module: 'External Secondary Checking', patterns: [/external_?secondary/i, /ExternalSecondary/] },
-  { module: 'Alter Report', patterns: [/alter_?report/i, /AlterReport/] },
   { module: 'Spot Rectification-Scrap', patterns: [/spot_?rectification/i, /SpotRectification/] },
-  { module: 'Rejected', patterns: [/model\s+Rejected\b/, /@@map\("rejected"\)/] },
   { module: 'Packing', patterns: [/model\s+Packing\b/, /@@map\("packings?"\)/] },
   { module: 'Needle Checking', patterns: [/needle_?check/i, /NeedleCheck/] },
   { module: 'Dispatch', patterns: [/model\s+Dispatch\b/, /@@map\("dispatch(es)?"\)/, /dispatch_/i] },
@@ -127,10 +145,22 @@ process.stdout.write(`  models in schema : ${models.length}\n`);
 process.stdout.write(`  forbidden modules: ${FORBIDDEN.length}\n`);
 process.stdout.write(`  allowlisted      : ${ALLOWLIST.length}\n`);
 ALLOWLIST.forEach((a) => process.stdout.write(`    - ${a.what}  (${a.why})\n`));
-process.stdout.write(`  pipeline ends at : CuttingIssue${models.includes('CuttingIssue') ? ' (present)' : ' (MISSING!)'}\n`);
+process.stdout.write(`  cutting issue    : CuttingIssue${models.includes('CuttingIssue') ? ' (present)' : ' (MISSING!)'}\n`);
+DELIVERED.forEach((d) =>
+  process.stdout.write(
+    `  delivered        : ${d.module} -> ${d.model}${models.includes(d.model) ? ' (present)' : ' (MISSING!)'}  [${d.phase}]\n`,
+  ),
+);
 
 if (!models.includes('CuttingIssue')) {
-  process.stdout.write('\nx CuttingIssue model is missing - the pipeline has no terminal stage.\n\n');
+  process.stdout.write('\nx CuttingIssue model is missing - stitching has nothing to draw cut pieces from.\n\n');
+  process.exit(1);
+}
+
+const missing = DELIVERED.filter((d) => !models.includes(d.model));
+if (missing.length) {
+  missing.forEach((d) => process.stdout.write(`\nx ${d.module} is delivered but model ${d.model} is missing.\n`));
+  process.stdout.write('\nSCOPE GUARD FAILED\n\n');
   process.exit(1);
 }
 

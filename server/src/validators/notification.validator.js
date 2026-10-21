@@ -18,8 +18,24 @@ export const markReadSchema = z.object({
   ids: z.array(uuid).max(200).optional(),
 });
 
+export const dismissSchema = z
+  .object({
+    ids: z.array(uuid).min(1).max(200).optional(),
+    /// Every notification already read.
+    allRead: z.boolean().optional(),
+  })
+  .refine((b) => Boolean(b.ids) !== Boolean(b.allRead), {
+    message: 'Send either ids or allRead, not both',
+  });
+
 export const preferencesSchema = z.object({
   notifyByEmail: z.boolean().optional(),
   notifyByWhatsapp: z.boolean().optional(),
   whatsappNumber: z.string().trim().max(20).nullish(),
+  notifyDailySummary: z.boolean().optional(),
+});
+
+export const dailySummaryQuery = z.object({
+  /// The India calendar day to preview; today when omitted.
+  date: isoDate.optional(),
 });

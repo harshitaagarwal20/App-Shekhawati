@@ -75,11 +75,13 @@ const KINDS = [
   {
     value: PRODUCTION,
     label: 'Production Planning',
+    hint: 'How many pieces, by which department, by when - cutting to packing.',
     permission: 'PLANNING.VIEW',
   },
   {
     value: PROCUREMENT,
     label: 'Procurement Planning',
+    hint: 'What has to be bought first - the material plan, priced off the BOM.',
     permission: 'MATERIAL_PLAN.VIEW',
   },
 ];
@@ -137,7 +139,7 @@ export default function PlanningHub() {
         <div className="hub-ask">
           <h2 className="hub-ask-q">Which plans do you want to see?</h2>
           <div className="hub-choice">
-            {allowed.map(({ value, label }) => (
+            {allowed.map(({ value, label, hint }) => (
               <button
                 key={value}
                 type="button"
@@ -145,6 +147,7 @@ export default function PlanningHub() {
                 onClick={() => setKind(value)}
               >
                 <span className="hub-choice-name">{label}</span>
+                <span className="hub-choice-hint">{hint}</span>
               </button>
             ))}
           </div>

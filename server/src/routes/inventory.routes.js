@@ -86,6 +86,8 @@ router.post(
  *
  * Before /rolls/:id, or Express reads "opening-stock" as a roll id.
  */
+router.get('/opening-stock/status', can('FABRIC_ROLL.CREATE'), c.openingStockStatus);
+
 router.post(
   '/opening-stock/preview',
   can('FABRIC_ROLL.CREATE'),

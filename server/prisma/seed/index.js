@@ -95,6 +95,16 @@ async function wipe() {
   // table left off is still full on the second run, and its foreign keys
   // refuse the delete of whatever it points at.
   const order = [
+    'rejectedRegisterEntry',
+    'alterationEntry',
+    'alterationReceipt',
+    'externalQcAttachment',
+    'externalQcCheckerLine',
+    'externalQcEntry',
+    'pendingReject',
+    'ironingEntry',
+    'hourlyMonitoringEntry',
+    'stitchingRecord',
     'stockLayerConsumption',
     'stockCostLayer',
     'stockLedger',
@@ -231,6 +241,13 @@ const USERS = [
   { username: 'merch', fullName: 'Merchandising Desk', email: 'merch@shekhawatiimpex.local', roleCodes: ['MERCHANDISING'], empId: null },
   { username: 'headoffice', fullName: 'Head Office Desk', email: 'ho@shekhawatiimpex.local', roleCodes: ['HEAD_OFFICE'], empId: null },
   { username: 'planner', fullName: 'Planning Desk', email: 'planner@shekhawatiimpex.local', roleCodes: ['MERCHANDISING'], empId: null },
+  // Phase 2 - the unit is read from the employee's Unit / Line.
+  { username: 'anil', fullName: 'Anil Kumar', email: 'anil@shekhawatiimpex.local', roleCodes: ['STITCHING_SUPERVISOR'], empId: 'EMP-002' },
+  { username: 'mahipal', fullName: 'Mahipal Yadav', email: 'mahipal@shekhawatiimpex.local', roleCodes: ['STITCHING_SUPERVISOR'], empId: 'EMP-003' },
+  { username: 'finishing', fullName: 'Ironing Desk', email: 'finishing@shekhawatiimpex.local', roleCodes: ['FINISHING_SUPERVISOR'], empId: null },
+  // Phase 4.
+  { username: 'extqc', fullName: 'External QC Desk', email: 'extqc@shekhawatiimpex.local', roleCodes: ['EXTERNAL_QC_COORDINATOR'], empId: null },
+  { username: 'alteration', fullName: 'Alteration Unit', email: 'alteration@shekhawatiimpex.local', roleCodes: ['ALTERATION_SUPERVISOR'], empId: null },
 ];
 
 async function seedUsers(employeeByEmpId) {

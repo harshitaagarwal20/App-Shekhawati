@@ -42,7 +42,8 @@ export async function authenticate(req, _res, next) {
       prisma.user.findFirst({
         where: { id: claims.sub, deletedAt: null },
         include: {
-          employee: { select: { id: true, empId: true, empName: true, department: true, designation: true } },
+          // unitLine: a stitching supervisor works for the unit named here.
+          employee: { select: { id: true, empId: true, empName: true, department: true, designation: true, unitLine: true } },
           roles: {
             include: {
               role: {

@@ -42,13 +42,17 @@
  *    a role row - no schema change.
  */
 
-/** Every in-scope module. Nothing after CUTTING_ISSUE exists. */
+/** Every in-scope module, in pipeline order. Stitching follows CUTTING_ISSUE. */
 export const MODULES = [
   'MASTER_LIST',
   'BUYER',
   'VENDOR',
   'EMPLOYEE',
   'STYLE',
+  // The excess thresholds (Masters > Excess Rules). Their own module rather
+  // than MASTER_LIST's: the business keeps them to the store and ADMIN, with
+  // the Director reading, while every desk still reads the dropdown lists.
+  'EXCESS_RULE',
   // FOB cost sheets of a style - prepared by merchandising, signed by the Director.
   'COST_SHEET',
   'USER',
@@ -81,6 +85,25 @@ export const MODULES = [
   // Cut pieces counted in from the cutting floor, before they are issued.
   'CUT_PIECES_RECEIPT',
   'CUTTING_ISSUE',
+  // Production Phase 2. What each unit stitched in a day, and what each tailor
+  // stitched in each hour. Neither is approved - the count is the record.
+  'STITCHING_RECORD',
+  'HOURLY_MONITORING',
+  // Phase 3. Checks taken on the line beside stitching (the workbook's QC
+  // Size and QC Defects sheets); each defect goes to the person named in
+  // Inform To. Moves no pieces.
+  'INLINE_QC',
+  // After stitching, before final QC.
+  'IRONING',
+  // Phase 4. The external agency's check after ironing, the in-house unit
+  // that repairs what it finds, and the register of what cannot be repaired.
+  'EXTERNAL_QC',
+  'ALTERATION',
+  'REJECTED_REGISTER',
+  // The cross-module queue of everything awaiting a decision (Dashboard >
+  // Approvals). It sat on REPORT.VIEW, which put it in front of every floor
+  // desk that runs a report and decides nothing.
+  'APPROVAL_QUEUE',
   'REPORT',
   // Not a document - the trail of who changed what. Read-only by
   // construction: see services/audit.service.js.
@@ -88,6 +111,23 @@ export const MODULES = [
 ];
 
 export const ACTIONS = ['VIEW', 'CREATE', 'EDIT', 'DELETE', 'APPROVE', 'EXPORT'];
+
+/**
+ * Actions particular to one module, beyond the standard set.
+ *
+ * INLINE_QC.RESOLVE marks who may be named in an Inline QC entry's Inform To
+ * - the Inform To dropdown lists the people holding it. Marking a defect
+ * Resolved is then for the person named, not for every holder.
+ *
+ * REPORT.SUMMARY marks who is sent the evening summary of the day's work
+ * (services/dailySummary.service.js). The Director holds it through
+ * `REPORT.*`; granting it to another role in the Roles screen adds that role's
+ * people, and each person can still switch it off in their own settings.
+ */
+const EXTRA_ACTIONS = {
+  INLINE_QC: ['RESOLVE'],
+  REPORT: ['SUMMARY'],
+};
 
 /**
  * Modules that carry an approval / authorisation decision in the workbook.
@@ -141,7 +181,26 @@ const APPROVABLE = new Set([
 ]);
 
 /** Read-only modules - they are projections of other documents. */
-const READ_ONLY = new Set(['INVENTORY', 'STOCK_LEDGER', 'REPORT', 'AUDIT']);
+const READ_ONLY = new Set([
+  'INVENTORY',
+  'STOCK_LEDGER',
+  'APPROVAL_QUEUE',
+  'REPORT',
+  'AUDIT',
+  // Written only by the stage that rejected the pieces (the Alteration Unit).
+  'REJECTED_REGISTER',
+]);
+
+function permission(module, action) {
+  return {
+    code: `${module}.${action}`,
+    module,
+    action,
+    description: `${action.charAt(0) + action.slice(1).toLowerCase()} ${module
+      .replace(/_/g, ' ')
+      .toLowerCase()}`,
+  };
+}
 
 export function buildPermissions() {
   const out = [];
@@ -149,15 +208,9 @@ export function buildPermissions() {
     for (const action of ACTIONS) {
       if (action === 'APPROVE' && !APPROVABLE.has(module)) continue;
       if (READ_ONLY.has(module) && !['VIEW', 'EXPORT'].includes(action)) continue;
-      out.push({
-        code: `${module}.${action}`,
-        module,
-        action,
-        description: `${action.charAt(0) + action.slice(1).toLowerCase()} ${module
-          .replace(/_/g, ' ')
-          .toLowerCase()}`,
-      });
+      out.push(permission(module, action));
     }
+    for (const action of EXTRA_ACTIONS[module] ?? []) out.push(permission(module, action));
   }
   return out;
 }
@@ -196,6 +249,7 @@ export const roles = [
       'COST_SHEET.VIEW',
       'PURCHASE_ORDER.VIEW',
       'INVENTORY.VIEW',
+      'APPROVAL_QUEUE.VIEW',
       'REPORT.*',
     ],
   },
@@ -236,6 +290,24 @@ export const roles = [
       // C12 - the raw material plan is prepared at the same desk as the rest.
       'MATERIAL_PLAN.*',
       ...owns('PLAN_APPROVAL'),
+      // Phase 2 - the plan said what each unit should deliver each day; this
+      // is what it did.
+      'STITCHING_RECORD.VIEW',
+      'STITCHING_RECORD.EXPORT',
+      'HOURLY_MONITORING.VIEW',
+      'HOURLY_MONITORING.EXPORT',
+      'INLINE_QC.VIEW',
+      'INLINE_QC.EXPORT',
+      'IRONING.VIEW',
+      'IRONING.EXPORT',
+      // Phase 4 - what the buyer's pieces did at External QC, and what became
+      // of the faulty ones.
+      'EXTERNAL_QC.VIEW',
+      'EXTERNAL_QC.EXPORT',
+      'ALTERATION.VIEW',
+      'ALTERATION.EXPORT',
+      'REJECTED_REGISTER.VIEW',
+      'REJECTED_REGISTER.EXPORT',
       'VENDOR.VIEW',
       'CUTTING_CHALLAN.VIEW',
       'CUT_PIECES_RECEIPT.VIEW',
@@ -243,6 +315,7 @@ export const roles = [
       'FABRIC_ISSUE.VIEW',
       'INVENTORY.VIEW',
       'STOCK_LEDGER.VIEW',
+      'APPROVAL_QUEUE.VIEW',
       ...READS_MASTERS,
       'REPORT.*',
     ],
@@ -297,8 +370,132 @@ export const roles = [
       'BUYER_ORDER.VIEW',
       'VENDOR.VIEW',
       'EMPLOYEE.VIEW',
+      // Phase 2 - the store issued the units their cut pieces and sends
+      // stitched pieces out for printing, so it reads what was stitched.
+      'STITCHING_RECORD.VIEW',
+      'STITCHING_RECORD.EXPORT',
+      'HOURLY_MONITORING.VIEW',
+      'HOURLY_MONITORING.EXPORT',
+      'INLINE_QC.VIEW',
+      'INLINE_QC.EXPORT',
+      // The challans the store issued close as their pieces reach ironing.
+      'IRONING.VIEW',
+      'IRONING.EXPORT',
+      'EXTERNAL_QC.VIEW',
+      'EXTERNAL_QC.EXPORT',
+      'ALTERATION.VIEW',
+      'ALTERATION.EXPORT',
+      'REJECTED_REGISTER.VIEW',
+      'REJECTED_REGISTER.EXPORT',
+      // The excess thresholds. The business's call: the store maintains them,
+      // the Director reads them. DELETE stays with ADMIN, as everywhere.
+      ...owns('EXCESS_RULE'),
+      'APPROVAL_QUEUE.VIEW',
       ...READS_MASTERS,
       'REPORT.*',
+    ],
+  },
+  {
+    /**
+     * THE IRONING TABLE.
+     *
+     * Not tied to a unit: ironing takes stitched pieces from every unit, so
+     * this desk sees them all. It receives them, records what each ironer
+     * pressed and damaged, and decides every damaged piece - re-iron, or
+     * reject. No DELETE, for the same reason as the stitching supervisor.
+     */
+    code: 'FINISHING_SUPERVISOR',
+    name: 'Ironing & Finishing Supervisor',
+    description:
+      'Runs the ironing table: receives stitched pieces from the units, records what each ironer '
+      + 'pressed and damaged, and decides each damaged piece - re-iron or reject.',
+    isSystem: true,
+    permissions: [
+      ...owns('IRONING'),
+      // Phase 4 - the re-iron and altered pieces come back to this table.
+      'EXTERNAL_QC.VIEW',
+      'ALTERATION.VIEW',
+      'REJECTED_REGISTER.VIEW',
+      'MASTER_LIST.VIEW',
+      'REPORT.VIEW',
+    ],
+  },
+  {
+    /**
+     * PHASE 4 - THE EXTERNAL AGENCY'S DESK.
+     *
+     * Records what the agency found on each inspection. Reads ironing (what
+     * has been pressed and can be offered) and the Alteration Unit (where its
+     * faulty pieces went). No DELETE, as at every other floor desk.
+     */
+    code: 'EXTERNAL_QC_COORDINATOR',
+    name: 'External QC Coordinator',
+    description:
+      'Records what the external agency found: pieces offered, approved, sent for alteration and '
+      + 'rejected, the reason for each faulty piece and the checker codes on the bags.',
+    isSystem: true,
+    permissions: [
+      ...owns('EXTERNAL_QC'),
+      'IRONING.VIEW',
+      'ALTERATION.VIEW',
+      'REJECTED_REGISTER.VIEW',
+      'REJECTED_REGISTER.EXPORT',
+      'MASTER_LIST.VIEW',
+      'REPORT.VIEW',
+    ],
+  },
+  {
+    /**
+     * PHASE 4 - THE ALTERATION UNIT.
+     *
+     * Works the bags External QC and ironing sent. Its not-repairable pieces
+     * make the Rejected Register, which it reads but never writes directly.
+     */
+    code: 'ALTERATION_SUPERVISOR',
+    name: 'Alteration Unit Supervisor',
+    description:
+      'Runs the in-house Alteration Unit: works the bags sent from External QC and from ironing, '
+      + 'records pieces altered or cleaned and pieces that cannot be repaired.',
+    isSystem: true,
+    permissions: [
+      ...owns('ALTERATION'),
+      'IRONING.VIEW',
+      'EXTERNAL_QC.VIEW',
+      'REJECTED_REGISTER.VIEW',
+      'REJECTED_REGISTER.EXPORT',
+      'MASTER_LIST.VIEW',
+      'REPORT.VIEW',
+    ],
+  },
+  {
+    /**
+     * ONE UNIT, AND ONLY THAT UNIT.
+     *
+     * The supervisor of a stitching unit records the unit's daily output and
+     * the hourly count per tailor. WHICH unit is not a permission - it is the
+     * Unit / Line on the Employee record this login is tied to, and
+     * stitching.service.js holds every read and write to it. A supervisor
+     * whose employee names no stitching unit can see nothing to record.
+     *
+     * No DELETE: a wrong count is corrected by editing it. Removing a day's
+     * record is an office decision, and stays with ADMIN.
+     */
+    code: 'STITCHING_SUPERVISOR',
+    name: 'Stitching Supervisor',
+    description:
+      'Runs one stitching unit. Records the unit\'s daily stitching and the hourly count per '
+      + 'tailor, for the orders cut for that unit only. The unit comes from the Unit / Line on '
+      + 'the supervisor\'s Employee record.',
+    isSystem: true,
+    permissions: [
+      ...owns('STITCHING_RECORD'),
+      ...owns('HOURLY_MONITORING'),
+      // Phase 3 - Inline QC tells the unit's supervisor what it found, and
+      // the supervisor marks each defect Resolved.
+      'INLINE_QC.VIEW',
+      'INLINE_QC.EXPORT',
+      'INLINE_QC.RESOLVE',
+      'MASTER_LIST.VIEW',
     ],
   },
   {
@@ -339,10 +536,15 @@ export const roles = [
   {
     code: 'QC',
     name: 'QC',
-    description: 'Records the Fabric Scrutiny Report. The decision itself rests with the Director.',
+    description:
+      'Records the Fabric Scrutiny Report (the decision itself rests with the Director) and the '
+      + 'Inline QC checks taken on the stitching line.',
     isSystem: true,
     permissions: [
       ...owns('FABRIC_SCRUTINY'),
+      // Phase 3 - "Role Acess - QC Dept (Checker)" on the QC Size and QC
+      // Defects sheets. Not tied to a unit: the checker walks every line.
+      ...owns('INLINE_QC'),
       'FABRIC_ROLL.VIEW',
       // Grading a roll's shade and dye lot is an inspection judgement, made
       // at the light box by the same desk that writes the scrutiny report.

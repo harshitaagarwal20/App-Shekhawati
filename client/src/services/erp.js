@@ -436,6 +436,8 @@ export const inventory = {
    * in one transaction and refuses any item that already has an opening
    * balance, so a double submit cannot double the inventory.
    */
+  /** `{ loaded }` - the sidebar hides its Opening Stock link once it is true. */
+  openingStockStatus: () => request({ method: 'GET', url: '/inventory/opening-stock/status' }),
   openingStockPreview: (rows) =>
     request({ method: 'POST', url: '/inventory/opening-stock/preview', data: { rows } }),
   openingStockApply: (rows) =>
@@ -603,6 +605,138 @@ export const cutPiecesReceipts = {
   nextNumber: () => request({ method: 'GET', url: '/cut-pieces-receipts/next-number' }),
   /** The sample check before stitching: pieces checked and defects found. */
   recordCheck: (id, body) => request({ method: 'POST', url: `/cut-pieces-receipts/${id}/check`, data: body }),
+};
+
+// --- Stitching (Production Phase 2) ----------------------------------------
+//
+// The server holds every call to the caller's own unit; `unit` is only read
+// for Admin and the office, who choose one.
+
+export const stitching = {
+  /** Units, time slots, and whether this login records or only reads. */
+  context: () => request({ method: 'GET', url: '/stitching/context' }),
+  /** Orders and styles with cut pieces posted to the unit, and its position on each. */
+  orders: (params) => request({ method: 'GET', url: '/stitching/orders', params }),
+
+  list: (params) => requestList({ method: 'GET', url: '/stitching/records', params }),
+  get: (id) => request({ method: 'GET', url: `/stitching/records/${id}` }),
+  /** What the form fills in by itself for a unit, day, order and style. */
+  day: (params) => request({ method: 'GET', url: '/stitching/records/day', params }),
+  create: (body) => request({ method: 'POST', url: '/stitching/records', data: body }),
+  update: (id, body) => request({ method: 'PATCH', url: `/stitching/records/${id}`, data: body }),
+  remove: (id) => request({ method: 'DELETE', url: `/stitching/records/${id}` }),
+
+  hourlyGrid: (params) => request({ method: 'GET', url: '/stitching/hourly/grid', params }),
+  /** One cell. `pcs: ''` clears it. Returns the whole grid, totals and all. */
+  saveSlot: (body) => request({ method: 'PUT', url: '/stitching/hourly/slot', data: body }),
+
+  printings: {
+    list: (params) => requestList({ method: 'GET', url: '/stitching/printings', params }),
+    get: (id) => request({ method: 'GET', url: `/stitching/printings/${id}` }),
+    orders: () => request({ method: 'GET', url: '/stitching/printings/orders' }),
+    summary: (params) => request({ method: 'GET', url: '/stitching/printings/summary', params }),
+    create: (body) => request({ method: 'POST', url: '/stitching/printings', data: body }),
+    update: (id, body) => request({ method: 'PATCH', url: `/stitching/printings/${id}`, data: body }),
+    remove: (id) => request({ method: 'DELETE', url: `/stitching/printings/${id}` }),
+  },
+};
+
+// --- Ironing ---------------------------------------------------------------
+
+export const ironing = {
+  /** Units, damage types and ironers - every dropdown on the screen. */
+  context: () => request({ method: 'GET', url: '/ironing/context' }),
+  /** (order, style, unit) with stitched pieces, and where they are now. */
+  orders: () => request({ method: 'GET', url: '/ironing/orders' }),
+  /** One unit's flow on an order, and its cutting challans' status. */
+  position: (params) => request({ method: 'GET', url: '/ironing/position', params }),
+  pendingRejects: (params) => request({ method: 'GET', url: '/ironing/pending-rejects', params }),
+  list: (params) => requestList({ method: 'GET', url: '/ironing', params }),
+  get: (id) => request({ method: 'GET', url: `/ironing/${id}` }),
+  create: (body) => request({ method: 'POST', url: '/ironing', data: body }),
+  /** Also how damaged pieces are decided: pcsReIroned / pcsRejected. */
+  update: (id, body) => request({ method: 'PATCH', url: `/ironing/${id}`, data: body }),
+  remove: (id) => request({ method: 'DELETE', url: `/ironing/${id}` }),
+};
+
+// --- Phase 4: External QC, the Alteration Unit, the Rejected Register ------
+
+/** Opens a file the API serves behind the bearer token, in a new tab. */
+async function openBlob(url, fileName) {
+  const blob = await requestBlob({ method: 'GET', url });
+  const href = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = href;
+  a.target = '_blank';
+  a.rel = 'noopener';
+  if (fileName) a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(href), 60_000);
+}
+
+/** Phase 3 - Inline QC, taken on the line beside stitching. */
+export const inlineQc = {
+  /** Tailors, the Inform To people, check types, and this login's open count. */
+  context: () => request({ method: 'GET', url: '/inline-qc/context' }),
+  /** Orders and styles with cutting posted to the unit - the stitching list. */
+  orders: (params) => request({ method: 'GET', url: '/inline-qc/orders', params }),
+  list: (params) => requestList({ method: 'GET', url: '/inline-qc', params }),
+  get: (id) => request({ method: 'GET', url: `/inline-qc/${id}` }),
+  create: (body) => request({ method: 'POST', url: '/inline-qc', data: body }),
+  update: (id, body) => request({ method: 'PATCH', url: `/inline-qc/${id}`, data: body }),
+  remove: (id) => request({ method: 'DELETE', url: `/inline-qc/${id}` }),
+  /** The Action needed list: `scope: 'mine'` (default) or `'all'`. */
+  actions: (params) => requestList({ method: 'GET', url: '/inline-qc/actions', params }),
+  resolve: (id, note) => request({ method: 'POST', url: `/inline-qc/actions/${id}/resolve`, data: { note: note || null } }),
+  reopen: (id) => request({ method: 'POST', url: `/inline-qc/actions/${id}/reopen` }),
+};
+
+export const externalQc = {
+  /** Agencies, checkers, the five reasons. */
+  context: () => request({ method: 'GET', url: '/external-qc/context' }),
+  /** Orders and styles ironing has pressed, with the net ironed qty available. */
+  orders: () => request({ method: 'GET', url: '/external-qc/orders' }),
+  position: (params) => request({ method: 'GET', url: '/external-qc/position', params }),
+  list: (params) => requestList({ method: 'GET', url: '/external-qc', params }),
+  get: (id) => request({ method: 'GET', url: `/external-qc/${id}` }),
+  create: (body) => request({ method: 'POST', url: '/external-qc', data: body }),
+  update: (id, body) => request({ method: 'PATCH', url: `/external-qc/${id}`, data: body }),
+  remove: (id) => request({ method: 'DELETE', url: `/external-qc/${id}` }),
+  /** The inspection report - see orders.attachments for why upload sets no Content-Type. */
+  attachments: {
+    upload: (id, file) => {
+      const body = new FormData();
+      body.append('file', file);
+      return request({ method: 'POST', url: `/external-qc/${id}/attachments`, data: body });
+    },
+    remove: (id, attachmentId) => request({ method: 'DELETE', url: `/external-qc/${id}/attachments/${attachmentId}` }),
+    open: (id, attachmentId, fileName) => openBlob(`/external-qc/${id}/attachments/${attachmentId}`, fileName),
+  },
+};
+
+export const alteration = {
+  /** The Alteration Staff dropdown. */
+  context: () => request({ method: 'GET', url: '/alteration/context' }),
+  /** Orders and styles with bags still open. */
+  orders: () => request({ method: 'GET', url: '/alteration/orders' }),
+  position: (params) => request({ method: 'GET', url: '/alteration/position', params }),
+  /** The pending list. */
+  bags: (params) => requestList({ method: 'GET', url: '/alteration/bags', params }),
+  bag: (id) => request({ method: 'GET', url: `/alteration/bags/${id}` }),
+  list: (params) => requestList({ method: 'GET', url: '/alteration', params }),
+  get: (id) => request({ method: 'GET', url: `/alteration/${id}` }),
+  /** { entryDate, staffId, remarks, lines: [{ receiptId, pcsAltered, pcsNotRepairable, notRepairableReason }] } */
+  create: (body) => request({ method: 'POST', url: '/alteration', data: body }),
+  update: (id, body) => request({ method: 'PATCH', url: `/alteration/${id}`, data: body }),
+  remove: (id) => request({ method: 'DELETE', url: `/alteration/${id}` }),
+};
+
+/** Read-only: every row is written by the stage that rejected the pieces. */
+export const rejectedRegister = {
+  list: (params) => requestList({ method: 'GET', url: '/rejected-register', params }),
+  get: (id) => request({ method: 'GET', url: `/rejected-register/${id}` }),
 };
 
 // --- Material Plan (C12) ----------------------------------------------------
@@ -902,8 +1036,13 @@ export const notifications = {
   unreadCount: () => request({ method: 'GET', url: '/notifications/unread-count' }),
   /** No ids: mark everything read. */
   markRead: (ids) => request({ method: 'POST', url: '/notifications/read', data: ids ? { ids } : {} }),
+  /** No ids: clear every notification already read. */
+  dismiss: (ids) => request({ method: 'POST', url: '/notifications/dismiss', data: ids ? { ids } : { allRead: true } }),
   preferences: () => request({ method: 'GET', url: '/notifications/preferences' }),
   setPreferences: (body) => request({ method: 'PATCH', url: '/notifications/preferences', data: body }),
+  /** Your own daily summary for a day, as it would be sent. Sends nothing. */
+  dailySummary: (date) =>
+    request({ method: 'GET', url: '/notifications/daily-summary', params: date ? { date } : {} }),
 };
 
 // --- Cost sheets (FOB costing) ---------------------------------------------

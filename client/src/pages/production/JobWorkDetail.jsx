@@ -13,6 +13,7 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import { jobWorks as jwApi } from '../../services/erp.js';
 import {
   Alert,
+  CollapsibleField,
   EnumSelect,
   Field,
   MasterSelect,
@@ -652,7 +653,8 @@ function ReceiveDialog({ job, onCancel, onDone }) {
               }}
               options={returnable.map((r) => ({
                 value: r.rollId,
-                label: `${r.rollNo} — ${fmtNum(r.pendingQty)} ${job.uom} at the vendor`,
+                label: `${r.rollNo} — ${fmtNum(r.pendingQty)} ${job.uom} at ${job.vendor?.vendorName ?? 'the vendor'}`
+                  + `${job.order?.orderNo ? ` · Order ${job.order.orderNo}` : ''}`,
               }))}
             />
           </Field>
@@ -725,9 +727,11 @@ function ReceiveDialog({ job, onCancel, onDone }) {
           </Alert>
         )}
 
-        <Field label="Remarks">
-          <TextArea rows={2} value={remarks} onChange={(e) => setRemarks(e.target.value)} />
-        </Field>
+        <CollapsibleField>
+          <Field label="Remarks">
+            <TextArea rows={2} value={remarks} onChange={(e) => setRemarks(e.target.value)} />
+          </Field>
+        </CollapsibleField>
       </div>
     </Modal>
   );

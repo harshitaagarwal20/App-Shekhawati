@@ -1618,11 +1618,16 @@ export async function options() {
       orderQty: true,
       effectiveQty: true,
       colorCode: true,
+      // Filled onto a PO raised against the order, so it is not retyped.
+      containerNo: true,
       sizeGroup: true,
       status: true,
       buyerDeliveryDate: true,
       buyer: { select: { id: true, buyerName: true } },
       style: { select: { id: true, styleNo: true, styleDescription: true } },
+      // Every style on the order, not just the lead one - the quotation form
+      // offers only the items their BOMs call for.
+      lines: { where: { deletedAt: null }, select: { styleId: true } },
     },
   });
 }

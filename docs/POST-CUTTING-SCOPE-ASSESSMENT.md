@@ -2,6 +2,13 @@
 
 **Status: assessment only. Nothing in this document has been built.**
 
+> **Status since this was written.** Several stages assessed here have been
+> built: Stitching Record and Hourly Monitoring, **Inline QC** (QC Size and QC
+> Defects as one register, answering question 4 for those two sheets),
+> Ironing, External QC, the Alteration Unit and the Rejected Register. See
+> [INLINE-QC-NOTES.md](INLINE-QC-NOTES.md) and the other phase notes. The
+> rest of this document is the original assessment, unchanged.
+
 The production flowchart (Cutting → Stitching → QC → Finishing → Packing →
 Dispatch) describes work that is **explicitly out of scope** for this
 application. This document maps every stage of it onto the tables, fields and

@@ -243,6 +243,18 @@ async function openingAlreadyPosted(tx, itemId, { rollTracked = true } = {}) {
 }
 
 /**
+ * Has go-live stock been loaded at all? Asked by the sidebar, which drops its
+ * Opening Stock link once it has. Any opening balance counts - a reversed one
+ * included, since somebody has clearly been through the setup.
+ */
+export async function status() {
+  const entries = await prisma.stockLedger.count({
+    where: { documentType: 'OPENING_BALANCE', direction: 'IN' },
+  });
+  return { loaded: entries > 0 };
+}
+
+/**
  * What the file WOULD do, worked out without writing anything.
  *
  * Every refusal `apply()` would make is made here too, so the office sees the

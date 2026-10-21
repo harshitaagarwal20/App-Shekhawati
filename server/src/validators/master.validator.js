@@ -391,6 +391,15 @@ export const createStyleSchema = z.object({
       }
       return n;
     }),
+  /**
+   * Phase 2 - pieces one tailor should stitch in an hour on this style.
+   * Blank clears it (same reason as qtyPerCarton above: an empty imported
+   * cell means "clear", not zero). Above zero when given.
+   */
+  hourlyTarget: z
+    .union([z.literal(''), z.null(), decimal('Hourly target', { allowZero: false, max: 100000 })])
+    .optional()
+    .transform((v) => (v === '' ? null : v)),
   imageRef: optionalText(200),
   status: statusActive.default('ACTIVE'),
   remarks: optionalText(2000),

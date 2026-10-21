@@ -425,6 +425,13 @@ export const styleMaster = {
           type: 'number',
           step: '1',
         },
+        /* Hourly Monitoring paints a tailor's slot red when it is under this. */
+        {
+          name: 'hourlyTarget',
+          label: 'Hourly Target (pcs / tailor)',
+          type: 'number',
+          step: '1',
+        },
         { name: 'status', label: 'Status', type: 'status' },
         { name: 'remarks', label: 'Remarks', type: 'textarea', span: 2 },
       ],
@@ -438,6 +445,7 @@ export const styleMaster = {
     colorCode: opt(60),
     avgFabricUtilizationPerPc: zeroOrPositive('Average fabric utilisation'),
     qtyPerCarton: optCount('Qty / Ctn'),
+    hourlyTarget: optCount('Hourly target'),
     status,
     remarks: opt(2000),
     /*

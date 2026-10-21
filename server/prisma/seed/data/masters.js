@@ -278,6 +278,22 @@ export const employees = [
   { empId: 'EMP-009', empName: 'Dinesh Sir', department: 'Procurement', designation: 'Director', unitLine: 'Head Office', status: 'ACTIVE' },
   { empId: 'EMP-010', empName: 'Ramesh Kumar', department: 'Stitching', designation: 'Supervisor', unitLine: 'Unit 3 - Ramesh', status: 'ACTIVE' },
   { empId: 'EMP-011', empName: 'Suresh Meena', department: 'Stitching', designation: 'Supervisor', unitLine: 'Unit 4 - Suresh', status: 'ACTIVE' },
+  // Phase 2 - tailors, so the Hourly Monitoring grid has rows. Not in the
+  // workbook's Employee Master sample; the units' rosters are the office's
+  // to load.
+  { empId: 'EMP-012', empName: 'Kamla Devi', department: 'Stitching', designation: 'Tailor', unitLine: 'Unit 1 - Anil Kumar', status: 'ACTIVE' },
+  { empId: 'EMP-013', empName: 'Mohd. Salim', department: 'Stitching', designation: 'Tailor', unitLine: 'Unit 1 - Anil Kumar', status: 'ACTIVE' },
+  { empId: 'EMP-014', empName: 'Geeta Saini', department: 'Stitching', designation: 'Tailor', unitLine: 'Unit 1 - Anil Kumar', status: 'ACTIVE' },
+  { empId: 'EMP-015', empName: 'Raju Bairwa', department: 'Stitching', designation: 'Tailor', unitLine: 'Unit 1 - Anil Kumar', status: 'ACTIVE' },
+  { empId: 'EMP-016', empName: 'Shabana Bano', department: 'Stitching', designation: 'Tailor', unitLine: 'Unit 2 - Mahipal', status: 'ACTIVE' },
+  { empId: 'EMP-017', empName: 'Om Prakash', department: 'Stitching', designation: 'Tailor', unitLine: 'Unit 2 - Mahipal', status: 'ACTIVE' },
+  { empId: 'EMP-018', empName: 'Pinky Kumari', department: 'Stitching', designation: 'Tailor', unitLine: 'Unit 2 - Mahipal', status: 'ACTIVE' },
+  // Ironing - the ironers.
+  { empId: 'EMP-019', empName: 'Bhanwar Lal', department: 'Finishing', designation: 'Ironer', unitLine: 'Ironing', status: 'ACTIVE' },
+  { empId: 'EMP-020', empName: 'Santosh Kanwar', department: 'Finishing', designation: 'Ironer', unitLine: 'Ironing', status: 'ACTIVE' },
+  // Phase 4 - the Alteration Unit's staff.
+  { empId: 'EMP-021', empName: 'Farida Begum', department: 'Alteration', designation: 'Tailor', unitLine: 'Alteration Unit', status: 'ACTIVE' },
+  { empId: 'EMP-022', empName: 'Mukesh Saini', department: 'Alteration', designation: 'Operator', unitLine: 'Alteration Unit', status: 'ACTIVE' },
 ];
 
 /**

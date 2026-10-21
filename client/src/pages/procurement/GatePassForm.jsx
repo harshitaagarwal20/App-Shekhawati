@@ -39,7 +39,7 @@ import {
   QtyStepper,
   ScanBox,
 } from '../../components/mobile.jsx';
-import { Field, RecordSelect, Spinner, TextArea, TextInput } from '../../components/ui.jsx';
+import { CollapsibleField, Field, RecordSelect, Spinner, TextArea, TextInput } from '../../components/ui.jsx';
 import { fmtDateTime, fmtNum, nowLocalInput, todayInput } from '../../utils/format.js';
 import { loadFailed } from '../../services/loadFailures.js';
 
@@ -478,9 +478,11 @@ export default function GatePassForm({ onSaved, onCancel }) {
             </label>
           )}
 
-          <Field label="Remarks" className="span-2">
-            <TextArea rows={2} value={remarks} onChange={(e) => setRemarks(e.target.value)} />
-          </Field>
+          <CollapsibleField className="span-2">
+            <Field label="Remarks">
+              <TextArea rows={2} value={remarks} onChange={(e) => setRemarks(e.target.value)} />
+            </Field>
+          </CollapsibleField>
 
           <div className="floor-actions">
             <BigButton kind="ghost" onClick={onCancel}>

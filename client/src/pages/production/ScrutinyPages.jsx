@@ -30,6 +30,7 @@ import {
 } from '../../services/erp.js';
 import {
   Alert,
+  CollapsibleField,
   EmptyState,
   EnumSelect,
   Field,
@@ -57,7 +58,7 @@ import {
 import { StateBadge, WorkflowTrail } from '../../components/workflow.jsx';
 import { Detail, DetailGrid, TraceChain } from '../shared/Detail.jsx';
 import { fabricIssues as fiApi, employees as employeesApi } from '../../services/erp.js';
-import { fmtDate, fmtDateTime, fmtEnum, fmtNum, todayInput } from '../../utils/format.js';
+import { fmtDate, fmtDateTime, fmtEnum, fmtNum, todayInput, fmtOrder } from '../../utils/format.js';
 import { loadFailed } from '../../services/loadFailures.js';
 import { ExportButton } from '../../components/dataTransfer.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
@@ -168,7 +169,7 @@ export function ScrutinyList() {
             <RecordSelect
               id="fs-f-order"
               options={orderOptions}
-              getLabel={(o) => o.orderNo}
+              getLabel={fmtOrder}
               placeholder="All orders"
               value={list.filters.orderId ?? ''}
               onChange={(e) => list.setFilter('orderId', e.target.value)}
@@ -445,7 +446,9 @@ function ScrutinyForm({ onSaved, onCancel }) {
             label="To be authorised by"
             listCode="AuthorisedBy"
           />
-          <RHFTextArea form={form} name="remarks" label="Remarks" className="span-2" />
+          <CollapsibleField className="span-2">
+            <RHFTextArea form={form} name="remarks" label="Remarks" />
+          </CollapsibleField>
         </FieldGroup>
       </div>
 
@@ -988,9 +991,11 @@ function FinaliseDialog({ scrutiny, onCancel, onDone }) {
           />
         </Field>
 
-        <Field label="Remarks">
-          <TextArea rows={3} value={remarks} onChange={(e) => setRemarks(e.target.value)} />
-        </Field>
+        <CollapsibleField>
+          <Field label="Remarks">
+            <TextArea rows={3} value={remarks} onChange={(e) => setRemarks(e.target.value)} />
+          </Field>
+        </CollapsibleField>
 
         <Alert kind="warning">
           <strong>This locks the record.</strong> After finalising, the only way to change anything
@@ -1098,9 +1103,11 @@ function AmendDialog({ scrutiny, onCancel, onDone }) {
           />
         </Field>
 
-        <Field label="Remarks">
-          <TextArea rows={2} value={remarks} onChange={(e) => setRemarks(e.target.value)} />
-        </Field>
+        <CollapsibleField>
+          <Field label="Remarks">
+            <TextArea rows={2} value={remarks} onChange={(e) => setRemarks(e.target.value)} />
+          </Field>
+        </CollapsibleField>
 
         {decision && decision !== scrutiny.decision && (
           <Alert kind="warning">

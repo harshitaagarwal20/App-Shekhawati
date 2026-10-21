@@ -210,7 +210,27 @@ Not one of the twelve, but the thing that makes the other twelve auditable.
 
 ---
 
+## 14. A defect found on the line that nobody acts on
+
+Inline QC (Phase 3). See [INLINE-QC-NOTES.md](INLINE-QC-NOTES.md).
+
+| Where | What |
+|---|---|
+| Service + `CHECK` | Pcs Checked is above 0, and Pcs Rejected is between 0 and Pcs Checked (`inline_qc_entries_pcs`) |
+| Service + `CHECK` | Operation and Size are given on a Size check and absent on a Workmanship check (`inline_qc_entries_size_fields`) |
+| Service | Rejected pieces need at least one defect, and any defect needs an Inform To person. A defect cannot be recorded without an owner |
+| Service | Inform To must be a login holding `INLINE_QC.RESOLVE` through a business role. Admin-only logins are not offered |
+| Service | Only the person named can mark a defect Resolved or reopen it (Admin excepted). Not the checker, and not another supervisor |
+| Service | The unit is the tailor's, and the order must have cutting posted to it. A check never covers more pieces than were cut for the unit |
+| Service | A supervisor reads only their own unit's checks and export, plus anything sent to them |
+| Audit | `inline_qc_entries` and `inline_qc_defects` are audited, so a defect removed in an edit, or a Resolved later undone, stays on record |
+
+---
+
 ## Where these are tested
+
+`test/inlineQc.rules.test.js` (no database) and `test/inlineQc.db.test.js`
+(over HTTP) cover control 14.
 
 `npm run test:rules` — 195 cases, no database. Covers every calculation, the
 transition tables, the navigation shape, the audit redaction and the

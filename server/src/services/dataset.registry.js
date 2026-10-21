@@ -76,6 +76,12 @@ import * as planApprovalService from './planApproval.service.js';
 import * as cuttingChallanService from './cuttingChallan.service.js';
 import * as cuttingIssueService from './cuttingIssue.service.js';
 import * as cutPiecesReceiptService from './cutPiecesReceipt.service.js';
+import * as stitchingService from './stitching.service.js';
+import * as inlineQcService from './inlineQc.service.js';
+import * as ironingService from './ironing.service.js';
+import * as externalQcService from './externalQc.service.js';
+import * as alterationService from './alteration.service.js';
+import * as rejectedRegisterService from './rejectedRegister.service.js';
 import * as excessService from './excess.service.js';
 import * as auditService from './audit.service.js';
 import { importColumns } from './import.service.js';
@@ -444,6 +450,167 @@ const DATASETS = [
     defaultSort: 'issueDate',
     defaultDir: 'desc',
     fetch: (q) => cuttingIssueService.list(q),
+  },
+
+  // =========================================================================
+  //  PRODUCTION PHASE 2 - STITCHING
+  //
+  //  The two stitching lists take the caller as well: a supervisor's file is
+  //  held to their own unit, exactly as their screen is.
+  // =========================================================================
+  {
+    key: 'stitching-records',
+    title: 'Stitching records',
+    group: 'Stitching',
+    module: 'STITCHING_RECORD',
+    filters: ['unit', 'orderId', 'styleId', 'dateFrom', 'dateTo'],
+    sortable: stitchingService.SORTABLE,
+    defaultSort: 'recordDate',
+    defaultDir: 'desc',
+    fetch: (q, auth) => stitchingService.list(q, auth),
+  },
+  {
+    key: 'hourly-monitoring',
+    title: 'Hourly monitoring',
+    group: 'Stitching',
+    module: 'HOURLY_MONITORING',
+    filters: ['unit', 'orderId', 'styleId', 'employeeId', 'dateFrom', 'dateTo'],
+    sortable: stitchingService.HOURLY_SORTABLE,
+    defaultSort: 'entryDate',
+    defaultDir: 'desc',
+    fetch: (q, auth) => stitchingService.listHourly(q, auth),
+  },
+  // Phase 3 - Inline QC. Held to a supervisor's unit like the stitching
+  // lists. The columns are the workbook's, in its order, so the file reads
+  // like the QC Size / QC Defects sheets it replaces.
+  {
+    key: 'inline-qc',
+    title: 'Inline QC',
+    group: 'Stitching',
+    module: 'INLINE_QC',
+    filters: ['unit', 'checkType', 'orderId', 'styleId', 'tailorId', 'informToUserId', 'defect', 'openOnly', 'dateFrom', 'dateTo'],
+    sortable: inlineQcService.SORTABLE,
+    defaultSort: 'entryDate',
+    defaultDir: 'desc',
+    columns: [
+      { key: 'entryDate', label: 'Date' },
+      { key: 'checkTypeLabel', label: 'Check Type' },
+      { key: 'order.orderNo', label: 'Order No' },
+      { key: 'order.buyer.buyerName', label: 'Buyer' },
+      { key: 'unit', label: 'Unit' },
+      { key: 'tailor.empId', label: 'Tailor Emp ID' },
+      { key: 'tailor.empName', label: 'Tailor Name' },
+      { key: 'style.styleNo', label: 'Style No' },
+      { key: 'operation', label: 'Operation' },
+      { key: 'sizeMeasurement', label: 'Size' },
+      { key: 'pcsChecked', label: 'Pcs Checked' },
+      { key: 'pcsRejected', label: 'Pcs Rejected' },
+      { key: 'rejectionPct', label: 'Rejection %' },
+      { key: 'defectsFound', label: 'Defects Found' },
+      { key: 'informToName', label: 'Inform To' },
+      { key: 'openDefects', label: 'Defects Open' },
+      { key: 'recordedByName', label: 'Checked By' },
+      { key: 'remarks', label: 'Remarks' },
+    ],
+    fetch: (q, auth) => inlineQcService.list(q, auth),
+  },
+  {
+    key: 'inline-qc-actions',
+    title: 'Inline QC - action needed',
+    group: 'Stitching',
+    module: 'INLINE_QC',
+    filters: ['scope', 'status', 'unit', 'orderId', 'informToUserId', 'dateFrom', 'dateTo'],
+    sortable: inlineQcService.ACTION_SORTABLE,
+    defaultSort: 'createdAt',
+    defaultDir: 'asc',
+    columns: [
+      { key: 'entryDate', label: 'Date' },
+      { key: 'checkType', label: 'Check Type' },
+      { key: 'orderNo', label: 'Order No' },
+      { key: 'unit', label: 'Unit' },
+      { key: 'tailor', label: 'Tailor Name' },
+      { key: 'styleNo', label: 'Style No' },
+      { key: 'operation', label: 'Operation' },
+      { key: 'defect', label: 'Defect' },
+      { key: 'pcsRejected', label: 'Pcs Rejected' },
+      { key: 'informTo', label: 'Inform To' },
+      { key: 'foundBy', label: 'Found By' },
+      { key: 'status', label: 'Status' },
+      { key: 'resolvedByName', label: 'Resolved By' },
+      { key: 'resolvedAt', label: 'Resolved At' },
+      { key: 'resolutionNote', label: 'Resolution' },
+    ],
+    fetch: (q, auth) => inlineQcService.actions(q, auth),
+  },
+  {
+    key: 'printing-after-stitching',
+    title: 'Printing after stitching',
+    group: 'Stitching',
+    module: 'PRINTING',
+    filters: ['orderId', 'styleId', 'vendorId', 'fromUnit', 'openOnly', 'dateFrom', 'dateTo'],
+    sortable: stitchingService.PRINTING_SORTABLE,
+    defaultSort: 'printingDate',
+    defaultDir: 'desc',
+    fetch: (q) => stitchingService.listPrintings(q),
+  },
+  {
+    key: 'ironing',
+    title: 'Ironing',
+    group: 'Stitching',
+    module: 'IRONING',
+    filters: ['source', 'fromUnit', 'orderId', 'styleId', 'ironerId', 'undecidedOnly', 'dateFrom', 'dateTo'],
+    sortable: ironingService.SORTABLE,
+    defaultSort: 'entryDate',
+    defaultDir: 'desc',
+    fetch: (q) => ironingService.list(q),
+  },
+
+  // =========================================================================
+  //  PHASE 4 - EXTERNAL QC, THE ALTERATION UNIT, THE REJECTED REGISTER
+  // =========================================================================
+  {
+    key: 'external-qc',
+    title: 'External QC',
+    group: 'Finishing',
+    module: 'EXTERNAL_QC',
+    filters: ['orderId', 'styleId', 'agencyId', 'checkerCode', 'dateFrom', 'dateTo'],
+    sortable: externalQcService.SORTABLE,
+    defaultSort: 'entryDate',
+    defaultDir: 'desc',
+    fetch: (q) => externalQcService.list(q),
+  },
+  {
+    key: 'alteration-bags',
+    title: 'Alteration Unit - pending bags',
+    group: 'Finishing',
+    module: 'ALTERATION',
+    filters: ['status', 'orderId', 'styleId', 'source', 'reason'],
+    sortable: alterationService.BAG_SORTABLE,
+    defaultSort: 'receivedDate',
+    defaultDir: 'asc',
+    fetch: (q) => alterationService.bags(q),
+  },
+  {
+    key: 'alteration-entries',
+    title: 'Alteration Unit - entries',
+    group: 'Finishing',
+    module: 'ALTERATION',
+    filters: ['orderId', 'styleId', 'staffId', 'receiptId', 'dateFrom', 'dateTo'],
+    sortable: alterationService.SORTABLE,
+    defaultSort: 'entryDate',
+    defaultDir: 'desc',
+    fetch: (q) => alterationService.list(q),
+  },
+  {
+    key: 'rejected-register',
+    title: 'Rejected Register',
+    group: 'Finishing',
+    module: 'REJECTED_REGISTER',
+    filters: ['stage', 'origin', 'reason', 'orderId', 'styleId', 'dateFrom', 'dateTo'],
+    sortable: rejectedRegisterService.SORTABLE,
+    defaultSort: 'rejectDate',
+    defaultDir: 'desc',
+    fetch: (q) => rejectedRegisterService.list(q),
   },
 
   // =========================================================================

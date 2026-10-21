@@ -329,9 +329,9 @@ async function buildApprovals(visible, decidable, queueTo) {
     /**
      * Where "open the queue" goes, or `null` when it goes nowhere for them.
      *
-     * The approval queue screen is guarded by REPORT.VIEW, which is not the
+     * The approval queue screen is guarded by APPROVAL_QUEUE.VIEW, which is not the
      * `<TYPE>.VIEW` that puts a group in this section. A role holding
-     * GATE_PASS.VIEW and no REPORT.VIEW would otherwise be shown a link that
+     * GATE_PASS.VIEW and no APPROVAL_QUEUE.VIEW would otherwise be shown a link that
      * lands on Forbidden, so the server decides it here rather than leaving
      * the screen to guess.
      */
@@ -727,11 +727,11 @@ export function sectionsFor(has) {
     /**
      * Whether the shared approval queue screen is reachable at all.
      *
-     * AppRoutes guards `/approvals` with REPORT.VIEW. Deciding it here keeps
+     * AppRoutes guards the queue with APPROVAL_QUEUE.VIEW. Deciding it here keeps
      * every access question about this screen in this one function, which is
      * the whole argument for the function existing.
      */
-    approvalQueue: has('REPORT.VIEW'),
+    approvalQueue: has('APPROVAL_QUEUE.VIEW'),
     pipeline: STAGES.filter((s) => has(s.permission)).map((s) => s.key),
     /** The month-by-month series: the same stages, gated the same way. */
     trend: STAGES.filter((s) => TREND_STAGES.includes(s.key) && has(s.permission)).map(

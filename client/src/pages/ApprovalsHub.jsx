@@ -50,19 +50,20 @@ const PLANS = 'plans';
  * came for: the Director is the last gate almost everywhere, and the first
  * thing they ask on signing in is what is waiting on them.
  *
- * REPORT.VIEW guards the queue because it is a read across the whole system,
- * and the Director holds it. That is the permission the route has always
- * carried - nothing about who may see what changes here.
+ * APPROVAL_QUEUE.VIEW guards the queue - the same permission as its API
+ * (GET /workflow/queue). It was REPORT.VIEW, which every floor desk holds.
  */
 const VIEWS = [
   {
     value: QUEUE,
     label: 'Awaiting Decision',
-    permission: 'REPORT.VIEW',
+    hint: 'Everything waiting for a decision, across every module - the worklist.',
+    permission: 'APPROVAL_QUEUE.VIEW',
   },
   {
     value: PLANS,
     label: 'Plan Approvals',
+    hint: 'The plan register: each version, its approval rounds and what they changed.',
     permission: 'PLAN_APPROVAL.VIEW',
   },
 ];

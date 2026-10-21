@@ -15,8 +15,9 @@ import { inventory as invApi, vendors as vendorsApi } from '../../services/erp.j
 import { loadFailed } from '../../services/loadFailures.js';
 import { loadFabricItems } from '../reports/Reports.jsx';
 import {
-  ColumnMenu,
   Alert,
+  CollapsibleField,
+  ColumnMenu,
   EmptyState,
   EnumSelect,
   Field,
@@ -607,9 +608,11 @@ function InspectBatchDialog({ count, onCancel, onSettled, run }) {
                 onChange={(e) => setStatus(e.target.value)}
               />
             </Field>
-            <Field label="Remarks">
-              <TextArea rows={2} value={remarks} onChange={(e) => setRemarks(e.target.value)} />
-            </Field>
+            <CollapsibleField>
+              <Field label="Remarks">
+                <TextArea rows={2} value={remarks} onChange={(e) => setRemarks(e.target.value)} />
+              </Field>
+            </CollapsibleField>
           </>
         )}
 

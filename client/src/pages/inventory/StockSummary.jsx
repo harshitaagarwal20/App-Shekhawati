@@ -75,6 +75,13 @@ export default function StockSummary() {
                 Reconcile
               </button>
             )}
+            {/* The way in to opening stock once its one-time sidebar link has
+                gone - for an item that was missed at go-live. */}
+            {can('FABRIC_ROLL.CREATE') && (
+              <button type="button" className="btn" onClick={() => navigate('/masters/opening-stock')}>
+                Opening stock
+              </button>
+            )}
           </>
         }
       />

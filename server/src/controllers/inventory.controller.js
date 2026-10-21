@@ -178,6 +178,11 @@ export const relocateRoll = asyncHandler(async (req, res) =>
 //  Opening stock
 // ---------------------------------------------------------------------------
 
+/** Whether any opening stock has been loaded yet. */
+export const openingStockStatus = asyncHandler(async (req, res) =>
+  ok(res, await openingStock.status()),
+);
+
 /** What the file would do, written nowhere. */
 export const previewOpeningStock = asyncHandler(async (req, res) =>
   ok(res, await openingStock.preview(req.body.rows)),

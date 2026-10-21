@@ -3,19 +3,26 @@
 Manufacturing ERP for a Jaipur-based bag / tote export house, replacing the
 Excel-and-paper process captured in `Shekwati Impex formats.xlsx`.
 
-**The application covers Masters → Cutting Issue and ends there.**
+**The application covers Masters → Cutting Issue → Stitching (with Inline QC beside it) → Ironing → External QC → Alteration Unit, and ends there.**
 
 ```
 MASTERS → BUYER ORDER → PLANNING → VENDOR QUOTATION → QUOTATION APPROVAL
        → PURCHASE ORDER → PO APPROVAL → GATE PASS → GRN → INVENTORY
        → FABRIC ISSUE → DYEING → PRINTING → FABRIC SCRUTINY
-       → PLAN APPROVAL → CUTTING ISSUE → END
+       → PLAN APPROVAL → CUTTING ISSUE → STITCHING (+ HOURLY MONITORING,
+         INLINE QC, optional PRINTING AFTER STITCHING) → IRONING
+       → EXTERNAL QC → ALTERATION UNIT / REJECTED REGISTER → END
 ```
 
-Nothing after Cutting Issue (stitching, hourly monitoring, QC records, alter,
-packing, needle checking, dispatch, reconciliation) is part of this system —
-no table, no route, no menu item, no placeholder. `npm run verify:scope` fails
-the build if any of it creeps in.
+Production Phase 2 added Stitching Record and Hourly Monitoring, then Ironing.
+Phase 3 added **Inline QC**, checks taken on the line while stitching runs: it
+sits beside stitching rather than after it and moves no pieces. Phase 4 added
+External QC, the Alteration Unit and the Rejected Register. Nothing after them
+(final QC, packing, needle checking, dispatch, reconciliation) is part of this
+system yet — no table, no route, no menu item, no placeholder.
+`npm run verify:scope` fails the build if any of it creeps in, and opening the
+next stage means moving it from `FORBIDDEN` to `DELIVERED` in
+`server/prisma/verify-scope.js`.
 
 That one line is the whole application. Drawn out — every branch, every gate,
 who decides what, and how stock moves under it — it is
@@ -47,6 +54,12 @@ those things is **[docs/USE-CASE-DIAGRAM.md](docs/USE-CASE-DIAGRAM.md)**.
 | **C12** | Material Plan: the raw material requirement — fabric **and** accessories — exploded from the Style BOM, frozen at creation, prepared by planning and signed before procurement goes to the market | **Delivered** |
 | **32** | Reporting: fourteen operational reports, one per implemented module, RBAC-filtered, CSV export | **Delivered** |
 | **33** | Excel reconciliation: every workbook column traced Excel → ERP → column → API → screen, with every deliberate omission documented | **Delivered** |
+| **P2** | Production Phase 2: Stitching Record (per unit, per day, never more than was cut for the unit), Hourly Monitoring (per tailor, per slot, saved cell by cell, phone-first), optional printing after stitching. A supervisor sees only their own unit — taken from the Unit / Line on their Employee record. See [docs/PRODUCTION-PHASE-2-NOTES.md](docs/PRODUCTION-PHASE-2-NOTES.md) | **Delivered** |
+| **P3** | Inline QC: one screen with a Check Type toggle (Size / Workmanship — the workbook's QC Size and QC Defects sheets), taken on the line beside stitching. Unit follows the tailor; Pcs Checked and Pcs Rejected; several defects from the Defect Type list. Each defect goes to the **Action needed** list of the supervisor named in Inform To, who marks it Resolved. See [docs/INLINE-QC-NOTES.md](docs/INLINE-QC-NOTES.md) | **Delivered** |
+| **Ironing** | Received from a unit (never more than it stitched less out for printing), ironed, damaged with a type; every damaged piece decided re-iron or rejected (rejects held as pending rejects); receiving closes the unit's cutting challans oldest first; daily and balance reports. See [docs/IRONING-NOTES.md](docs/IRONING-NOTES.md) | **Delivered** |
+| **P4** | External QC (offered = approved + alteration + rejected, each faulty box by reason), the Alteration Unit (bags to repair or clean), and the Rejected Register. See [docs/PHASE-4-EXTERNAL-QC-NOTES.md](docs/PHASE-4-EXTERNAL-QC-NOTES.md) | **Delivered** |
+| **VP** | Vendor Performance (Dashboard → Vendor Performance): charts of job workers' shrinkage against their allowance and lots back by the due date, suppliers' PO lines received in full by the delivery date, cutting wastage by mill, and defect reasons at every QC stage. Each is a report in the registry, so it also has a table and a CSV export | **Delivered** |
+| **DS** | Daily summary: at `DAILY_SUMMARY_TIME` (default 20:00 India time), holders of `REPORT.SUMMARY` (the Director) get the day's pieces cut, issued and stitched, External and Inline QC, rejections and the approvals waiting — in the bell, and by email / WhatsApp per their settings. Each line is shown only to someone who may view that register; anyone can switch it off or preview it under Notifications → Settings | **Delivered** |
 
 > **Live on Azure.** The application is deployed and in use — App Service for the
 > API, a Static Web App for the client, PostgreSQL Flexible Server behind both.
@@ -333,10 +346,18 @@ set their own from **Change Password** as soon as they have signed in.
 | `vinay` | Planning GM | Vinay ji (GM) |
 | `ravi` | Store & Cutting Manager | Ravi Prajapat |
 | `maharaj` | Store & Cutting Manager | Maharaj Singh |
-| `sunita`, `rekha` | QC | Sunita Devi, Rekha Sharma |
+| `sunita`, `rekha` | QC (Fabric Scrutiny and Inline QC) | Sunita Devi, Rekha Sharma |
 | `merch` | Merchandising & Planning | — |
 | `headoffice` | Head Office | — |
 | `planner` | Merchandising & Planning | — |
+| `anil` | Stitching Supervisor | Anil Kumar — Unit 1 |
+| `mahipal` | Stitching Supervisor | Mahipal Yadav — Unit 2 |
+| `finishing` | Ironing & Finishing Supervisor | — (the ironing desk) |
+| `extqc` | External QC Coordinator | — (the External QC desk) |
+| `alteration` | Alteration Unit Supervisor | — (the Alteration Unit) |
+
+The stitching supervisors are who Inline QC informs: they hold
+`INLINE_QC.RESOLVE` and get each defect on their Action needed list.
 
 ---
 

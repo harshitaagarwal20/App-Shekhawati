@@ -30,7 +30,7 @@ import {
   TextInput,
 } from '../../components/ui.jsx';
 import QuotationForm from './QuotationForm.jsx';
-import { fmtDate } from '../../utils/format.js';
+import { fmtDate, fmtOrder } from '../../utils/format.js';
 import { loadFailed } from '../../services/loadFailures.js';
 import { ExportButton } from '../../components/dataTransfer.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
@@ -140,7 +140,7 @@ export default function QuotationList() {
               id="q-f-order"
               options={orderOptions}
               getValue={(o) => o.id}
-              getLabel={(o) => o.orderNo}
+              getLabel={fmtOrder}
               placeholder="All orders"
               value={list.filters.orderId ?? ''}
               onChange={(e) => list.setFilter('orderId', e.target.value)}

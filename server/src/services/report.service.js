@@ -41,6 +41,9 @@ import { D, ageDays } from '../utils/figures.js';
 import { toCsv as writeCsv } from '../utils/csv.js';
 import { EXTRA_REPORTS } from './reports.extra.js';
 import { INVENTORY_ANALYSIS_REPORTS } from './reports.inventory.js';
+import { PRODUCTION_REPORTS } from './reports.production.js';
+import { FINISHING_REPORTS } from './reports.finishing.js';
+import { VENDOR_REPORTS } from './reports.vendor.js';
 
 const ZERO = D(0);
 
@@ -492,6 +495,17 @@ export const REPORTS = {
 
   // Supplier-wise stock, supplier yield, inward inspection - see reports.inventory.js.
   ...INVENTORY_ANALYSIS_REPORTS,
+
+  // Ironing: daily output by ironer and order, and the balance waiting.
+  ...PRODUCTION_REPORTS,
+
+  // Phase 4: External QC by order / agency / reason, the Checker Report, the
+  // Alteration Unit's pending and summary, and the net pipeline.
+  ...FINISHING_REPORTS,
+
+  // Vendor performance: job workers' shrinkage and punctuality, suppliers'
+  // delivery against the PO date, and defect reasons across every QC stage.
+  ...VENDOR_REPORTS,
 };
 
 // ===========================================================================
@@ -1212,7 +1226,10 @@ async function jobWorkStatus(q, processes) {
     const sent = D(j.qty);
     const back = D(j.receivedQty);
     const shrinkage = D(j.shrinkagePct);
-    const allowed = D(j.standardShrinkageAllowed);
+    // The allowance this job was issued under. It was read from
+    // `standardShrinkageAllowed`, a receipt column the job does not have, so
+    // every job showed 0% allowed and any shrinkage at all read as a breach.
+    const allowed = D(j.shrinkageTolerancePct);
     const pending = sent.minus(back);
     return {
       id: j.id,
@@ -1285,8 +1302,8 @@ async function printingStatus(q) {
     vendorName: p.vendor?.vendorName ?? null,
     rollNo: '—',
     qty: D(p.qty).toFixed(4),
-    receivedQty: '—',
-    pendingQty: '—',
+    receivedQty: D(p.qtyReceived).toFixed(4),
+    pendingQty: D(p.qty).minus(D(p.qtyReceived)).toFixed(4),
     shrinkagePctDisplay: '—',
     allowedPctDisplay: '—',
     breached: 'No',

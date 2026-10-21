@@ -31,6 +31,7 @@ import {
 } from '../../services/erp.js';
 import {
   Alert,
+  CollapsibleField,
   EnumSelect,
   Field,
   MasterSelect,
@@ -45,7 +46,7 @@ import {
   VarietySelect,
 } from '../../components/ui.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
-import { fmtDate, fmtDateTime, todayInput } from '../../utils/format.js';
+import { fmtDate, fmtDateTime, todayInput, fmtOrder } from '../../utils/format.js';
 import { loadFailed } from '../../services/loadFailures.js';
 
 // Kolkata's calendar date, not UTC's - before 05:30 IST those differ by a day.
@@ -264,7 +265,9 @@ export function PoDocumentForm() {
             </Field>
             <Field label="Deliver by"><TextInput type="date" value={head.deliveryDate} onChange={setH('deliveryDate')} /></Field>
             <Field label="Payment terms"><TextInput value={head.paymentTerms} maxLength={150} onChange={setH('paymentTerms')} /></Field>
-            <Field label="Remarks" className="span-2"><TextArea rows={2} value={head.headerRemarks} onChange={setH('headerRemarks')} /></Field>
+            <CollapsibleField className="span-2">
+              <Field label="Remarks"><TextArea rows={2} value={head.headerRemarks} onChange={setH('headerRemarks')} /></Field>
+            </CollapsibleField>
           </div>
         </div>
       </div>
@@ -695,12 +698,14 @@ export function QuotationDocumentForm() {
             </Field>
             <Field label="Date"><TextInput type="date" value={head.quotationDate} onChange={setH('quotationDate')} /></Field>
             <Field label="For buyer order">
-              <RecordSelect options={orders} getValue={(o) => o.id} getLabel={(o) => o.orderNo} placeholder="None"
+              <RecordSelect options={orders} getValue={(o) => o.id} getLabel={fmtOrder} placeholder="None"
                 value={head.orderId} onChange={setH('orderId')} />
             </Field>
             <Field label="Vendor's ref no"><TextInput value={head.vendorRefNo} maxLength={60} onChange={setH('vendorRefNo')} /></Field>
             <Field label="Valid until"><TextInput type="date" value={head.validUntil} onChange={setH('validUntil')} /></Field>
-            <Field label="Remarks" className="span-2"><TextArea rows={2} value={head.remarks} onChange={setH('remarks')} /></Field>
+            <CollapsibleField className="span-2">
+              <Field label="Remarks"><TextArea rows={2} value={head.remarks} onChange={setH('remarks')} /></Field>
+            </CollapsibleField>
           </div>
         </div>
       </div>
@@ -962,7 +967,9 @@ export function GrnDocumentForm() {
             <Field label="Into location" hint="Defaults to the main store.">
               <MasterSelect listCode="StockLocation" value={head.location} currentValue={head.location} onChange={setH('location')} />
             </Field>
-            <Field label="Remarks" className="span-2"><TextArea rows={2} value={head.headerRemarks} onChange={setH('headerRemarks')} /></Field>
+            <CollapsibleField className="span-2">
+              <Field label="Remarks"><TextArea rows={2} value={head.headerRemarks} onChange={setH('headerRemarks')} /></Field>
+            </CollapsibleField>
           </div>
         </div>
       </div>

@@ -28,6 +28,7 @@ import {
 } from '../../services/erp.js';
 import {
   Alert,
+  CollapsibleField,
   ConfirmDialog,
   EmptyState,
   Field,
@@ -42,7 +43,7 @@ import {
   TextInput,
 } from '../../components/ui.jsx';
 import { Detail, DetailGrid } from '../shared/Detail.jsx';
-import { fmtDate, fmtDateTime, fmtNum, toDateInput, todayInput } from '../../utils/format.js';
+import { fmtDate, fmtDateTime, fmtNum, toDateInput, todayInput, fmtOrder } from '../../utils/format.js';
 import { loadFailed } from '../../services/loadFailures.js';
 import { ExportButton } from '../../components/dataTransfer.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
@@ -114,7 +115,7 @@ export function CutPiecesReceiptList() {
             onChange={(e) => list.setFilter('orderId', e.target.value)}
             options={orderOptions}
             getValue={(o) => o.id}
-            getLabel={(o) => o.orderNo}
+            getLabel={fmtOrder}
             placeholder="All orders"
           />
         </Field>
@@ -744,9 +745,11 @@ function CheckModal({ row, onClose, onSaved }) {
         Add defect
       </button>
 
-      <Field label="Remarks">
-        <TextArea rows={2} value={remarks} onChange={(e) => setRemarks(e.target.value)} />
-      </Field>
+      <CollapsibleField>
+        <Field label="Remarks">
+          <TextArea rows={2} value={remarks} onChange={(e) => setRemarks(e.target.value)} />
+        </Field>
+      </CollapsibleField>
 
       {problem ? (
         <Alert kind="warning">{problem}</Alert>
@@ -1058,9 +1061,11 @@ function ReceiptModal({ existing, onClose, onSaved }) {
           </Field>
         )}
 
-        <Field label="Remarks" className="span-2">
-          <TextArea rows={2} value={form.remarks} onChange={(e) => set({ remarks: e.target.value })} />
-        </Field>
+        <CollapsibleField className="span-2">
+          <Field label="Remarks">
+            <TextArea rows={2} value={form.remarks} onChange={(e) => set({ remarks: e.target.value })} />
+          </Field>
+        </CollapsibleField>
       </div>
 
       {/* --- C6: the fabric these pieces were cut from ----------------------
@@ -1093,7 +1098,16 @@ function ReceiptModal({ existing, onClose, onSaved }) {
             >
               <RecordSelect
                 value={form.fabricIssueId}
-                onChange={(e) => set({ fabricIssueId: e.target.value })}
+                onChange={(e) => {
+                  // Pre-filled with what the issue put on the floor, when nothing
+                  // is typed yet. The parts of it - consumed, wastage - are the
+                  // cutter's to state.
+                  const fi = fabricIssues.find((i) => i.id === e.target.value);
+                  set({
+                    fabricIssueId: e.target.value,
+                    ...(form.issuedQty === '' && fi ? { issuedQty: String(Number(fi.fabricQtyIssued)) } : {}),
+                  });
+                }}
                 options={fabricIssues}
                 disabled={!form.orderId}
                 placeholder="Select the fabric issue..."
@@ -1121,7 +1135,9 @@ function ReceiptModal({ existing, onClose, onSaved }) {
                 ? `Reconciles: ${fmtNum(fabric.issued)} received is fully accounted for.`
                 : fabric.issued <= 0
                   ? 'Enter the fabric received on the floor - the other figures are parts of it.'
-                  : `Does not reconcile: ${fmtNum(Math.abs(fabric.difference))} ` +
+                  // Four places, as the inputs take: at two, a 0.001 gap read
+                  // "0 unaccounted for" on a form that still would not save.
+                  : `Does not reconcile: ${fmtNum(Math.abs(fabric.difference), { decimals: 4 })} ` +
                     `${fabric.difference > 0 ? 'unaccounted for - enter the wastage' : 'more than was received'}.`}
               {fabric.balances && !form.fabricIssueId && ' Choose the fabric issue it came from.'}
             </Alert>

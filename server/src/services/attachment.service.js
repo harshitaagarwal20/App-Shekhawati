@@ -149,20 +149,27 @@ export async function fetch(buyerOrderId, id) {
   return row;
 }
 
-export async function create({ buyerOrderId, file, note }, actor) {
-  await assertOrder(buyerOrderId);
-
+/**
+ * Every check an upload has to pass, whichever record it is hung off.
+ *
+ * @param only   the extensions this screen takes (default: everything in
+ *               ACCEPTED), e.g. ['.pdf', '.jpg', '.jpeg', '.png', '.webp']
+ * @param kinds  those extensions in words, for the refusal
+ */
+export function assertUploadable(
+  file,
+  { only = ACCEPTED_EXTENSIONS, kinds = 'a PDF, an image (JPEG, PNG or WebP) or an Excel workbook (.xlsx or .xls)' } = {},
+) {
   if (!file) {
     throw ApiError.badRequest('No file was uploaded.', { field: 'file' });
   }
 
   const ext = extensionOf(file.originalname);
-  const allowedTypes = ACCEPTED[ext];
+  const allowedTypes = only.includes(ext) ? ACCEPTED[ext] : null;
   if (!allowedTypes) {
     throw ApiError.badRequest(
-      `"${file.originalname}" is not an accepted kind of file. Attach a PDF, an `
-        + 'image (JPEG, PNG or WebP) or an Excel workbook (.xlsx or .xls).',
-      { field: 'file', received: ext || '(no extension)', allowed: ACCEPTED_EXTENSIONS },
+      `"${file.originalname}" is not an accepted kind of file. Attach ${kinds}.`,
+      { field: 'file', received: ext || '(no extension)', allowed: only },
     );
   }
 
@@ -199,6 +206,11 @@ export async function create({ buyerOrderId, file, note }, actor) {
       { field: 'file', received: ext },
     );
   }
+}
+
+export async function create({ buyerOrderId, file, note }, actor) {
+  await assertOrder(buyerOrderId);
+  assertUploadable(file);
 
   const row = await prisma.buyerOrderAttachment.create({
     data: {

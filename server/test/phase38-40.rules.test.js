@@ -306,7 +306,7 @@ describe('§39 - the navigation shows the current scope and nothing else', () =>
   test('the pipeline groups are numbered in flow order', () => {
     const PIPELINE = [
       'Masters', 'Orders', 'Procurement', 'Stores',
-      'Job Work', 'Cutting',
+      'Job Work', 'Cutting', 'Stitching', 'Finishing',
     ];
 
     // Each group's label paired with the `stage` that follows it, if any.
@@ -320,8 +320,8 @@ describe('§39 - the navigation shows the current scope and nothing else', () =>
     );
     assert.deepEqual(
       staged.map((g) => g.stage),
-      [1, 2, 3, 4, 5, 6],
-      'the stages must run 1..6 with no gaps',
+      [1, 2, 3, 4, 5, 6, 7, 8],
+      'the stages must run 1..8 with no gaps',
     );
   });
 
@@ -385,18 +385,30 @@ describe('§39 - the navigation shows the current scope and nothing else', () =>
     }
   });
 
-  test('nothing after Cutting Issue appears anywhere in the navigation', () => {
+  test('nothing after Finishing appears anywhere in the navigation', () => {
     // The scope boundary, restated where a future edit would trip over it.
+    // Production Phase 2 opened Stitching and Hourly Monitoring; Phase 4
+    // opened External QC, the Alteration Unit and the Rejected Register. The
+    // rest of the floor (internal QC record, packing, needle, dispatch) is
+    // still not built.
     const OUT_OF_SCOPE = [
-      'Stitching', 'Hourly', 'QC Record', 'Alter', 'Packing',
+      'QC Record', 'Packing',
       'Needle', 'Dispatch', 'Reconciliation',
     ];
     for (const word of OUT_OF_SCOPE) {
       assert.ok(
         !new RegExp(`label: '[^']*${word}`, 'i').test(nav),
-        `"${word}" appears in the navigation. The pipeline ends at Cutting Issue.`,
+        `"${word}" appears in the navigation. The pipeline ends at Finishing.`,
       );
     }
+  });
+
+  test('Stitching is stage 7, straight after Cutting', () => {
+    const groups = [...nav.matchAll(/label: '([^']+)',\s*\r?\n\s*stage: (\d+)/g)].map((m) => [m[1], Number(m[2])]);
+    const at = groups.findIndex(([label]) => label === 'Stitching');
+    assert.ok(at > 0, 'there is a Stitching group with a stage');
+    assert.deepEqual(groups[at - 1], ['Cutting', 6]);
+    assert.equal(groups[at][1], 7);
   });
 
   /*

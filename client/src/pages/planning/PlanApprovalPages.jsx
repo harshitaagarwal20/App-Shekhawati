@@ -58,7 +58,7 @@ import {
   WorkflowTrail,
 } from '../../components/workflow.jsx';
 import { Detail, DetailGrid } from '../shared/Detail.jsx';
-import { fmtDate, fmtDateTime, fmtNum, todayInput } from '../../utils/format.js';
+import { fmtDate, fmtDateTime, fmtNum, todayInput, fmtOrder } from '../../utils/format.js';
 import { loadFailed } from '../../services/loadFailures.js';
 import { ExportButton } from '../../components/dataTransfer.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
@@ -140,7 +140,7 @@ export function PlanApprovalList() {
             <RecordSelect
               id="pa-f-order"
               options={orderOptions}
-              getLabel={(o) => o.orderNo}
+              getLabel={fmtOrder}
               placeholder="All orders"
               value={list.filters.orderId ?? ''}
               onChange={(e) => list.setFilter('orderId', e.target.value)}

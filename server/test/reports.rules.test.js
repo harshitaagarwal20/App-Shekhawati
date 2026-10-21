@@ -17,6 +17,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { REPORTS, catalogue, descriptorFor, toCsv } from '../src/services/report.service.js';
+import { DEFECT_STAGES, defectStagesFor, _internal as vendor } from '../src/services/reports.vendor.js';
 import { parseCsvRecords, toCsv as writeCsv } from '../src/utils/csv.js';
 
 const readRepoFile = (rel) =>
@@ -46,18 +47,36 @@ const EXPECTED = [
   'supplier-stock',
   'supplier-yield',
   'inward-inspection',
+  // Ironing: daily output by ironer and order, and the balance waiting.
+  'ironing-daily',
+  'ironing-balance',
+  // Phase 4: External QC by order / agency / reason, the Checker Report, the
+  // Alteration Unit's pending and summary, and the net pipeline.
+  'external-qc-by-order',
+  'external-qc-by-agency',
+  'external-qc-by-reason',
+  'checker-report',
+  'alteration-pending',
+  'alteration-summary',
+  'finishing-pipeline',
+  // Vendor performance: job workers' shrinkage and punctuality, suppliers'
+  // delivery against the PO date, and defect reasons across the QC stages.
+  'jobworker-performance',
+  'supplier-delivery',
+  'defect-reasons',
 ];
 
-/** Modules that do not exist in this system, and must not gain a report. */
+/**
+ * Modules that do not exist in this system, and must not gain a report.
+ * Phase 4 delivered External QC with its checker codes, the Alteration Unit
+ * and the Rejected Register, so "checker", "alter" and "rejected" left.
+ */
 const OUT_OF_SCOPE = [
   'stitching',
   'hourly',
   'qc-size',
   'qc-defect',
-  'checker',
-  'alter',
   'rectification',
-  'rejected',
   'packing',
   'needle',
   'dispatch',
@@ -106,6 +125,9 @@ describe('Reports - no report exists for an out-of-scope module', () => {
       'GATE_PASS', 'GRN', 'FABRIC_ROLL', 'INVENTORY', 'STOCK_LEDGER',
       'FABRIC_ISSUE', 'DYE_ISSUE', 'DYEING_RECEIPT', 'PRINTING',
       'FABRIC_SCRUTINY', 'PLAN_APPROVAL', 'CUTTING_ISSUE', 'REPORT',
+      'IRONING',
+      // Phase 4.
+      'EXTERNAL_QC', 'ALTERATION', 'REJECTED_REGISTER',
     ]);
 
     for (const [key, report] of Object.entries(REPORTS)) {
@@ -165,11 +187,12 @@ describe('Reports - the catalogue is filtered by permission', () => {
   });
 
   test('a user sees exactly the reports their permissions cover', () => {
-    // Somebody who can only see purchase orders gets the PO report and
-    // nothing else. (Pending PO approvals was removed: the Approvals queue
-    // already lists them.)
+    // Somebody who can only see purchase orders gets the PO reports and
+    // nothing else - the PO status and its suppliers' delivery against the
+    // PO date. (Pending PO approvals was removed: the Approvals queue already
+    // lists them.)
     const visible = catalogue((code) => code === 'PURCHASE_ORDER.VIEW').map((r) => r.key);
-    assert.deepEqual(visible.sort(), ['po-status']);
+    assert.deepEqual(visible.sort(), ['po-status', 'supplier-delivery']);
   });
 
   test('the catalogue carries the columns, so one screen can render any report', () => {
@@ -277,7 +300,9 @@ describe('Reports - the CSV agrees with the columns', () => {
  */
 describe('Reports - every date range filters a date column', () => {
   const schema = readRepoFile('../prisma/schema.prisma');
-  const source = readRepoFile('../src/services/report.service.js');
+  // The vendor reports are read too: they filter on three registers' dates.
+  const source =
+    readRepoFile('../src/services/report.service.js') + readRepoFile('../src/services/reports.vendor.js');
 
   /** Field name -> the set of column kinds the schema gives it. */
   const kindsByField = new Map();
@@ -336,5 +361,80 @@ describe('Reports - every date range filters a date column', () => {
           'its rows against the range they asked for',
       );
     }
+  });
+});
+
+/**
+ * Vendor performance - the on-time rule and the stage gating, with no
+ * database. The reports are only as fair as these two rules.
+ */
+describe('Vendor performance - what counts as on time', () => {
+  const { judge, newPunctuality, punctualityFigures } = vendor;
+  const day = (iso) => new Date(iso);
+  const NOW = day('2026-10-21');
+
+  test('done on or before the due date is on time; after it is late by whole days', () => {
+    const p = newPunctuality();
+    judge(p, day('2026-10-10'), day('2026-10-10'), NOW);
+    judge(p, day('2026-10-10'), day('2026-10-08'), NOW);
+    judge(p, day('2026-10-10'), day('2026-10-14'), NOW);
+    const f = punctualityFigures(p);
+    assert.equal(f.dueCount, 3);
+    assert.equal(f.onTimeCount, 2);
+    assert.equal(f.lateCount, 1);
+    assert.equal(f.onTimePct, '66.7%');
+    assert.equal(f.avgDaysLate, '4.0');
+  });
+
+  test('still not done after the due date counts against the rate, as overdue', () => {
+    // A lot that never comes back must not score better than one a day late.
+    const p = newPunctuality();
+    judge(p, day('2026-10-01'), null, NOW);
+    const f = punctualityFigures(p);
+    assert.equal(f.overdueCount, 1);
+    assert.equal(f.onTimePct, '0.0%');
+    assert.equal(f.worstDaysLate, 20);
+  });
+
+  test('not yet due and not yet done is left out of the rate', () => {
+    const p = newPunctuality();
+    judge(p, day('2026-11-01'), null, NOW);
+    const f = punctualityFigures(p);
+    assert.equal(f.dueCount, 0);
+    assert.equal(f.notYetDueCount, 1);
+    assert.equal(f.onTimePct, null, 'no rate rather than 0% or 100%');
+  });
+
+  test('no due date, no judgement', () => {
+    const p = newPunctuality();
+    judge(p, null, day('2026-10-01'), NOW);
+    assert.equal(punctualityFigures(p).dueCount, 0);
+  });
+});
+
+describe('Vendor performance - defect reasons show only the stages you may view', () => {
+  test('each stage names an in-scope register permission', () => {
+    for (const s of DEFECT_STAGES) assert.match(s.permission, /^[A-Z_]+\.VIEW$/, s.key);
+  });
+
+  test('a caller with no stage permission reads no stage', () => {
+    assert.deepEqual(defectStagesFor(() => false), []);
+    assert.deepEqual(defectStagesFor(undefined), [], 'no permission check handed in means nothing, not everything');
+  });
+
+  test('a QC user who sees External QC alone gets External QC alone', () => {
+    const got = defectStagesFor((c) => c === 'EXTERNAL_QC.VIEW').map((s) => s.key);
+    assert.deepEqual(got, ['EXTERNAL_QC']);
+  });
+
+  test('the stage filter narrows within what the caller may see, never beyond it', () => {
+    const all = () => true;
+    assert.deepEqual(defectStagesFor(all, 'INLINE_QC').map((s) => s.key), ['INLINE_QC']);
+    assert.deepEqual(defectStagesFor((c) => c === 'EXTERNAL_QC.VIEW', 'INLINE_QC'), []);
+  });
+
+  test('the report runs under a permission everyone with Reports holds, and gates inside', () => {
+    assert.equal(REPORTS['defect-reasons'].permission, 'REPORT.VIEW');
+    assert.ok(REPORTS['defect-reasons'].filters.includes('qcStage'));
   });
 });

@@ -2,6 +2,8 @@ import { Router } from 'express';
 import validate from '../middleware/validate.js';
 import * as c from '../controllers/notification.controller.js';
 import {
+  dailySummaryQuery,
+  dismissSchema,
   markReadSchema,
   notificationListQuery,
   preferencesSchema,
@@ -17,7 +19,9 @@ const router = Router();
 router.get('/', validate({ query: notificationListQuery }), c.list);
 router.get('/unread-count', c.unreadCount);
 router.post('/read', validate({ body: markReadSchema }), c.markRead);
+router.post('/dismiss', validate({ body: dismissSchema }), c.dismiss);
 router.get('/preferences', c.getPreferences);
 router.patch('/preferences', validate({ body: preferencesSchema }), c.setPreferences);
+router.get('/daily-summary', validate({ query: dailySummaryQuery }), c.dailySummaryPreview);
 
 export default router;

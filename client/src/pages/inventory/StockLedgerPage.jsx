@@ -37,7 +37,7 @@ import {
   Spinner,
   TextInput,
 } from '../../components/ui.jsx';
-import { fmtDate, fmtEnum, fmtNum } from '../../utils/format.js';
+import { fmtDate, fmtEnum, fmtNum, fmtOrder } from '../../utils/format.js';
 import { loadFailed } from '../../services/loadFailures.js';
 import { ExportButton } from '../../components/dataTransfer.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
@@ -161,7 +161,7 @@ export default function StockLedgerPage() {
           <RecordSelect
             id="led-f-order"
             options={orderOptions}
-            getLabel={(o) => o.orderNo}
+            getLabel={fmtOrder}
             placeholder="All orders"
             value={list.filters.orderId ?? ''}
             onChange={(e) => list.setFilter('orderId', e.target.value)}

@@ -2,15 +2,17 @@
 //  SHEKHAWATI IMPEX ERP - DATABASE SCHEMA
 //  Phase 0 - Foundation
 //
-//  Scope of the application (fixed):
+//  Scope of the application:
 //    Masters -> Buyer Order -> Planning -> Vendor Quotation -> Quotation
 //    Approval -> Purchase Order -> PO Approval -> Gate Pass -> GRN ->
 //    Inventory -> Fabric Issue -> Dyeing -> Printing -> Fabric Scrutiny ->
-//    Plan Approval -> Cutting Issue.
+//    Plan Approval -> Cutting Issue -> Stitching (with Hourly Monitoring,
+//    and printing after stitching) -> Ironing.
 //
-//  The application ENDS at Cutting Issue. No table in this schema models
-//  Stitching Record, Hourly Monitoring, QC Size, QC Defects, Internal Quality
-//  Check, Internal/Final Checker Report, Finished Checker, External Secondary
+//  Production Phase 2 added Stitching Record and Hourly Monitoring; Ironing
+//  followed, with pieces rejected there held as pending rejects. No table
+//  in this schema yet models QC Size, QC Defects, Internal Quality Check,
+//  Internal/Final Checker Report, Finished Checker, External Secondary
 //  Checking, Alter Report, Spot Rectification-Scrap, Rejected, Packing,
 //  Needle Checking, Dispatch or Reconciliation Report.
 //
@@ -425,10 +427,16 @@ model User {
   /// notifications always happen; these only add channels.
   notifyByEmail    Boolean @default(true) @map("notify_by_email")
   notifyByWhatsapp Boolean @default(false) @map("notify_by_whatsapp")
+  /// The evening summary of the day's work. Sent only to holders of
+  /// REPORT.SUMMARY; this is each person's own way to switch it off.
+  notifyDailySummary Boolean @default(true) @map("notify_daily_summary")
   /// International format, digits only after the plus - "919876543210".
   whatsappNumber   String? @map("whatsapp_number") @db.VarChar(20)
 
   notifications Notification[]
+
+  /// Phase 3 - Inline QC entries whose defects this person was told to act on.
+  inlineQcAssigned InlineQcEntry[] @relation("InlineQcInformTo")
 
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   createdById String?   @map("created_by_id") @db.Uuid
@@ -1125,17 +1133,19 @@ model Vendor {
   /// Pin code kept here because the "Dye issue" sheet prints it per vendor.
   pinCode String? @map("pin_code") @db.VarChar(12)
 
-  quotations     VendorQuotation[]
-  purchaseOrders PurchaseOrder[]
-  gatePasses     GatePass[]
-  grns           Grn[]
-  fabricRolls    FabricRoll[]
-  fabricIssues   FabricIssue[]
-  dyeIssues      DyeIssue[]
-  printings      Printing[]
+  quotations        VendorQuotation[]
+  purchaseOrders    PurchaseOrder[]
+  gatePasses        GatePass[]
+  grns              Grn[]
+  fabricRolls       FabricRoll[]
+  fabricIssues      FabricIssue[]
+  dyeIssues         DyeIssue[]
+  printings         Printing[]
+  /// Phase 4 - the inspections this agency carried out (category External QC).
+  externalQcEntries ExternalQcEntry[]
   /// C3 - vendor-specific shrinkage tolerances, where this job worker has been
   /// held to a number of its own.
-  shrinkageRules ShrinkageRule[]
+  shrinkageRules    ShrinkageRule[]
 
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   createdById String?   @map("created_by_id") @db.Uuid
@@ -1168,11 +1178,21 @@ model Employee {
   /// Excel: "Status" (Dropdown -> Active/Inactive)
   status      StatusActive @default(ACTIVE)
 
-  users             User[]
-  fabricIssues      FabricIssue[]
-  scrutinyChecks    FabricScrutiny[]
-  gatePasses        GatePass[]
-  cutPiecesReceipts CutPiecesReceipt[]
+  users                  User[]
+  fabricIssues           FabricIssue[]
+  scrutinyChecks         FabricScrutiny[]
+  gatePasses             GatePass[]
+  cutPiecesReceipts      CutPiecesReceipt[]
+  /// Phase 2 - the tailor's hourly counts.
+  hourlyEntries          HourlyMonitoringEntry[]
+  /// Ironing - the pieces this ironer pressed.
+  ironingEntries         IroningEntry[]
+  /// Phase 4 - the faulty pieces External QC traced to this checker's code.
+  externalQcCheckerLines ExternalQcCheckerLine[]
+  /// Phase 4 - the pieces this person altered or cleaned in the Alteration Unit.
+  alterationEntries      AlterationEntry[]
+  /// Phase 3 - Inline QC checks taken on this tailor's work.
+  inlineQcEntries        InlineQcEntry[]
 
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   createdById String?   @map("created_by_id") @db.Uuid
@@ -1234,6 +1254,10 @@ model Style {
   /// Nullable: most styles arrive without it, and 0 cartons of a bag is not a
   /// specification anybody means, so the column is > 0 or absent.
   qtyPerCarton              Int?         @map("qty_per_carton")
+  /// Phase 2 - pieces ONE tailor is expected to stitch in one hour on this
+  /// style. Hourly Monitoring paints a slot red when it comes in under this.
+  /// Optional: a style with no target is simply never highlighted.
+  hourlyTarget              Decimal?     @map("hourly_target") @db.Decimal(10, 2)
   /// Excel: "Image Ref" (Manual) - e.g. IMG/TR0751008.jpg
   imageRef                  String?      @map("image_ref") @db.VarChar(200)
   /// Excel: "Status" (Dropdown -> Active/Inactive)
@@ -1277,24 +1301,36 @@ model Style {
   /// The panels one finished bag is cut into. See StyleComponent.
   components StyleComponent[]
 
-  bomLines        StyleBomLine[]
+  bomLines                StyleBomLine[]
   /// FOB cost sheets, one per version. See model StyleCostSheet.
-  costSheets      StyleCostSheet[]
-  orders          BuyerOrder[]
-  fabricIssues    FabricIssue[]
-  printings       Printing[]
-  scrutinies      FabricScrutiny[]
-  cuttingIssues   CuttingIssue[]
-  purchaseOrders  PurchaseOrder[]
+  costSheets              StyleCostSheet[]
+  orders                  BuyerOrder[]
+  fabricIssues            FabricIssue[]
+  printings               Printing[]
+  scrutinies              FabricScrutiny[]
+  cuttingIssues           CuttingIssue[]
+  purchaseOrders          PurchaseOrder[]
   /// C5 - cutting requirements raised for this style.
-  cuttingChallans CuttingChallan[]
+  cuttingChallans         CuttingChallan[]
   /// C7 - plan approval versions raised style-number-wise.
-  planApprovals   PlanApproval[]
+  planApprovals           PlanApproval[]
   /// C12 - raw material plans priced off this style's BOM.
-  materialPlans   MaterialPlan[]
+  materialPlans           MaterialPlan[]
   /// C13 - the order lines that buy this style.
-  orderLines      BuyerOrderLine[]
-  plannings       Planning[]
+  orderLines              BuyerOrderLine[]
+  plannings               Planning[]
+  /// Phase 2 - stitching output and hourly counts on this style.
+  stitchingRecords        StitchingRecord[]
+  hourlyEntries           HourlyMonitoringEntry[]
+  ironingEntries          IroningEntry[]
+  pendingRejects          PendingReject[]
+  /// Phase 4 - External QC, the Alteration Unit and the Rejected Register.
+  externalQcEntries       ExternalQcEntry[]
+  alterationReceipts      AlterationReceipt[]
+  alterationEntries       AlterationEntry[]
+  /// Phase 3 - Inline QC checks taken on the stitching line.
+  inlineQcEntries         InlineQcEntry[]
+  rejectedRegisterEntries RejectedRegisterEntry[]
 
   createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
   createdById       String?            @map("created_by_id") @db.Uuid
@@ -1642,24 +1678,36 @@ model BuyerOrder {
 
   /// C13 - the styles this order is for, and how many pieces of each.
   /// THE AUTHORITY on what the order contains.
-  lines           BuyerOrderLine[]
-  plannings       Planning[]
-  quotations      VendorQuotation[]
-  purchaseOrders  PurchaseOrder[]
-  stockLedger     StockLedger[]
-  excessApprovals ExcessApproval[]
-  fabricIssues    FabricIssue[]
-  dyeIssues       DyeIssue[]
-  printings       Printing[]
-  scrutinies      FabricScrutiny[]
-  planApprovals   PlanApproval[]
-  cuttingIssues   CuttingIssue[]
+  lines                   BuyerOrderLine[]
+  plannings               Planning[]
+  quotations              VendorQuotation[]
+  purchaseOrders          PurchaseOrder[]
+  stockLedger             StockLedger[]
+  excessApprovals         ExcessApproval[]
+  fabricIssues            FabricIssue[]
+  dyeIssues               DyeIssue[]
+  printings               Printing[]
+  scrutinies              FabricScrutiny[]
+  planApprovals           PlanApproval[]
+  cuttingIssues           CuttingIssue[]
+  /// Phase 2 - stitching output and hourly counts against this order.
+  stitchingRecords        StitchingRecord[]
+  hourlyEntries           HourlyMonitoringEntry[]
+  ironingEntries          IroningEntry[]
+  pendingRejects          PendingReject[]
+  /// Phase 4 - External QC, the Alteration Unit and the Rejected Register.
+  externalQcEntries       ExternalQcEntry[]
+  alterationReceipts      AlterationReceipt[]
+  alterationEntries       AlterationEntry[]
+  /// Phase 3 - Inline QC checks taken on the stitching line.
+  inlineQcEntries         InlineQcEntry[]
+  rejectedRegisterEntries RejectedRegisterEntry[]
   /// C12 - the raw material plans raised against this order.
-  materialPlans   MaterialPlan[]
+  materialPlans           MaterialPlan[]
   /// C9 - the buyer's measurement sheets, held rather than referred to.
-  attachments     BuyerOrderAttachment[]
+  attachments             BuyerOrderAttachment[]
   /// Cost sheets priced for this particular order, if any.
-  costSheets      StyleCostSheet[]
+  costSheets              StyleCostSheet[]
 
   createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
   createdById       String?            @map("created_by_id") @db.Uuid
@@ -3336,8 +3384,8 @@ model FabricIssue {
   /// Printed on the challan, so a batch shares it like the date and remarks.
   deliveryDate DateTime? @map("delivery_date") @db.Date
 
-  dyeIssues     DyeIssue[]     @relation("JobWorkFirstIssue")
-  cuttingIssues CuttingIssue[]
+  dyeIssues         DyeIssue[]         @relation("JobWorkFirstIssue")
+  cuttingIssues     CuttingIssue[]
   /// The receipts that accounted for this issue's cloth on the cutting floor.
   cutPiecesReceipts CutPiecesReceipt[]
 
@@ -3388,9 +3436,9 @@ model DyeIssue {
   dyeIssueNo String @unique @map("dye_issue_no") @db.VarChar(40)
 
   /// Excel: "Date" (Auto)
-  issueDate    DateTime       @map("issue_date") @db.Date
+  issueDate DateTime       @map("issue_date") @db.Date
   /// Excel: "Process" (Manual -> L_Process): Dyeing / Printing / Washing / Finishing
-  process      JobWorkProcess
+  process   JobWorkProcess
   /// Excel: "Roll No" (Auto-Dropdown -> FabricRoll)
   ///
   /// C16: THE LEAD ROLL - line 1's roll, kept in step by the service.
@@ -3408,8 +3456,8 @@ model DyeIssue {
   /// ANYTHING DECIDING WHETHER A ROLL MAY BE SENT MUST READ `rolls`, NOT THIS.
   /// fabricIssue.assertJobWorkAuthorised() matches on the set, because a
   /// challan for the second roll of a job would otherwise find no authority.
-  rollId       String         @map("roll_id") @db.Uuid
-  roll         FabricRoll     @relation(fields: [rollId], references: [id], onDelete: Restrict)
+  rollId    String         @map("roll_id") @db.Uuid
+  roll      FabricRoll     @relation(fields: [rollId], references: [id], onDelete: Restrict)
 
   /// C16 - every roll this job covers. THE AUTHORITY on what may be sent.
   rolls        DyeIssueRoll[]
@@ -3732,6 +3780,18 @@ model Printing {
   qty          Decimal     @db.Decimal(18, 4)
   /// Excel: "UOM" (Dropdown -> L_UOM); Roll for pre-stitch, Pcs for post-stitch
   uom          String      @db.VarChar(20)
+  /// Phase 2 - "Pcs Received Back". What the printer has returned of `qty`.
+  /// qty - qtyReceived is OUT for printing: stitched, but not available to
+  /// any later stage until it comes back. Never more than `qty` (CHECK).
+  qtyReceived  Decimal     @default(0) @map("qty_received") @db.Decimal(18, 4)
+  /// The day the last pieces came back, when they have.
+  receivedDate DateTime?   @map("received_date") @db.Date
+  /// After stitching only: the stitching unit the pieces were sent from
+  /// (L_StitchingUnit). Pieces out for printing are held against THAT unit,
+  /// so ironing cannot receive them from it until they are back. Required on
+  /// every after-stitching row written since Ironing; null on older rows,
+  /// which are held against the order as a whole instead.
+  fromUnit     String?     @map("from_unit") @db.VarChar(80)
   /// Excel: "Remarks" (text)
   remarks      String?     @db.Text
 
@@ -4770,6 +4830,19 @@ model CuttingIssue {
 
   gatePasses GatePass[]
 
+  // --- RECEIVED BACK AT IRONING ----------------------------------------------
+  //
+  //  The stitched pieces of this challan as they arrive at ironing. DERIVED,
+  //  never typed: ironing.service.js recomputes both columns for the unit,
+  //  order and style after every ironing write, sharing what the unit has
+  //  sent to ironing across its challans oldest first. Nothing else on a
+  //  posted challan changes - the cut stays exactly as it was recorded.
+
+  /// Pieces of this challan received at ironing so far.
+  pcsReceivedAtIroning Decimal              @default(0) @map("pcs_received_at_ironing") @db.Decimal(18, 4)
+  /// Not received / Partially received / Closed.
+  ironingReceiptStatus IroningReceiptStatus @default(NOT_RECEIVED) @map("ironing_receipt_status")
+
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   createdById String?   @map("created_by_id") @db.Uuid
   updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
@@ -4789,6 +4862,716 @@ model CuttingIssue {
   @@index([inventoryItemId])
   @@index([deletedAt])
   @@map("cutting_issues")
+}
+
+// ===========================================================================
+//  PRODUCTION PHASE 2 - STITCHING AND HOURLY MONITORING
+// ===========================================================================
+
+/// EXCEL SHEET: "Stitching Record" - what a stitching unit stitched in a day.
+/// (Role Acess - Stitching Unit (Supervisor))
+///
+/// ONE ROW PER UNIT, DATE, ORDER AND STYLE. The supervisor states the day's
+/// output once; a second entry for the same day is an edit of this row, not a
+/// second row (partial unique index in the migration, live rows only).
+///
+/// THE CEILING. A unit can never have stitched more pieces of an order and
+/// style than the cutting issues POSTED to it carried. stitching.service.js
+/// checks the running total under an advisory lock on every write.
+///
+/// The workbook's sample row (10,000 / 900 / 100) does not add up. Remaining
+/// here is Deliverable - Actual, written by the server and held to it by a
+/// CHECK constraint. Negative means the unit stitched more than the day asked.
+model StitchingRecord {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// Excel: "Unit" (Auto from the supervisor's login; Dropdown for Admin)
+  /// -> L_StitchingUnit, the same value CuttingIssue.firmName carries.
+  unit       String     @db.VarChar(80)
+  /// Excel: "Date" (Auto)
+  recordDate DateTime   @map("record_date") @db.Date
+  /// Excel: "Order No" (Dropdown - orders with cutting issued to this unit)
+  orderId    String     @map("order_id") @db.Uuid
+  order      BuyerOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  /// Excel: "Style No" (Auto - from the cutting issued for the order)
+  styleId    String     @map("style_id") @db.Uuid
+  style      Style      @relation(fields: [styleId], references: [id], onDelete: Restrict)
+
+  /// Excel: "Deliverable Qty" (Auto from the plan schedule, editable)
+  deliverableQty      Decimal  @default(0) @map("deliverable_qty") @db.Decimal(18, 4)
+  /// What the approved stitching plan said for this unit and date when the
+  /// row was saved, so a typed-over target can be seen for what it is.
+  /// Null when no approved plan had a line for the day.
+  deliverableFromPlan Decimal? @map("deliverable_from_plan") @db.Decimal(18, 4)
+  /// Excel: "Actual Stitched" (Manual)
+  actualStitched      Decimal  @map("actual_stitched") @db.Decimal(18, 4)
+  /// Excel: "Remaining" (Auto) = deliverableQty - actualStitched. SERVER-CALCULATED.
+  remaining           Decimal  @db.Decimal(18, 4)
+  /// Excel: "Remarks" (Text)
+  remarks             String?  @db.Text
+
+  /// Who stated the count - stamped from the login, never typed.
+  recordedById   String? @map("recorded_by_id") @db.Uuid
+  recordedByName String? @map("recorded_by_name") @db.VarChar(120)
+
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdById String?   @map("created_by_id") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  updatedById String?   @map("updated_by_id") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
+  deletedById String?   @map("deleted_by_id") @db.Uuid
+
+  @@index([unit, orderId, styleId])
+  @@index([recordDate])
+  @@index([orderId])
+  @@index([styleId])
+  @@index([deletedAt])
+  @@map("stitching_records")
+}
+
+/// EXCEL SHEET: "Hourly Monitoring" - one tailor, one time slot, one count.
+///
+/// A CELL OF THE GRID, NOT A ROW OF IT. The supervisor fills one slot an hour,
+/// so each cell is saved on its own the moment it is typed and a half-filled
+/// day is the normal state of the table. Clearing a cell deletes its row (the
+/// audit trail keeps what it held), which is why this table carries no
+/// soft-delete columns and can use a plain unique key.
+///
+/// The slot is the text of a value in the HourlySlot master list ("10:00",
+/// "5:30"), so the time slots are configured on the Dropdown Lists screen.
+model HourlyMonitoringEntry {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// L_StitchingUnit - the unit the count was taken in.
+  unit         String     @db.VarChar(80)
+  /// Excel: "Date" (Auto)
+  entryDate    DateTime   @map("entry_date") @db.Date
+  orderId      String     @map("order_id") @db.Uuid
+  order        BuyerOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  styleId      String     @map("style_id") @db.Uuid
+  style        Style      @relation(fields: [styleId], references: [id], onDelete: Restrict)
+  /// Excel: "Emp ID" (from the Employee Master) - the tailor.
+  employeeId   String     @map("employee_id") @db.Uuid
+  employee     Employee   @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  /// L_HourlySlot - "10:00", "11:00" ... "6:30".
+  slot         String     @db.VarChar(20)
+  /// Pieces this tailor stitched in this slot.
+  pcs          Decimal    @db.Decimal(18, 4)
+  /// The style's hourly target when the cell was saved, frozen so a later
+  /// change to the style does not repaint last month's grid.
+  hourlyTarget Decimal?   @map("hourly_target") @db.Decimal(10, 2)
+
+  recordedById   String? @map("recorded_by_id") @db.Uuid
+  recordedByName String? @map("recorded_by_name") @db.VarChar(120)
+
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdById String?  @map("created_by_id") @db.Uuid
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  updatedById String?  @map("updated_by_id") @db.Uuid
+
+  @@unique([entryDate, orderId, styleId, employeeId, slot], name: "hourly_cell")
+  @@index([unit, entryDate])
+  @@index([orderId])
+  @@index([styleId])
+  @@index([employeeId])
+  @@map("hourly_monitoring_entries")
+}
+
+// ===========================================================================
+//  IRONING - after stitching, before final QC
+// ===========================================================================
+
+/// How far a cutting challan's pieces have come back, stitched, to ironing.
+enum IroningReceiptStatus {
+  NOT_RECEIVED
+  PARTIALLY_RECEIVED
+  CLOSED
+}
+
+/// A pending reject was held here until the Alteration Unit existed to take
+/// it. Phase 4 converted every PENDING one into an AlterationReceipt; nothing
+/// writes this table any more.
+enum PendingRejectStatus {
+  PENDING
+  /// Taken into the Alteration Unit as a bag (see AlterationReceipt).
+  TRANSFERRED
+  /// The ironing entry it came from was deleted or corrected.
+  CANCELLED
+}
+
+/// EXCEL SHEET: none - Ironing.
+///
+/// A MOVEMENT, NOT A DAY. One row says what happened at the ironing table for
+/// one order and style from one stitching unit: pieces received from the unit,
+/// pieces ironed, pieces damaged. Any of the three may be zero - a delivery
+/// with nothing ironed yet is a row; a morning's ironing of yesterday's pieces
+/// is another. The balance is the running sum, per unit, order and style:
+///
+///     balance = received - ironed - damaged + re-ironed
+///
+/// A DAMAGED PIECE IS DECIDED ONE OF TWO WAYS. Re-iron puts it back in the
+/// balance to be ironed again; Rejected sends it to the Alteration Unit as a
+/// bag with reason "Ironing damage". Damage not yet decided is
+/// pcsDamaged - pcsReIroned - pcsRejected, and the screens keep asking.
+///
+/// PHASE 4 - WHERE THE PIECES CAME FROM (source). A stitching unit, as before;
+/// or back from External QC with reason "Iron" (RE_IRON); or altered in the
+/// Alteration Unit (ALTERATION_UNIT). Only the first names a unit. Each source
+/// is its own lane with its own balance, so a piece is never received twice.
+model IroningEntry {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// "Date" (Auto)
+  entryDate DateTime      @map("entry_date") @db.Date
+  /// "Order No" (Dropdown) and "Style" (Auto)
+  orderId   String        @map("order_id") @db.Uuid
+  order     BuyerOrder    @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  styleId   String        @map("style_id") @db.Uuid
+  style     Style         @relation(fields: [styleId], references: [id], onDelete: Restrict)
+  /// "Source" (Dropdown) - stitching unit, re-iron from External QC, or the
+  /// Alteration Unit.
+  source    IroningSource @default(STITCHING_UNIT)
+  /// "From Unit" (Dropdown -> L_StitchingUnit) - where the pieces were stitched.
+  /// Set exactly when source is STITCHING_UNIT (a CHECK holds it).
+  fromUnit  String?       @map("from_unit") @db.VarChar(80)
+  /// "Ironer" (Dropdown -> employees with Designation "Ironer"). Required when
+  /// anything was ironed or damaged; a delivery alone needs no ironer.
+  ironerId  String?       @map("ironer_id") @db.Uuid
+  ironer    Employee?     @relation(fields: [ironerId], references: [id], onDelete: Restrict)
+
+  /// "Pcs Received for Ironing" (Manual)
+  pcsReceived Decimal @default(0) @map("pcs_received") @db.Decimal(18, 4)
+  /// "Pcs Ironed" (Manual)
+  pcsIroned   Decimal @default(0) @map("pcs_ironed") @db.Decimal(18, 4)
+  /// "Pcs Damaged in Ironing" (Manual)
+  pcsDamaged  Decimal @default(0) @map("pcs_damaged") @db.Decimal(18, 4)
+  /// "Damage Type" (Dropdown -> L_IroningDamage). Required when damaged > 0.
+  damageType  String? @map("damage_type") @db.VarChar(60)
+  /// Of pcsDamaged: decided "Re-iron" - back into the balance.
+  pcsReIroned Decimal @default(0) @map("pcs_re_ironed") @db.Decimal(18, 4)
+  /// Of pcsDamaged: decided "Rejected" - sent to the Alteration Unit, see
+  /// alterationReceipt.
+  pcsRejected Decimal @default(0) @map("pcs_rejected") @db.Decimal(18, 4)
+  /// "Remarks" (Text)
+  remarks     String? @db.Text
+
+  /// Before Phase 4: the reject this entry's rejected pieces raised. History.
+  pendingReject     PendingReject?
+  /// The bag this entry's rejected pieces went to the Alteration Unit in. One
+  /// per entry, its qty kept equal to pcsRejected.
+  alterationReceipt AlterationReceipt?
+
+  recordedById   String? @map("recorded_by_id") @db.Uuid
+  recordedByName String? @map("recorded_by_name") @db.VarChar(120)
+
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdById String?   @map("created_by_id") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  updatedById String?   @map("updated_by_id") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
+  deletedById String?   @map("deleted_by_id") @db.Uuid
+
+  @@index([fromUnit, orderId, styleId])
+  @@index([source, orderId, styleId])
+  @@index([entryDate])
+  @@index([orderId])
+  @@index([styleId])
+  @@index([ironerId])
+  @@index([deletedAt])
+  @@map("ironing_entries")
+}
+
+/// Where the pieces at the ironing table came from.
+enum IroningSource {
+  /// Stitched, from the unit named in fromUnit.
+  STITCHING_UNIT
+  /// "Re-iron": sent back by External QC with reason "Iron".
+  RE_IRON
+  /// "From Alteration Unit": altered or cleaned, on their way back to External QC.
+  ALTERATION_UNIT
+}
+
+/// Pieces rejected at ironing before the Alteration Unit existed to take them.
+///
+/// Phase 4 moved every PENDING row into the Alteration Unit as a bag (status
+/// TRANSFERRED, alterationReceipt points back here) rather than re-keying it
+/// from memory. Ironing now sends its rejects straight to the Alteration Unit,
+/// so this table is history.
+model PendingReject {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// Where the reject came from. "IRONING" is the only source so far.
+  source         String        @db.VarChar(30)
+  ironingEntryId String?       @unique @map("ironing_entry_id") @db.Uuid
+  ironingEntry   IroningEntry? @relation(fields: [ironingEntryId], references: [id], onDelete: Restrict)
+
+  orderId    String              @map("order_id") @db.Uuid
+  order      BuyerOrder          @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  styleId    String              @map("style_id") @db.Uuid
+  style      Style               @relation(fields: [styleId], references: [id], onDelete: Restrict)
+  /// The stitching unit the pieces came from.
+  unit       String              @db.VarChar(80)
+  qty        Decimal             @db.Decimal(18, 4)
+  /// "Ironing damage"
+  reason     String              @db.VarChar(120)
+  /// The damage type, from the ironing entry.
+  defectType String?             @map("defect_type") @db.VarChar(60)
+  status     PendingRejectStatus @default(PENDING)
+
+  /// The Alteration Unit bag this reject was converted into.
+  alterationReceipt AlterationReceipt?
+
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdById String?  @map("created_by_id") @db.Uuid
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  updatedById String?  @map("updated_by_id") @db.Uuid
+
+  @@index([status])
+  @@index([orderId])
+  @@map("pending_rejects")
+}
+
+// ===========================================================================
+//  PHASE 4 - EXTERNAL QC, THE ALTERATION UNIT, THE REJECTED REGISTER
+// ===========================================================================
+//
+//  After ironing, an external agency checks the pieces. Every piece it is
+//  offered lands in exactly one of three boxes, and every piece in the two
+//  faulty boxes carries exactly one reason:
+//
+//      Approved      -> waits for Humidity Checking (Phase 5)
+//      reason Iron   -> back to Ironing, source Re-iron
+//      any other     -> the Alteration Unit, as a bag  (never a stitching unit)
+//
+//  The Alteration Unit works each bag: altered or cleaned pieces go back to
+//  Ironing (source From Alteration Unit) and through External QC again; pieces
+//  it cannot repair go into the Rejected Register with the bag's reason.
+//
+//  Every stage balance is net - see services/finishingFlow.service.js.
+// ===========================================================================
+
+/// EXCEL SHEET: none - External QC (secondary check by an external agency).
+///
+/// One inspection of one order and style: the pieces offered and the three
+/// boxes they were sorted into, each faulty box broken down by reason.
+/// CHECK constraints hold the arithmetic:
+///
+///     approved + alteration + rejected = offered
+///     alt_alter + alt_iron + alt_defected + alt_spoiled + alt_other = alteration
+///     rej_alter + rej_iron + rej_defected + rej_spoiled + rej_other = rejected
+model ExternalQcEntry {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// "Date" (Auto)
+  entryDate     DateTime   @map("entry_date") @db.Date
+  /// "Order No" (Dropdown) and "Style" (Auto)
+  orderId       String     @map("order_id") @db.Uuid
+  order         BuyerOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  styleId       String     @map("style_id") @db.Uuid
+  style         Style      @relation(fields: [styleId], references: [id], onDelete: Restrict)
+  /// "Agency" (Dropdown -> Vendor Master, category External QC)
+  agencyId      String     @map("agency_id") @db.Uuid
+  agency        Vendor     @relation(fields: [agencyId], references: [id], onDelete: Restrict)
+  /// "Inspector" (Manual) - the agency's person at the table.
+  inspectorName String?    @map("inspector_name") @db.VarChar(120)
+
+  /// "Pcs Offered" (Manual) - never more than the order's net ironed qty.
+  pcsOffered    Decimal @map("pcs_offered") @db.Decimal(18, 4)
+  /// "Approved" (Manual)
+  pcsApproved   Decimal @default(0) @map("pcs_approved") @db.Decimal(18, 4)
+  /// "Alteration" (Manual)
+  pcsAlteration Decimal @default(0) @map("pcs_alteration") @db.Decimal(18, 4)
+  /// "Rejected" (Manual)
+  pcsRejected   Decimal @default(0) @map("pcs_rejected") @db.Decimal(18, 4)
+
+  /// The Alteration box, by reason.
+  altAlter    Decimal @default(0) @map("alt_alter") @db.Decimal(18, 4)
+  altIron     Decimal @default(0) @map("alt_iron") @db.Decimal(18, 4)
+  altDefected Decimal @default(0) @map("alt_defected") @db.Decimal(18, 4)
+  altSpoiled  Decimal @default(0) @map("alt_spoiled") @db.Decimal(18, 4)
+  altOther    Decimal @default(0) @map("alt_other") @db.Decimal(18, 4)
+  /// The Rejected box, by reason.
+  rejAlter    Decimal @default(0) @map("rej_alter") @db.Decimal(18, 4)
+  rejIron     Decimal @default(0) @map("rej_iron") @db.Decimal(18, 4)
+  rejDefected Decimal @default(0) @map("rej_defected") @db.Decimal(18, 4)
+  rejSpoiled  Decimal @default(0) @map("rej_spoiled") @db.Decimal(18, 4)
+  rejOther    Decimal @default(0) @map("rej_other") @db.Decimal(18, 4)
+
+  /// "Remarks" (Text)
+  remarks String? @db.Text
+
+  /// "Checker Code(s) responsible" (optional)
+  checkers    ExternalQcCheckerLine[]
+  /// "Inspection report" (optional) - photos or PDFs.
+  attachments ExternalQcAttachment[]
+  /// The bags this inspection sent to the Alteration Unit.
+  bags        AlterationReceipt[]
+
+  recordedById   String? @map("recorded_by_id") @db.Uuid
+  recordedByName String? @map("recorded_by_name") @db.VarChar(120)
+
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdById String?   @map("created_by_id") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  updatedById String?   @map("updated_by_id") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
+  deletedById String?   @map("deleted_by_id") @db.Uuid
+
+  @@index([orderId, styleId])
+  @@index([entryDate])
+  @@index([agencyId])
+  @@index([deletedAt])
+  @@map("external_qc_entries")
+}
+
+/// One checker code an External QC entry traced faulty pieces to - the
+/// number marked on the bag. Free text, because it is read off a bag; when it
+/// matches a Checker on the Employee Master (Emp ID) that employee is linked.
+model ExternalQcCheckerLine {
+  id String @id @default(uuid()) @db.Uuid
+
+  entryId     String          @map("entry_id") @db.Uuid
+  entry       ExternalQcEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  /// As written on the bag, trimmed and upper-cased.
+  checkerCode String          @map("checker_code") @db.VarChar(30)
+  employeeId  String?         @map("employee_id") @db.Uuid
+  employee    Employee?       @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  /// Faulty pieces (alteration + rejected) traced to this code.
+  pcs         Decimal         @db.Decimal(18, 4)
+
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdById String?  @map("created_by_id") @db.Uuid
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  updatedById String?  @map("updated_by_id") @db.Uuid
+
+  @@unique([entryId, checkerCode])
+  @@index([checkerCode])
+  @@index([employeeId])
+  @@map("external_qc_checker_lines")
+}
+
+/// The agency's inspection report - a photo or a PDF. The bytes are selected
+/// by exactly one read; see externalQc.service.js. Not audited: the trail
+/// would store every file a second time.
+model ExternalQcAttachment {
+  id String @id @default(uuid()) @db.Uuid
+
+  entryId   String          @map("entry_id") @db.Uuid
+  entry     ExternalQcEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  fileName  String          @map("file_name") @db.VarChar(255)
+  mimeType  String          @map("mime_type") @db.VarChar(120)
+  sizeBytes Int             @map("size_bytes")
+  data      Bytes
+
+  uploadedById   String? @map("uploaded_by_id") @db.Uuid
+  uploadedByName String? @map("uploaded_by_name") @db.VarChar(120)
+
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
+  deletedById String?   @map("deleted_by_id") @db.Uuid
+
+  @@index([entryId])
+  @@map("external_qc_attachments")
+}
+
+/// Which box of an External QC entry a bag came out of.
+enum QcBox {
+  ALTERATION
+  REJECTED
+}
+
+/// Where a bag in the Alteration Unit came from.
+enum AlterationSource {
+  /// The Alteration or Rejected box of an External QC entry.
+  EXTERNAL_QC
+  /// Rejected at the ironing table by the finishing supervisor (internal).
+  IRONING
+}
+
+/// Kept by the service from the bag's own figures, for the pending list.
+enum AlterationBagStatus {
+  /// Pieces still to be worked.
+  OPEN
+  /// Every piece altered or found not repairable.
+  CLOSED
+  /// Its source was corrected to nothing before any of it was worked.
+  CANCELLED
+}
+
+/// A BAG IN THE ALTERATION UNIT: pieces of one order and style, sent for one
+/// reason, from one place. Never typed in - each is kept equal to the figure
+/// on the entry that sent it:
+///
+///   EXTERNAL_QC  one bag per box and reason other than Iron (Alter,
+///                Defected, Spoiled, Other) on an External QC entry
+///   IRONING      one bag per ironing entry: its rejected pieces
+///
+/// pcsAltered and pcsNotRepairable are the sums of the AlterationEntries
+/// against the bag, rewritten on every change; a CHECK keeps them within qty.
+model AlterationReceipt {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// The day the bag was sent - the date of the entry that sent it.
+  receivedDate DateTime         @map("received_date") @db.Date
+  source       AlterationSource
+
+  externalQcEntryId String?          @map("external_qc_entry_id") @db.Uuid
+  externalQcEntry   ExternalQcEntry? @relation(fields: [externalQcEntryId], references: [id], onDelete: Restrict)
+  box               QcBox?
+  ironingEntryId    String?          @unique @map("ironing_entry_id") @db.Uuid
+  ironingEntry      IroningEntry?    @relation(fields: [ironingEntryId], references: [id], onDelete: Restrict)
+  /// Set on the bags Phase 4 converted from Phase 3's pending rejects.
+  pendingRejectId   String?          @unique @map("pending_reject_id") @db.Uuid
+  pendingReject     PendingReject?   @relation(fields: [pendingRejectId], references: [id], onDelete: Restrict)
+
+  orderId String     @map("order_id") @db.Uuid
+  order   BuyerOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  styleId String     @map("style_id") @db.Uuid
+  style   Style      @relation(fields: [styleId], references: [id], onDelete: Restrict)
+  /// The stitching unit, when the bag came from ironing and that is known.
+  unit    String?    @db.VarChar(80)
+
+  /// Alter / Defected / Spoiled / Other, or "Ironing damage". Carried into
+  /// the Rejected Register for any piece that cannot be repaired.
+  reason     String  @db.VarChar(60)
+  /// The ironing damage type, for a bag from ironing.
+  defectType String? @map("defect_type") @db.VarChar(60)
+
+  qty              Decimal             @db.Decimal(18, 4)
+  pcsAltered       Decimal             @default(0) @map("pcs_altered") @db.Decimal(18, 4)
+  pcsNotRepairable Decimal             @default(0) @map("pcs_not_repairable") @db.Decimal(18, 4)
+  status           AlterationBagStatus @default(OPEN)
+
+  entries  AlterationEntry[]
+  rejected RejectedRegisterEntry[]
+
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdById String?  @map("created_by_id") @db.Uuid
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  updatedById String?  @map("updated_by_id") @db.Uuid
+
+  @@unique([externalQcEntryId, box, reason])
+  @@index([orderId, styleId])
+  @@index([status])
+  @@index([receivedDate])
+  @@map("alteration_receipts")
+}
+
+/// EXCEL SHEET: none - Alteration Unit.
+///
+/// What the unit did with one bag on one day: pieces altered or cleaned (back
+/// to ironing), and pieces it could not repair (to the Rejected Register).
+/// Across a bag's entries, altered + not repairable never exceed the bag.
+model AlterationEntry {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// "Date" (Auto)
+  entryDate DateTime          @map("entry_date") @db.Date
+  receiptId String            @map("receipt_id") @db.Uuid
+  receipt   AlterationReceipt @relation(fields: [receiptId], references: [id], onDelete: Restrict)
+  /// "Order No" and "Style" (Auto) - the bag's.
+  orderId   String            @map("order_id") @db.Uuid
+  order     BuyerOrder        @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  styleId   String            @map("style_id") @db.Uuid
+  style     Style             @relation(fields: [styleId], references: [id], onDelete: Restrict)
+
+  /// "Pcs Altered / Cleaned" (Manual)
+  pcsAltered          Decimal  @default(0) @map("pcs_altered") @db.Decimal(18, 4)
+  /// "Pcs Not Repairable" (Manual)
+  pcsNotRepairable    Decimal  @default(0) @map("pcs_not_repairable") @db.Decimal(18, 4)
+  /// Why they cannot be repaired. Required when pcsNotRepairable > 0.
+  notRepairableReason String?  @map("not_repairable_reason") @db.VarChar(200)
+  /// "Alteration Staff" (Dropdown -> employees in Department Alteration)
+  staffId             String   @map("staff_id") @db.Uuid
+  staff               Employee @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  /// "Remarks" (Text)
+  remarks             String?  @db.Text
+
+  /// The Rejected Register row this entry's not-repairable pieces made.
+  rejected RejectedRegisterEntry?
+
+  recordedById   String? @map("recorded_by_id") @db.Uuid
+  recordedByName String? @map("recorded_by_name") @db.VarChar(120)
+
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdById String?   @map("created_by_id") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  updatedById String?   @map("updated_by_id") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
+  deletedById String?   @map("deleted_by_id") @db.Uuid
+
+  @@index([receiptId])
+  @@index([orderId, styleId])
+  @@index([entryDate])
+  @@index([staffId])
+  @@index([deletedAt])
+  @@map("alteration_entries")
+}
+
+/// The stage of the floor a piece was finally rejected at.
+enum RejectStage {
+  ALTERATION_UNIT
+}
+
+/// THE REJECTED REGISTER - pieces out of the order for good.
+///
+/// Written only by the service that owns the stage, never typed in: today
+/// that is the Alteration Unit, one row per entry with pieces not repairable,
+/// its qty kept equal to the entry's. The reason is the bag's original reason
+/// (Defected, Spoiled, Ironing damage ...), not the alteration staff's note,
+/// which is kept beside it.
+model RejectedRegisterEntry {
+  id String @id @default(uuid()) @db.Uuid
+
+  rejectDate DateTime    @map("reject_date") @db.Date
+  stage      RejectStage
+
+  orderId String     @map("order_id") @db.Uuid
+  order   BuyerOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  styleId String     @map("style_id") @db.Uuid
+  style   Style      @relation(fields: [styleId], references: [id], onDelete: Restrict)
+  /// The stitching unit, when known.
+  unit    String?    @db.VarChar(80)
+
+  qty                 Decimal          @db.Decimal(18, 4)
+  /// The original reason the piece left the line.
+  reason              String           @db.VarChar(60)
+  defectType          String?          @map("defect_type") @db.VarChar(60)
+  /// Where the bag came from before the stage that rejected it.
+  origin              AlterationSource
+  notRepairableReason String?          @map("not_repairable_reason") @db.VarChar(200)
+
+  alterationEntryId   String?            @unique @map("alteration_entry_id") @db.Uuid
+  alterationEntry     AlterationEntry?   @relation(fields: [alterationEntryId], references: [id], onDelete: Restrict)
+  alterationReceiptId String?            @map("alteration_receipt_id") @db.Uuid
+  alterationReceipt   AlterationReceipt? @relation(fields: [alterationReceiptId], references: [id], onDelete: Restrict)
+
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdById String?   @map("created_by_id") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  updatedById String?   @map("updated_by_id") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
+  deletedById String?   @map("deleted_by_id") @db.Uuid
+
+  @@index([orderId, styleId])
+  @@index([rejectDate])
+  @@index([stage])
+  @@index([deletedAt])
+  @@map("rejected_register_entries")
+}
+
+// ===========================================================================
+//  PHASE 3 - INLINE QC
+//
+//  The workbook's "QC Size" and "QC Defects" sheets (Role Acess - QC Dept
+//  (Checker)), kept as one register with a Check Type: the two sheets carry
+//  the same row bar Operation and Size, which only a Size check has.
+//
+//  It runs beside stitching, not after it: a checker walks the line while the
+//  tailors work, so an entry draws on the cutting posted to the tailor's unit
+//  and moves no pieces. What it produces is the Action needed list - every
+//  defect found goes to the person named in Inform To, who marks it Resolved.
+// ===========================================================================
+
+enum InlineQcCheckType {
+  /// "QC Size" - Operation and Size measurement are given.
+  SIZE
+  /// "QC Defects" - workmanship; no operation or size.
+  WORKMANSHIP
+}
+
+enum InlineQcDefectStatus {
+  OPEN
+  RESOLVED
+}
+
+/// One check on one tailor's work. See inlineQc.service.js.
+model InlineQcEntry {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// "Date" (Auto) - today, may be moved back, never forward.
+  entryDate DateTime          @map("entry_date") @db.Date
+  /// Size or Workmanship - which of the two workbook sheets this row is.
+  checkType InlineQcCheckType @map("check_type")
+
+  /// "Tailor Name" (Dropdown -> Employee Master, Designation Tailor)
+  tailorId String   @map("tailor_id") @db.Uuid
+  tailor   Employee @relation(fields: [tailorId], references: [id], onDelete: Restrict)
+  /// "Unit" (Auto) - the tailor's Unit / Line when the check was taken.
+  unit     String   @db.VarChar(80)
+
+  /// "Order No" (Dropdown) - orders with cutting posted to the unit.
+  orderId String     @map("order_id") @db.Uuid
+  order   BuyerOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  /// "Style No" (Dropdown) - the order's styles cut for the unit.
+  styleId String     @map("style_id") @db.Uuid
+  style   Style      @relation(fields: [styleId], references: [id], onDelete: Restrict)
+
+  /// "Operation" (Dropdown -> L_Operation). Size checks only.
+  operation       String? @db.VarChar(60)
+  /// "Size" (Manual). Size checks only - "Free Size", "32 cm".
+  sizeMeasurement String? @map("size_measurement") @db.VarChar(60)
+
+  /// "Pcs Checked" (Manual)
+  pcsChecked  Decimal @map("pcs_checked") @db.Decimal(18, 4)
+  /// "Pcs Rejected" (Manual) - never more than checked.
+  pcsRejected Decimal @default(0) @map("pcs_rejected") @db.Decimal(18, 4)
+
+  /// "Defects Found" (Dropdown -> L_DefectType, several)
+  defects InlineQcDefect[]
+
+  /// "Inform To" (Dropdown) - a login holding INLINE_QC.RESOLVE. Required
+  /// when a defect is found: it is who the defects go to.
+  informToUserId String? @map("inform_to_user_id") @db.Uuid
+  informTo       User?   @relation("InlineQcInformTo", fields: [informToUserId], references: [id], onDelete: Restrict)
+  informToName   String? @map("inform_to_name") @db.VarChar(120)
+
+  remarks String? @db.Text
+
+  recordedById   String? @map("recorded_by_id") @db.Uuid
+  recordedByName String? @map("recorded_by_name") @db.VarChar(120)
+
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdById String?   @map("created_by_id") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  updatedById String?   @map("updated_by_id") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
+  deletedById String?   @map("deleted_by_id") @db.Uuid
+
+  @@index([entryDate])
+  @@index([unit, entryDate])
+  @@index([orderId, styleId])
+  @@index([tailorId])
+  @@index([informToUserId])
+  @@index([deletedAt])
+  @@map("inline_qc_entries")
+}
+
+/// One defect found on a check - one line on the Inform To person's Action
+/// needed list until they mark it Resolved.
+model InlineQcDefect {
+  id String @id @default(uuid()) @db.Uuid
+
+  entryId String        @map("entry_id") @db.Uuid
+  entry   InlineQcEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  /// A value of the Defect Type list.
+  defect  String        @db.VarChar(120)
+
+  status         InlineQcDefectStatus @default(OPEN)
+  resolvedAt     DateTime?            @map("resolved_at") @db.Timestamptz(3)
+  resolvedById   String?              @map("resolved_by_id") @db.Uuid
+  resolvedByName String?              @map("resolved_by_name") @db.VarChar(120)
+  /// What was done about it, in the resolver's words. Optional.
+  resolutionNote String?              @map("resolution_note") @db.VarChar(500)
+
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdById String?  @map("created_by_id") @db.Uuid
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  updatedById String?  @map("updated_by_id") @db.Uuid
+
+  @@unique([entryId, defect])
+  @@index([status])
+  @@map("inline_qc_defects")
 }
 
 // ===========================================================================
@@ -4829,6 +5612,10 @@ model Notification {
   dedupeKey String? @map("dedupe_key") @db.VarChar(200)
 
   readAt DateTime? @map("read_at") @db.Timestamptz(3)
+
+  /// Cleared from the bell by its owner. The row stays, so the dedupeKey
+  /// still stops a replayed event from bringing it back.
+  dismissedAt DateTime? @map("dismissed_at") @db.Timestamptz(3)
 
   /// PENDING -> SENT | FAILED, or SKIPPED when the channel is not configured
   /// or the person has not asked for it.

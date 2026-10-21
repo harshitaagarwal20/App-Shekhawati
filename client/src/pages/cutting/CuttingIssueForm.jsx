@@ -64,7 +64,7 @@ import {
   QtyStepper,
 } from '../../components/mobile.jsx';
 import { ExcessPanel } from '../../components/workflow.jsx';
-import { Field, PageHeader, TextArea, TextInput } from '../../components/ui.jsx';
+import { CollapsibleField, Field, MasterSelect, PageHeader, TextArea, TextInput } from '../../components/ui.jsx';
 import { fmtNum, todayInput } from '../../utils/format.js';
 import { loadFailed } from '../../services/loadFailures.js';
 
@@ -86,6 +86,13 @@ export default function CuttingIssueForm() {
   const [cuttingPcsDamaged, setCuttingPcsDamaged] = useState('');
   const [handleIssued, setHandleIssued] = useState('');
   const [remarks, setRemarks] = useState('');
+  /*
+   * The stitching unit the pieces go to. Required: Stitching, Hourly
+   * Monitoring and Inline QC each list only the orders cut FOR their unit
+   * (CuttingIssue.firmName), so a challan posted with no unit sent its pieces
+   * nowhere any later screen could find them.
+   */
+  const [firmName, setFirmName] = useState('');
 
   // No fabric quantities here: the cloth the pieces were cut from is accounted
   // for on the Cut Pieces Receipt, where they were counted in. This challan
@@ -219,6 +226,7 @@ export default function CuttingIssueForm() {
         planApprovalId: approvalId || null,
         fabricIssueId: fabricIssueId || null,
         containerNo: containerNo || null,
+        firmName,
         plannedCutting: preview?.context.plannedCuttingPcs ?? undefined,
         cuttingPcsIssued: String(cuttingPcs),
         cuttingPcsDamaged: String(cuttingPcsDamaged || 0),
@@ -238,7 +246,7 @@ export default function CuttingIssueForm() {
   }
 
   const ctx = preview?.context;
-  const ready = preview?.canPost && Number(cuttingPcs) > 0;
+  const ready = preview?.canPost && Number(cuttingPcs) > 0 && Boolean(firmName);
   const readyPcs = pieces ? Math.max(0, Number(pieces.pcsReadyToIssue ?? 0)) : null;
   const handles = perBag
     ? fmtNum(Number(cuttingPcs || 0) * perBag.handlesPerBag)
@@ -251,7 +259,9 @@ export default function CuttingIssueForm() {
       ? 'Choose the approved plan.'
       : !(Number(cuttingPcs) > 0)
         ? 'Enter the pieces going to stitching.'
-        : preview && !preview.canPost
+        : !firmName
+          ? 'Choose the stitching unit the pieces go to.'
+          : preview && !preview.canPost
           ? `${preview.failures.length} check${preview.failures.length === 1 ? '' : 's'} not passed - see above.`
           : null;
 
@@ -424,7 +434,7 @@ export default function CuttingIssueForm() {
             open={step === 4 && Boolean(approvalId)}
             done={Number(cuttingPcs) > 0}
             onReopen={() => setStep(4)}
-            summary={`${fmtNum(cuttingPcs)} pcs to stitching`}
+            summary={`${fmtNum(cuttingPcs)} pcs to ${firmName || 'stitching'}`}
           >
             {/* Typed only when the approval does not carry one. Otherwise it is
                 the approval's and is shown, not edited. */}
@@ -433,6 +443,16 @@ export default function CuttingIssueForm() {
                 <TextInput value={containerNo} onChange={(e) => setContainerNo(e.target.value)} />
               </Field>
             )}
+
+            <Field label="Stitching unit" required hint="The unit these pieces go to. Its Stitching screen lists only what was cut for it.">
+              <MasterSelect
+                listCode="StitchingUnit"
+                value={firmName}
+                currentValue={firmName}
+                onChange={(e) => setFirmName(e.target.value)}
+                placeholder="Choose the receiving unit..."
+              />
+            </Field>
 
             <QtyStepper
               id="ci-pcs"
@@ -485,9 +505,11 @@ export default function CuttingIssueForm() {
               )}
             </div>
 
-            <Field label="Remarks">
-              <TextArea rows={2} value={remarks} onChange={(e) => setRemarks(e.target.value)} />
-            </Field>
+            <CollapsibleField>
+              <Field label="Remarks">
+                <TextArea rows={2} value={remarks} onChange={(e) => setRemarks(e.target.value)} />
+              </Field>
+            </CollapsibleField>
           </FloorStep>
         </div>
 
@@ -547,6 +569,7 @@ export default function CuttingIssueForm() {
         lines={[
           { label: 'Order', value: ctx?.orderNo },
           { label: 'Style', value: ctx?.styleNo },
+          { label: 'Stitching unit', value: firmName },
           { label: 'Pieces', value: fmtNum(cuttingPcs) },
           { label: 'Damaged', value: cuttingPcsDamaged ? fmtNum(cuttingPcsDamaged) : '0' },
           { label: 'Handles', value: handles },

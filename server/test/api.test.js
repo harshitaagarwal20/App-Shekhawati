@@ -280,7 +280,9 @@ describe('RBAC is enforced on the server', () => {
   });
 
   test('no permission exists for any out-of-scope module', async () => {
-    const forbidden = ['STITCHING', 'PACKING', 'DISPATCH', 'NEEDLE', 'RECONCILIATION', 'ALTER'];
+    // Stitching (Production Phase 2) and the Alteration Unit (Phase 4) are
+    // delivered; packing, needle checking, dispatch and reconciliation are not.
+    const forbidden = ['PACKING', 'DISPATCH', 'NEEDLE', 'RECONCILIATION'];
     const permissions = await prisma.permission.findMany({ select: { module: true } });
     for (const p of permissions) {
       for (const bad of forbidden) {
@@ -678,6 +680,7 @@ describe('user administration', () => {
     assert.ok(Array.isArray(body.data));
     const modules = body.data.map((m) => m.module);
     assert.ok(modules.includes('CUTTING_ISSUE'));
-    assert.ok(!modules.some((m) => /STITCH|PACK|DISPATCH/.test(m)));
+    // Stitching is delivered (Production Phase 2); packing and dispatch are not.
+    assert.ok(!modules.some((m) => /PACK|DISPATCH/.test(m)));
   });
 });

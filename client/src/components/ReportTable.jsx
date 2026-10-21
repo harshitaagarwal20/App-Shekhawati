@@ -36,9 +36,11 @@ export default function ReportTable({ report }) {
               </td>
             </tr>
           )}
-          {report.rows.map((row) => (
+          {report.rows.map((row, i) => (
             <tr className="clickable"
-              key={row.id}
+              // Grouped reports (by order, by reason ...) have no row id; the
+              // position is stable for one render of one page.
+              key={row.id ?? i}
               onClick={row.route ? () => navigate(row.route) : undefined}
               style={row.route ? { cursor: 'pointer' } : undefined}
             >

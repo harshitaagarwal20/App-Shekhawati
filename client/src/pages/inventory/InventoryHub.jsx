@@ -64,21 +64,25 @@ const VIEWS = [
   {
     value: STOCK,
     label: 'Stock on Hand',
+    hint: 'What is in the store now, item by item, with its value and reorder level.',
     permission: 'INVENTORY.VIEW',
   },
   {
     value: MOVEMENT,
     label: 'Stock Movement',
+    hint: 'Every receipt and issue behind those balances - the stock ledger.',
     permission: 'STOCK_LEDGER.VIEW',
   },
   {
     value: ROLLS,
     label: 'Fabric Rolls',
+    hint: 'Fabric counted the way the floor counts it: roll by roll, with its stage.',
     permission: 'FABRIC_ROLL.VIEW',
   },
   {
     value: ANALYSIS,
     label: 'Inventory Analysis',
+    hint: 'Supplier by supplier: stock held, how their cloth cuts, inward inspection.',
     permission: ['INVENTORY.VIEW', 'FABRIC_ROLL.VIEW'],
   },
 ];

@@ -187,6 +187,15 @@ const ACRONYMS = new Set([
   'GRN', 'PO', 'GST', 'GSTIN', 'HSN', 'BOM', 'UOM', 'GSM', 'QC', 'MRN', 'FOB', 'CIF',
 ]);
 
+/**
+ * An order as a dropdown shows it: number, then buyer - "SO-00150 · Demo Retail BV".
+ * An order number alone means nothing to somebody picking from forty of them.
+ */
+export function fmtOrder(o) {
+  const buyer = o?.buyer?.buyerName ?? o?.buyerName;
+  return buyer ? `${o.orderNo} · ${buyer}` : (o?.orderNo ?? '');
+}
+
 export function fmtEnum(value, fallback = '-') {
   if (!value) return fallback;
   return String(value)

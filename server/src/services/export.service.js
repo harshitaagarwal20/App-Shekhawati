@@ -128,7 +128,7 @@ function baseQuery(dataset, query) {
 }
 
 /** Pages through the dataset's own list() until it runs out. */
-async function readAll(dataset, query) {
+async function readAll(dataset, query, auth) {
   const base = baseQuery(dataset, query);
   const rows = [];
   let page = 1;
@@ -136,13 +136,16 @@ async function readAll(dataset, query) {
 
   for (;;) {
     // Sequential by nature: page 2 cannot be asked for until page 1 is back.
+    // `auth` is the caller. Most lists ignore it; one that holds its reader
+    // to a scope of their own (a supervisor's unit) needs it, or the file
+    // would carry rows the screen never shows them.
     const result = await dataset.fetch({
       ...base,
       page,
       pageSize: CHUNK,
       skip: (page - 1) * CHUNK,
       take: CHUNK,
-    });
+    }, auth);
 
     total = result.total ?? result.rows.length;
 
@@ -331,9 +334,9 @@ export function formatCell(value) {
  * @param {object} query  The screen's query string
  * @returns {{key:string, title:string, columns:{key:string,label:string}[], rows:object[], total:number}}
  */
-export async function runExport(key, query = {}) {
+export async function runExport(key, query = {}, auth = null) {
   const dataset = descriptorFor(key);
-  const { rows, total } = await readAll(dataset, query);
+  const { rows, total } = await readAll(dataset, query, auth);
 
   const columns = dataset.columns ?? deriveColumns(rows, dataset.hide);
 

@@ -646,7 +646,10 @@ a { color: var(--primary); }
  */
 .toolbar {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
+  /* 140px, not 158: at a 1440 screen 158 fit six cells, so a register with
+     five filters beside its two-cell search pushed the fifth onto a row of
+     its own. A select still holds "All vendors" at 140. */
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 10px 12px;
   align-items: end;
   padding: 12px 16px;
@@ -942,12 +945,27 @@ textarea { min-height: 68px; resize: vertical; }
   border-color: var(--primary);
   color: #fff;
 }
+.hub-choice-btn { width: 280px; min-height: 96px; justify-content: space-between; position: relative; padding-right: 40px; }
 .hub-choice-name { font-size: 15px; font-weight: 700; }
+.hub-choice-hint { font-size: 12.5px; line-height: 1.45; color: var(--text-muted); }
 /* The muted line has to lighten with the fill or it disappears into it. */
+.hub-choice-btn:hover .hub-choice-hint { color: rgba(255, 255, 255, 0.85); }
+/* It goes somewhere: an arrow says so, and moves when you aim at it. */
+.hub-choice-btn::after {
+  content: '→';
+  position: absolute;
+  right: 16px;
+  top: 13px;
+  font-size: 16px;
+  color: var(--text-faint);
+  transition: transform var(--t-fast) var(--ease);
+}
+.hub-choice-btn:hover::after { color: #fff; transform: translateX(3px); }
+.hub-choice-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 
 @media (max-width: 640px) {
   .hub-choice { flex-direction: column; }
-  .hub-choice-btn { min-width: 0; }
+  .hub-choice-btn { min-width: 0; width: auto; min-height: 0; }
 }
 
 /* --- An input that carries its unit ---------------------------------------- */
@@ -1065,6 +1083,34 @@ textarea { min-height: 68px; resize: vertical; }
   border-bottom: 1px solid var(--border);
 }
 
+/* --- Folded parts of a form (CollapsibleSection / CollapsibleField) ------- */
+
+/* A section: its title is the toggle, with a chevron that turns on open. */
+.form-fold { grid-column: 1 / -1; }
+.form-fold > summary { cursor: pointer; list-style: none; display: block; }
+.form-fold > summary::-webkit-details-marker { display: none; }
+.form-fold > summary::before {
+  content: '▸';
+  display: inline-block;
+  width: 1.1em;
+  transition: transform 0.15s;
+}
+.form-fold[open] > summary::before { transform: rotate(90deg); }
+.form-fold > summary:hover { color: var(--text-muted); }
+.form-fold > summary .faint { text-transform: none; letter-spacing: 0; font-weight: 400; }
+
+/* A single box: a link until opened, then the plain field with no link. */
+.field-fold > summary {
+  list-style: none;
+  display: inline-block;
+  font-size: 13px;
+  text-decoration: none;
+  margin: 4px 0 10px;
+}
+.field-fold > summary::-webkit-details-marker { display: none; }
+.field-fold > summary:hover { text-decoration: underline; }
+.field-fold[open] > summary { display: none; }
+
 /* --- Buttons -------------------------------------------------------------- */
 
 .btn {
@@ -1129,9 +1175,15 @@ table.data tbody tr:hover { background: var(--surface-2); }
    to know, because a card you can open needs to look like one. */
 table.data tbody tr.clickable { cursor: pointer; }
 table.data td.num { text-align: right; font-variant-numeric: tabular-nums; }
+/* Its heading too. Two hundred and forty headers already carry `num`; without
+   this they sat flush left over figures flush right, a column's width apart. */
+table.data th.num { text-align: right; }
 table.data td.actions { text-align: right; white-space: nowrap; width: 48px; }
 table.data th.actions-head { text-align: right; }
-table.data td.code { font-family: var(--mono); font-size: 12px; }
+/* The line box of the 13px text beside it, not of its own 12px: cells are
+   top-aligned, and a shorter line box lifted every document number 1.5px
+   above the rest of its row. */
+table.data td.code { font-family: var(--mono); font-size: 12px; line-height: 19.5px; }
 table.data tr.inactive td { color: var(--text-faint); }
 
 /* --- Badges --------------------------------------------------------------- */
@@ -1552,6 +1604,8 @@ table.data tr.inactive td { color: var(--text-faint); }
   padding: 1px 8px;
   font-size: 11.5px;
 }
+/* An Inline QC defect the person informed has resolved. */
+.chip.chip-done { color: var(--text-faint); text-decoration: line-through; }
 
 .bom-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
 .bom-table th, .bom-table td { padding: 5px 6px; border-bottom: 1px solid var(--border); text-align: left; }
@@ -3254,6 +3308,31 @@ table.data.dash-mini tr:first-child td { border-top: none; }
   position: relative;
 }
 .notify-item:hover { background: var(--surface-3); }
+/* The × sits beside the item, not inside it - a button cannot hold a button.
+   It shows on hover or focus, and always on touch, where there is no hover. */
+.notify-row { position: relative; }
+.notify-row .notify-item { padding-right: 34px; }
+.notify-dismiss {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--t-fast) var(--ease);
+}
+.notify-row:hover .notify-dismiss, .notify-dismiss:focus-visible { opacity: 1; }
+.notify-dismiss:hover { background: var(--border); color: var(--text); }
+.notify-dismiss:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+@media (hover: none) { .notify-dismiss { opacity: 1; } }
 .notify-item.is-unread::before {
   content: '';
   position: absolute;
@@ -3674,4 +3753,280 @@ table.data tr.is-selected td { background: var(--primary-soft); }
 }
 @media (max-width: 560px) {
   .ci-two { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ===========================================================================
+ *  STITCHING - Production Phase 2
+ *
+ *  Hourly Monitoring is used on a phone, standing in the line, once an hour.
+ *  Its boxes are thumb-sized (52px), number pads open by themselves
+ *  (inputMode), and a slot under the style's target is red in both views.
+ * =========================================================================== */
+
+.text-danger { color: var(--danger); }
+
+/* A value the server decided, shown where a field would be. */
+.unit-fact {
+  padding: 7px 9px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  font-weight: 600;
+  min-height: 36px;
+}
+
+.stitch-position { margin: 0 0 12px; }
+.stitch-position-track {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+.stitch-position-fill { height: 100%; background: var(--success); border-radius: 999px; }
+.stitch-position-text { margin-top: 6px; font-size: 13px; }
+.stitch-facts {
+  margin: 4px 0 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.hourly-page { max-width: 1100px; }
+.hourly-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: stretch;
+  margin: 4px 0 12px;
+}
+.hourly-fact {
+  flex: 1 1 140px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+.hourly-fact-label { font-size: 11.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.02em; }
+.hourly-fact-value { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.hourly-fact-sub { font-size: 11.5px; color: var(--text-faint); }
+.hourly-saving { align-self: center; font-size: 12px; color: var(--text-muted); min-width: 70px; }
+
+.hourly-mode { display: flex; gap: 8px; margin-bottom: 10px; }
+.hourly-mode .btn { flex: 0 0 auto; }
+
+/* The slot chips scroll sideways; the page never does. */
+.slot-strip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+}
+.slot-chip {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 64px;
+  min-height: 48px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.slot-chip.is-active { background: var(--primary); border-color: var(--primary); color: #fff; }
+.slot-chip-total { font-size: 11px; font-weight: 400; opacity: 0.8; font-variant-numeric: tabular-nums; }
+
+.tailor-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.tailor-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+.tailor-who { min-width: 0; }
+.tailor-name { font-weight: 600; overflow-wrap: anywhere; }
+.tailor-sub { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.tailor-input { flex: 0 0 104px; text-align: right; }
+.tailor-input input {
+  height: 52px;
+  font-size: 22px;
+  font-weight: 700;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.tailor-row.is-short { border-color: var(--danger); background: var(--danger-soft); }
+.tailor-row.is-short input { border-color: var(--danger); color: var(--danger); }
+
+.cell-status { display: block; font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.cell-status.ok { color: var(--success); }
+.cell-status.bad { color: var(--danger); overflow-wrap: anywhere; }
+
+/* The whole day: tailor column pinned, slots scroll under it. */
+.hourly-grid-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+.hourly-grid { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 13px; }
+.hourly-grid th, .hourly-grid td {
+  padding: 4px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+}
+.hourly-grid thead th { font-size: 11.5px; color: var(--text-muted); background: var(--surface-2); padding: 8px 4px; }
+.hourly-grid .num { text-align: right; padding-right: 8px; }
+.hourly-grid td input {
+  width: 56px;
+  height: 40px;
+  padding: 4px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.hourly-grid td.is-short { background: var(--danger-soft); }
+.hourly-grid td.is-short input { border-color: var(--danger); color: var(--danger); font-weight: 700; }
+.hourly-grid .sticky-col {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--surface);
+  min-width: 128px;
+  max-width: 160px;
+  white-space: normal;
+  padding-left: 10px;
+  border-right: 1px solid var(--border);
+}
+.hourly-grid thead .sticky-col { background: var(--surface-2); }
+.hourly-grid tfoot th, .hourly-grid tfoot td { background: var(--surface-2); border-bottom: 0; padding: 8px 4px; }
+
+@media (max-width: 640px) {
+  .hourly-pickers { grid-template-columns: minmax(0, 1fr); }
+  .hourly-fact-value { font-size: 18px; }
+  .hourly-grid .sticky-col { min-width: 104px; }
+}
+.hourly-grid thead th.is-now { color: var(--primary); box-shadow: inset 0 -3px 0 var(--primary); }
+
+/* --- Phase 4: External QC and the Alteration Unit ------------------------ */
+/* The three boxes sit in one row: approved, alteration, rejected, and their sum. */
+.qc-boxes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0 16px; margin-top: 4px; }
+.qc-reasons input { width: 96px; text-align: right; }
+
+/* Where the offered pieces went: the three boxes as one stacked bar. Colour
+   only ever fills the bar - the line under it carries the words. */
+.qc-tally { margin: 2px 0 8px; }
+.qc-tally-bar {
+  display: flex;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--chart-track);
+  overflow: hidden;
+}
+.qc-tally-bar > span { transition: width var(--t-base) var(--ease); }
+.qc-tally-bar .is-approved { background: var(--success); }
+.qc-tally-bar .is-alteration { background: var(--accent); }
+.qc-tally-bar .is-rejected { background: var(--danger); }
+.qc-tally-text { margin-top: 6px; font-size: 12.5px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.qc-tally.is-ok .qc-tally-text { color: var(--success); font-weight: 600; }
+.qc-tally.is-short .qc-tally-text { color: var(--warning); font-weight: 600; }
+.qc-tally.is-over .qc-tally-text { color: var(--danger); font-weight: 600; }
+/* Over-counted: the track itself goes red behind the bar's overflow. */
+.qc-tally.is-over .qc-tally-bar { box-shadow: inset 0 0 0 1px var(--danger); }
+
+/* A file input dressed as the app's own button, with the chosen name beside it. */
+.file-pick { display: flex; align-items: center; gap: 10px; min-height: 36px; min-width: 0; }
+.file-pick .btn { flex: 0 0 auto; cursor: pointer; }
+.file-pick .btn:focus-within { outline: 2px solid var(--primary); outline-offset: 2px; }
+.file-pick-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+
+/* Four short fields to a row, so a fourth is not stranded on a row alone. */
+.form-grid.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 1024px) { .form-grid.four { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* The rest of a three-column row after one field. */
+.form-grid .span-rest { grid-column: span 2; }
+
+/* Why the primary button is disabled, said where the eye already is. */
+.modal-footer-note { margin-right: auto; align-self: center; font-size: 12.5px; color: var(--text-muted); }
+.qc-checker-line { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto; gap: 8px; margin-bottom: 8px; align-items: center; }
+.form-section { margin: 16px 0 6px; font-size: 14px; }
+.plain-list { list-style: none; margin: 0 0 12px; padding: 0; }
+.plain-list li { padding: 4px 0; }
+@media (max-width: 640px) {
+  .qc-boxes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .qc-reasons input { width: 72px; }
+}
+
+/* --- Ranked bars (Vendor Performance, Inventory Analysis) ------------------
+   The dashboard's bar rows, in a panel of their own. Wider label and value
+   columns, because these name a vendor and an item and carry units. The
+   marker is a 2px tick in text ink - a reference, not a second series - and a
+   breached bar turns the status red and says "Over" in its own row.
+   -------------------------------------------------------------------------- */
+
+.rb-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.rb-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 14px 14px 10px;
+  min-width: 0;
+}
+.rb-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 8px; }
+.rb-title { margin: 0; font-size: 14px; font-weight: 600; color: var(--text); }
+.rb-note { margin: 3px 0 0; font-size: 12px; color: var(--text-muted); }
+.rb-empty { margin: 6px 0 8px; font-size: 13px; color: var(--text-muted); }
+
+.rb-panel .bar-row { grid-template-columns: minmax(90px, 30%) 1fr 72px; padding: 6px 4px; }
+.rb-legend { margin-bottom: 4px; }
+.rb-scale { margin-left: auto; font-size: 11px; color: var(--text-faint); }
+.rb-panel .bar-label { overflow-wrap: anywhere; }
+.rb-track { position: relative; overflow: visible; }
+.rb-track .bar-fill { border-radius: 0 4px 4px 0; }
+.bar-fill.is-bad { background: var(--danger); }
+.rb-sub-bad { color: var(--danger); }
+.rb-marker {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--text);
+  border-radius: 1px;
+}
+.rb-marker-key { display: inline-block; width: 2px; height: 14px; background: var(--text); border-radius: 1px; }
+
+@media (max-width: 560px) {
+  .rb-panel .bar-row { grid-template-columns: 1fr 76px; }
+}
+
+/* The daily summary preview in Notification settings - the message as sent. */
+.summary-preview {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-family: inherit;
+  font-size: 12.5px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  color: var(--text);
 }

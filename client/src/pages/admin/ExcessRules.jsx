@@ -134,9 +134,9 @@ function RulesTab({ can }) {
   const [banner, setBanner] = useState(null);
   const [busy, setBusy] = useState(false);
 
-  const canEdit = can('MASTER_LIST.EDIT');
-  const canCreate = can('MASTER_LIST.CREATE');
-  const canDelete = can('MASTER_LIST.DELETE');
+  const canEdit = can('EXCESS_RULE.EDIT');
+  const canCreate = can('EXCESS_RULE.CREATE');
+  const canDelete = can('EXCESS_RULE.DELETE');
 
   async function doDelete() {
     setBusy(true);

@@ -13,6 +13,8 @@
 
 import { forwardRef, useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext.jsx';
 import { invalidateMasterList, useMasterList } from '../hooks/useMasterList.js';
 import { purchaseOrders as poApi } from '../services/erp.js';
 import { Combobox } from './Combobox.jsx';
@@ -69,6 +71,16 @@ export function StatusBadge({ status }) {
     // Inward inspection of a fabric roll.
     PASSED: 'badge-approved',
     FAILED: 'badge-rejected',
+    // A cutting challan's stitched pieces coming back to ironing.
+    NOT_RECEIVED: 'badge-inactive',
+    PARTIALLY_RECEIVED: 'badge-info',
+    CLOSED: 'badge-approved',
+    // A bag in the Alteration Unit (CLOSED and CANCELLED above).
+    OPEN: 'badge-pending',
+    // A Phase 3 pending reject, moved into the Alteration Unit.
+    TRANSFERRED: 'badge-info',
+    // An Inline QC defect, dealt with by the person informed (OPEN above).
+    RESOLVED: 'badge-approved',
   };
   const label = String(status ?? '').replace(/_/g, ' ');
   return <span className={`badge ${map[status] ?? 'badge-inactive'}`}>{label || '-'}</span>;
@@ -97,6 +109,40 @@ export function PageHeader({ title, actions }) {
         <h1>{title}</h1>
       </div>
       {actions && <div className="page-actions">{actions}</div>}
+    </div>
+  );
+}
+
+/**
+ * Two registers that share one sidebar link, as tabs under the page heading -
+ * Stitching / Printing after stitching, External QC / Rejected Register.
+ *
+ * Each tab is its own route, so a link or a reload lands on the right one. A
+ * tab the user may not open is left out, and with only one left there is
+ * nothing to choose between, so no strip is drawn at all.
+ *
+ * @param {string} active  the `key` of the tab being shown
+ * @param {Array}  tabs    `{ key, label, to, permission? }`
+ */
+export function ViewTabs({ active, tabs }) {
+  const navigate = useNavigate();
+  const { can } = useAuth();
+  const shown = tabs.filter((t) => !t.permission || can(t.permission));
+  if (shown.length < 2) return null;
+  return (
+    <div className="hourly-mode" role="tablist">
+      {shown.map(({ key, label, to }) => (
+        <button
+          key={key}
+          type="button"
+          role="tab"
+          aria-selected={active === key}
+          className={`btn ${active === key ? 'btn-primary' : ''}`}
+          onClick={() => navigate(to)}
+        >
+          {label}
+        </button>
+      ))}
     </div>
   );
 }
@@ -157,6 +203,63 @@ export const SuffixInput = forwardRef(function SuffixInput({ suffix, ...props },
 export const TextArea = forwardRef(function TextArea({ error, ...props }, ref) {
   return <textarea ref={ref} aria-invalid={error ? 'true' : undefined} {...props} />;
 });
+
+/*
+ * FOLDED PARTS OF A FORM.
+ *
+ * Native <details>, so whatever is inside stays mounted while folded:
+ * react-hook-form keeps its registrations, a value already there is still
+ * submitted, and nothing has to be lifted out to survive a toggle.
+ *
+ * A fold never hides a problem. After every render it opens itself if a field
+ * inside shows an error (Field renders `.err`), and - for a single optional
+ * box like Remarks - if that box already holds something. It only ever opens:
+ * clearing the box does not fold it away from under the cursor.
+ * focusFirstError() also opens it, so a refused field can take focus.
+ */
+function useFoldOpener({ open, openWhenFilled }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || el.open) return;
+    const filled =
+      openWhenFilled &&
+      [...el.querySelectorAll('textarea, input:not([type=hidden])')].some((i) => i.value);
+    if (open || filled || el.querySelector('.err')) el.open = true;
+  });
+  return ref;
+}
+
+/**
+ * A titled section of optional fields, folded by default. `summary` says what
+ * is inside without opening it - e.g. the values already filled in.
+ */
+export function CollapsibleSection({ title, summary, open = false, children }) {
+  const ref = useFoldOpener({ open });
+  return (
+    <details ref={ref} className="form-fold span-2">
+      <summary className="fieldset-title">
+        {title}
+        {summary && <span className="faint"> &mdash; {summary}</span>}
+      </summary>
+      <div className="form-grid">{children}</div>
+    </details>
+  );
+}
+
+/**
+ * One optional box - Remarks - shown as a "+ Add remarks" link until wanted.
+ * Once opened the link goes and the field reads exactly as it did before.
+ */
+export function CollapsibleField({ label = 'Remarks', className = '', children }) {
+  const ref = useFoldOpener({ openWhenFilled: true });
+  return (
+    <details ref={ref} className={`field-fold ${className}`}>
+      <summary className="btn-link">+ Add {label.toLowerCase()}</summary>
+      {children}
+    </details>
+  );
+}
 
 /**
  * A select whose options come from a plain array. Use this only for
@@ -541,14 +644,23 @@ export function DropdownMenu({ trigger, children, label, align = 'right', menuCl
       if (btnRef.current?.contains(e.target) || menuRef.current?.contains(e.target)) return;
       setOpen(false);
     }
+    /*
+     * Escape closes the menu, not the screen - the rule Combobox follows. A
+     * MultiSelect inside a Modal (the Inline QC defects) shut the whole form
+     * on Escape, because Modal also listens on the document. Caught in the
+     * CAPTURE phase and stopped there, it never reaches Modal's listener.
+     */
     function onKeyDown(e) {
-      if (e.key === 'Escape') setOpen(false);
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      setOpen(false);
     }
     document.addEventListener('mousedown', onPointerDown);
-    document.addEventListener('keydown', onKeyDown);
+    document.addEventListener('keydown', onKeyDown, true);
     return () => {
       document.removeEventListener('mousedown', onPointerDown);
-      document.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener('keydown', onKeyDown, true);
     };
   }, [open]);
 

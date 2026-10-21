@@ -35,6 +35,7 @@ import {
 } from '../../services/erp.js';
 import {
   Alert,
+  CollapsibleField,
   EmptyState,
   Field,
   MasterSelect,
@@ -48,7 +49,7 @@ import {
   TextInput,
 } from '../../components/ui.jsx';
 import { StateBadge } from '../../components/workflow.jsx';
-import { fmtDate, fmtEnum, fmtNum, todayInput } from '../../utils/format.js';
+import { fmtDate, fmtEnum, fmtNum, todayInput, fmtOrder } from '../../utils/format.js';
 import { loadFailed } from '../../services/loadFailures.js';
 import { ExportButton } from '../../components/dataTransfer.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
@@ -418,7 +419,7 @@ function CreateChallanModal({ onClose, onSaved }) {
             // {value,label} objects gave every option an undefined key.
             options={orderOptions}
             getValue={(o) => o.id}
-            getLabel={(o) => o.orderNo}
+            getLabel={fmtOrder}
           />
         </Field>
 
@@ -477,9 +478,11 @@ function CreateChallanModal({ onClose, onSaved }) {
           <TextInput type="date" value={requiredBy} onChange={(e) => setRequiredBy(e.target.value)} />
         </Field>
 
-        <Field label="Remarks" className="span-2">
-          <TextArea rows={2} value={remarks} onChange={(e) => setRemarks(e.target.value)} />
-        </Field>
+        <CollapsibleField className="span-2">
+          <Field label="Remarks">
+            <TextArea rows={2} value={remarks} onChange={(e) => setRemarks(e.target.value)} />
+          </Field>
+        </CollapsibleField>
       </div>
 
       <h4>What cutting needs</h4>

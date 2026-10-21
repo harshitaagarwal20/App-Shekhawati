@@ -42,6 +42,7 @@ import { useResourceList } from '../../hooks/useResourceList.js';
 import { materialPlans as mpApi, orders as ordersApi } from '../../services/erp.js';
 import {
   Alert,
+  CollapsibleField,
   EmptyState,
   Field,
   Modal,
@@ -388,9 +389,11 @@ function CreateMaterialPlanModal({ onClose, onSaved }) {
         <Field label="Container no">
           <TextInput value={containerNo} onChange={(e) => setContainerNo(e.target.value)} />
         </Field>
-        <Field label="Remarks" className="span-2">
-          <TextArea rows={2} value={remarks} onChange={(e) => setRemarks(e.target.value)} />
-        </Field>
+        <CollapsibleField className="span-2">
+          <Field label="Remarks">
+            <TextArea rows={2} value={remarks} onChange={(e) => setRemarks(e.target.value)} />
+          </Field>
+        </CollapsibleField>
       </div>
 
       {previewing && <Spinner label="Working out the requirement…" />}

@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { navMatch, visibleNavigation } from '../config/navigation.js';
 import { ConfirmDialog } from '../components/ui.jsx';
 import NotificationBell from '../components/NotificationBell.jsx';
+import { inventory as inventoryApi } from '../services/erp.js';
 
 /**
  * Application shell.
@@ -13,7 +14,7 @@ import NotificationBell from '../components/NotificationBell.jsx';
  * carrying the breadcrumb, and the record area beneath it.
  *
  * The sidebar is an accordion rather than a flat list because the navigation is
- * twenty-seven links across nine groups. Rendering all of them at once made the
+ * some thirty links across eleven groups. Rendering all of them at once made the
  * list taller than most screens, so a user scrolled the menu to find a screen
  * instead of reading it. Now one group is open - the one holding the current
  * page - and the rest are one click away.
@@ -104,6 +105,21 @@ const ICONS = {
       <line x1="15.8" y1="16.4" x2="5" y2="4" />
     </>
   ),
+  // A needle, and the running stitch it leaves.
+  Stitching: (
+    <>
+      <line x1="4" y1="20" x2="15.5" y2="8.5" />
+      <circle cx="17.8" cy="6.2" r="2.4" />
+      <line x1="13" y1="20" x2="21" y2="20" strokeDasharray="2 2" />
+    </>
+  ),
+  // An iron - pressing is where finishing starts.
+  Finishing: (
+    <>
+      <path d="M3 18h18v-4a5 5 0 0 0-5-5H9z" />
+      <path d="M10.5 9V6h7v3" />
+    </>
+  ),
   Administration: (
     <>
       <circle cx="12" cy="8" r="3.6" />
@@ -146,7 +162,29 @@ export default function AppLayout() {
 
   const userMenuRef = useRef(null);
 
-  const groups = useMemo(() => visibleNavigation(can), [can]);
+  /*
+   * One-time setup links (Opening Stock) leave the sidebar once the setup is
+   * done. Assumed done until the server says otherwise, so on a live system
+   * the link never flashes up and disappears; only a user who may load the
+   * stock is asked at all.
+   */
+  const [setupDone, setSetupDone] = useState(true);
+  const canLoadOpening = can('FABRIC_ROLL.CREATE');
+  useEffect(() => {
+    if (!canLoadOpening) return undefined;
+    let live = true;
+    inventoryApi
+      .openingStockStatus()
+      .then((s) => live && setSetupDone(Boolean(s?.loaded)))
+      .catch(() => {
+        /* the link stays hidden; the screen is still reachable from Stock on Hand */
+      });
+    return () => {
+      live = false;
+    };
+  }, [canLoadOpening]);
+
+  const groups = useMemo(() => visibleNavigation(can, { setupDone }), [can, setupDone]);
 
   /*
    * WHERE AM I - asked once.

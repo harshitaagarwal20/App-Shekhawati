@@ -467,7 +467,7 @@ function ApprovalsSection({ approvals }) {
         Awaiting decision
         <span className="dash-heading-count">{approvals.total}</span>
         {/*
-          The shared queue screen is guarded by REPORT.VIEW, which is not the
+          The shared queue screen is guarded by APPROVAL_QUEUE.VIEW, which is not the
           permission that put any of these groups on screen. The server sends
           `queueTo: null` when this user cannot reach it, rather than offering
           a link that lands on Forbidden.
@@ -507,7 +507,7 @@ function ApprovalsSection({ approvals }) {
             /**
              * The stage screen, or the approval queue for a type that has no
              * list of its own. `queueTo` is the server's decision and is null
-             * when this user lacks REPORT.VIEW, so the fallback can never land
+             * when this user lacks APPROVAL_QUEUE.VIEW, so the fallback can never land
              * them on Forbidden — it just leaves the bar unlinked, which is
              * the honest answer when there is nowhere they may go.
              */

@@ -26,7 +26,8 @@ by line rather than taken on trust.
 | **Merchandising & Planning** | `MERCHANDISING` | "Order" / "Planning" | Buyer orders, and the plans raised against them |
 | **Planning GM** | `PLANNING_GM` | Vinay ji (GM) | Planning end to end; submits plans to the Director |
 | **Store & Cutting Manager** | `STORE_MANAGER` | Ravi Prajapat · Maharaj Singh | Procurement, the store, job work — and the cutting floor |
-| **QC** | `QC` | Sunita Devi, Rekha Sharma | Records the Fabric Scrutiny Report. The decision is not theirs |
+| **QC** | `QC` | Sunita Devi, Rekha Sharma | Records the Fabric Scrutiny Report (the decision is not theirs) and the Inline QC checks on the stitching line |
+| **Stitching Supervisor** | `STITCHING_SUPERVISOR` | Anil Kumar, Mahipal Yadav | Runs one stitching unit. Is named in Inline QC's Inform To and resolves the defects sent to them |
 | **Director** | `DIRECTOR` | Dinesh Sir | Final authority everywhere. Sees everything, edits nothing |
 
 **Offstage parties.** The Buyer and the Vendor / Job Worker drive the process
@@ -217,9 +218,15 @@ descriptions, which are prose.
 | Plan approval | VCEDAX | · | · | VCX | VCEX | V | V | · | V**A**X |
 | Cutting issue | VCEDAX | · | V | V | V | VCE**A**X | VCE**A**X | · | V**A**X |
 | Cutting challan | VCEDAX | · | V | V | V | VCEX | VCEX | · | V**A**X |
+| Inline QC | VCEDX + R | · | VX | · | · | VX | · | VCEX | VX |
 | Reports | VX | VX | V | V | VX | VX | V | V | VX |
 | Users · Roles | VCEDX | · | · | · | · | · | · | · | VX |
 | Audit trail | VX | · | · | · | · | · | · | · | VX |
+
+**R** on Inline QC is `INLINE_QC.RESOLVE`, the one module-specific action. It
+is held by the **Stitching Supervisor** (not a column above), who also has
+**VX** on Inline QC. It decides who can be named in Inform To. Marking a
+defect Resolved is then for the person named, not for every holder.
 
 Three rows earn a note:
 
@@ -299,6 +306,16 @@ The five that carry the most rule, in the usual form.
 | **Main flow** | Ten verifications run — all of them, every time, none short-circuiting — then the ledger is posted and the document locked |
 | **Rules** | `issued = consumed + remainder + wastage`, with wastage typed rather than inferred. OUT covers the full issued quantity; the remainder returns IN on the same roll |
 | **Guarantee** | Nothing is cut that the order, the plan, the approval, the process and the stock do not all agree on — because there is nothing after this to correct it with |
+
+### UC-06 · Record an inline QC check, and act on its defects
+
+| | |
+|---|---|
+| **Primary actors** | QC (`INLINE_QC.CREATE`) records; the Stitching Supervisor named in Inform To resolves |
+| **Preconditions** | Cutting posted to the tailor's unit for the order and style |
+| **Main flow** | Choose Size or Workmanship; pick the tailor (the unit follows), the order and style, and, for Size, the operation and the size measured; enter Pcs Checked and Pcs Rejected and the defects found; choose who to inform. Each defect lands on that person's Action needed list with an in-app notification. They mark it Resolved, with an optional note |
+| **Rules** | Rejected ≤ checked; rejected pieces need a defect; a defect needs Inform To; Operation and Size only on a Size check. A supervisor reads only their own unit's checks |
+| **Guarantee** | No defect found on the line is left without a named owner, and only that owner can close it. Every add, removal, resolve and reopen is in the audit trail |
 
 ---
 

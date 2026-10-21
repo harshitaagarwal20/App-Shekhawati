@@ -50,7 +50,8 @@ import { PageHeader } from './ui.jsx';
  *
  * @param {string}   title     the page heading - the subject, not the answer
  * @param {string}   question  asked above the panels, in plain words
- * @param {Array}    choices   `{ value, label }` - one panel each
+ * @param {Array}    choices   `{ value, label, hint }` - one panel each; `hint`
+ *                             is the line that says what is in it
  * @param {Function} onChoose  called with the value of the panel pressed
  */
 export default function HubChoice({ title, question, choices, onChoose }) {
@@ -62,7 +63,7 @@ export default function HubChoice({ title, question, choices, onChoose }) {
       <div className="hub-ask">
         <h2 className="hub-ask-q">{question}</h2>
         <div className="hub-choice">
-          {choices.map(({ value, label }) => (
+          {choices.map(({ value, label, hint }) => (
             <button
               key={value}
               type="button"
@@ -70,6 +71,7 @@ export default function HubChoice({ title, question, choices, onChoose }) {
               onClick={() => onChoose(value)}
             >
               <span className="hub-choice-name">{label}</span>
+              {hint && <span className="hub-choice-hint">{hint}</span>}
             </button>
           ))}
         </div>

@@ -525,33 +525,33 @@ excessRoutes.post('/assess', can('REPORT.VIEW'), validate({ body: assessExcessSc
 
 excessRoutes.get(
   '/rules',
-  can('MASTER_LIST.VIEW'),
+  can('EXCESS_RULE.VIEW'),
   validate({ query: excessRuleListQuery }),
   c.listExcessRules,
 );
 
 /**
- * Changing a threshold is a MASTER_LIST act, not a transaction one.
+ * Changing a threshold is an EXCESS_RULE act, not a transaction one.
  *
- * It is configuration - the same kind of thing as adding a colour to a
- * dropdown - and it belongs to Head Office, who own the masters, rather than to
- * the store that would benefit from a looser limit.
+ * It sat on MASTER_LIST.*, with Head Office as the owner. The business has
+ * since given the rules to the store, with the Director reading - so they have
+ * a module of their own, and the dropdown lists stay open to every desk.
  */
 excessRoutes.post(
   '/rules',
-  can('MASTER_LIST.CREATE'),
+  can('EXCESS_RULE.CREATE'),
   validate({ body: createExcessRuleSchema }),
   c.createExcessRule,
 );
 excessRoutes.patch(
   '/rules/:id',
-  can('MASTER_LIST.EDIT'),
+  can('EXCESS_RULE.EDIT'),
   validate({ params: idParam, body: updateExcessRuleSchema }),
   c.updateExcessRule,
 );
 excessRoutes.delete(
   '/rules/:id',
-  can('MASTER_LIST.DELETE'),
+  can('EXCESS_RULE.DELETE'),
   validate({ params: idParam }),
   c.removeExcessRule,
 );
@@ -608,10 +608,15 @@ export const workflowRoutes = Router();
 /** The whole state machine, for a screen to draw a progress trail from. */
 workflowRoutes.get('/states', can('REPORT.VIEW'), c.workflowStates);
 
-/** Everything waiting on a decision, across every module, in one list. */
+/**
+ * Everything waiting on a decision, across every module, in one list.
+ *
+ * Its own permission, not REPORT.VIEW: the floor desks run reports but decide
+ * nothing, and the business took the queue away from them.
+ */
 workflowRoutes.get(
   '/queue',
-  can('REPORT.VIEW'),
+  can('APPROVAL_QUEUE.VIEW'),
   validate({ query: workflowQueueQuery }),
   c.workflowQueue,
 );

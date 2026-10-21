@@ -48,7 +48,7 @@ export const requireExportPermission = (req, _res, next) => {
 };
 
 export const csv = asyncHandler(async (req, res) => {
-  const result = await exportService.runExport(req.params.key, req.query);
+  const result = await exportService.runExport(req.params.key, req.query, req.auth);
 
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', `attachment; filename="${exportService.fileNameFor(result)}"`);

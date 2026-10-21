@@ -83,6 +83,17 @@ const schema = z.object({
 
   /** How often the outbox is swept for email / WhatsApp to send. */
   NOTIFY_DISPATCH_SECONDS: z.coerce.number().int().min(5).max(3600).default(30),
+
+  /**
+   * The evening summary of the day's work (services/dailySummary.service.js),
+   * sent at this time, India time, to holders of REPORT.SUMMARY. In-app always;
+   * by email / WhatsApp as each person's settings say.
+   */
+  DAILY_SUMMARY_ENABLED: z.enum(['true', 'false']).default('true').transform((v) => v === 'true'),
+  DAILY_SUMMARY_TIME: z
+    .string()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'DAILY_SUMMARY_TIME is HH:MM in 24-hour India time - 20:00')
+    .default('20:00'),
 });
 
 const parsed = schema.safeParse(process.env);

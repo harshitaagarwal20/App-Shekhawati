@@ -10,9 +10,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
-import { gatePasses as gpApi, purchaseOrders as poApi } from '../../services/erp.js';
+import { gatePasses as gpApi, jobWorks as jwApi, purchaseOrders as poApi } from '../../services/erp.js';
 import {
   Alert,
+  CollapsibleField,
   ConfirmDialog,
   EnumSelect,
   Field,
@@ -84,14 +85,50 @@ export default function GatePassDetail() {
     if (!allocating) return;
     let live = true;
     setAllocPos(null);
-    poApi
-      .options({
-        approvedOnly: 'true',
-        openOnly: 'true',
-        ...(vendorId && !allocAllVendors ? { vendorId } : {}),
-      })
-      .then((rows) => live && setAllocPos(rows.filter((po) => Number(po.pendingQty) > 0)))
-      .catch(() => live && setAllocPos([]));
+    const byVendor = vendorId && !allocAllVendors ? { vendorId } : {};
+    /*
+     * A PO is not the only document a load answers. Fabric coming back from a
+     * dyer or printer is the return of a JOB WORK order, and the server has
+     * always taken its number here (resolveReference) - the dialog just never
+     * offered it, so a dyer's delivery had "nothing to choose from".
+     */
+    Promise.all([
+      poApi
+        .options({ approvedOnly: 'true', openOnly: 'true', ...byVendor })
+        .catch(() => []),
+      jwApi.options({ pendingReturnOnly: 'true', ...byVendor }).catch(() => []),
+    ]).then(([pos, jobs]) => {
+      if (!live) return;
+      setAllocPos([
+        ...pos
+          .filter((po) => Number(po.pendingQty) > 0)
+          .map((po) => ({
+            docNo: po.poId,
+            label: [
+              po.header?.poNo && po.header.poNo !== po.poId ? `PO ${po.header.poNo} / ${po.poId}` : `PO ${po.poId}`,
+              [po.accessoriesItem ?? po.subCategory ?? po.item, po.accessoryType, po.colorCode]
+                .filter(Boolean)
+                .join(' '),
+              `${fmtNum(po.pendingQty)} ${po.uom} pending`,
+              po.vendor?.vendorName,
+            ]
+              .filter(Boolean)
+              .join(' · '),
+          })),
+        ...jobs.map((j) => ({
+          docNo: j.dyeIssueNo,
+          label: [
+            `Job work ${j.dyeIssueNo}`,
+            fmtEnum(j.process),
+            j.roll?.rollNo && `roll ${j.roll.rollNo}`,
+            `${fmtNum(Math.max(0, Number(j.qty) - Number(j.receivedQty ?? 0)))} ${j.uom ?? ''} not back`.trim(),
+            j.vendor?.vendorName,
+          ]
+            .filter(Boolean)
+            .join(' · '),
+        })),
+      ]);
+    });
     return () => {
       live = false;
     };
@@ -167,11 +204,11 @@ export default function GatePassDetail() {
           <strong>Not allocated.</strong> This delivery was recorded at the gate from{' '}
           {gp.partyName}
           {gp.movementTime && ` at ${fmtDateTime(gp.movementTime)}`}, but has not been matched to a
-          purchase order yet. It cannot be cleared until it is.
+          purchase order or job work yet. It cannot be cleared until it is.
           {canAllocate && (
             <span className="row" style={{ marginTop: 8 }}>
               <button type="button" className="btn btn-sm btn-primary" onClick={() => setAllocating(true)}>
-                Allocate to a PO
+                Allocate to a PO or job work
               </button>
             </span>
           )}
@@ -312,32 +349,22 @@ export default function GatePassDetail() {
             <p className="muted" style={{ marginTop: 0 }}>
               {gp.partyName} delivered
               {gp.movementTime && ` at ${fmtDateTime(gp.movementTime)}`}. Choose the purchase
-              order this load is for - the item, quantity and UOM are taken from it.
+              order this load is for - or, for fabric coming back from a dyer or printer, its job
+              work order. The item, quantity and UOM are taken from it.
             </p>
             <Field
-              label="Purchase Order"
+              label="PO or job work"
               required
-              hint="Approved POs still waiting for goods. Each shows what is pending."
+              hint="Approved POs still waiting for goods, and job work not yet fully back. Each shows what is pending."
               htmlFor="alloc-doc"
             >
               <RecordSelect
                 id="alloc-doc"
                 options={allocPos ?? []}
                 loading={allocPos === null}
-                getValue={(po) => po.poId}
-                getLabel={(po) =>
-                  [
-                    po.header?.poNo && po.header.poNo !== po.poId ? `${po.header.poNo} / ${po.poId}` : po.poId,
-                    [po.accessoriesItem ?? po.subCategory ?? po.item, po.accessoryType, po.colorCode]
-                      .filter(Boolean)
-                      .join(' '),
-                    `${fmtNum(po.pendingQty)} ${po.uom} pending`,
-                    po.vendor?.vendorName,
-                  ]
-                    .filter(Boolean)
-                    .join(' · ')
-                }
-                placeholder="Select the PO..."
+                getValue={(d) => d.docNo}
+                getLabel={(d) => d.label}
+                placeholder="Select the PO or job work..."
                 value={allocDoc}
                 onChange={(e) => setAllocDoc(e.target.value)}
               />
@@ -352,13 +379,13 @@ export default function GatePassDetail() {
                     setAllocDoc('');
                   }}
                 />
-                Show POs of all vendors
+                Show all vendors
               </label>
             )}
             {allocPos && allocPos.length === 0 && (
               <Alert kind="warning">
-                No approved PO is waiting for goods
-                {vendorId && !allocAllVendors ? ' from this vendor' : ''}. The PO must be approved
+                No approved PO or open job work is waiting for goods
+                {vendorId && !allocAllVendors ? ' from this vendor' : ''}. A PO must be approved
                 before goods can be allocated to it.
               </Alert>
             )}
@@ -394,7 +421,7 @@ export default function GatePassDetail() {
                     purpose: allocPurpose || undefined,
                   });
                   setAllocating(false);
-                  setBanner({ kind: 'success', text: `${gp.gatePassNo} allocated to PO ${allocDoc.trim()}.` });
+                  setBanner({ kind: 'success', text: `${gp.gatePassNo} allocated to ${allocDoc.trim()}.` });
                   await load();
                 } catch (e) {
                   setAllocError(e.message);
@@ -485,9 +512,11 @@ function ClearDialog({ gatePass, onCancel, onDone }) {
           label="Received Qty"
           max={gatePass.qty}
         />
-        <Field label="Remarks" className="span-2">
-          <TextArea rows={2} value={remarks} onChange={(e) => setRemarks(e.target.value)} />
-        </Field>
+        <CollapsibleField className="span-2">
+          <Field label="Remarks">
+            <TextArea rows={2} value={remarks} onChange={(e) => setRemarks(e.target.value)} />
+          </Field>
+        </CollapsibleField>
       </div>
     </Modal>
   );

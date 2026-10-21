@@ -17,6 +17,7 @@ import { useResourceList } from '../../hooks/useResourceList.js';
 import { cuttingIssues as ciApi, orders as ordersApi } from '../../services/erp.js';
 import {
   Alert,
+  CollapsibleField,
   EmptyState,
   EnumSelect,
   Field,
@@ -26,6 +27,7 @@ import {
   RecordSelect,
   SortableTh,
   Spinner,
+  StatusBadge,
   TextArea,
   TextInput,
 } from '../../components/ui.jsx';
@@ -36,7 +38,7 @@ import {
   WorkflowTrail,
 } from '../../components/workflow.jsx';
 import { Detail, DetailGrid, TraceChain } from '../shared/Detail.jsx';
-import { fmtDate, fmtDateTime, fmtNum } from '../../utils/format.js';
+import { fmtDate, fmtDateTime, fmtNum, fmtOrder } from '../../utils/format.js';
 import { loadFailed } from '../../services/loadFailures.js';
 import { ExportButton } from '../../components/dataTransfer.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
@@ -117,7 +119,7 @@ export function CuttingIssueList() {
             <RecordSelect
               id="ci-f-order"
               options={orderOptions}
-              getLabel={(o) => o.orderNo}
+              getLabel={fmtOrder}
               placeholder="All orders"
               value={list.filters.orderId ?? ''}
               onChange={(e) => list.setFilter('orderId', e.target.value)}
@@ -210,6 +212,11 @@ export function CuttingIssueList() {
                     <td>
                       <StateBadge state={c.workflowState} />
                       {c.posted && <div className="faint">locked</div>}
+                      {c.ironingReceiptStatus && c.ironingReceiptStatus !== 'NOT_RECEIVED' && (
+                        <div className="faint">
+                          {c.ironingReceiptStatus === 'CLOSED' ? 'Closed' : 'Partially received'} at ironing
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -398,6 +405,13 @@ export function CuttingIssueDetail() {
             <Detail label="Style" value={c.style?.styleDescription} />
             <Detail label="Firm / unit" value={c.firmName} />
             <Detail label="Good pieces given to stitching" value={fmtNum(c.cuttingPcsIssued)} />
+            {c.postedAt && (
+              <Detail
+                label="Back from stitching, at ironing"
+                value={<StatusBadge status={c.ironingReceiptStatus ?? 'NOT_RECEIVED'} />}
+                sub={`${fmtNum(c.pcsReceivedAtIroning ?? 0)} of ${fmtNum(c.cuttingPcsIssued)} pieces`}
+              />
+            )}
             <Detail label="Cut pieces damaged / rejected" value={fmtNum(c.cuttingPcsDamaged)} />
             <Detail label="Fabric consumed" value={fmtNum(c.consumedQty, { decimals: 2 })} />
             <Detail label="Fabric wastage" value={fmtNum(c.wastageQty, { decimals: 2 })} />
@@ -543,9 +557,11 @@ function PostDialog({ challan, onCancel, onDone }) {
           <ExcessPanel excess={verification.excess} title="Excess over the approved plan" />
         )}
 
-        <Field label="Remarks">
-          <TextArea rows={2} value={remarks} onChange={(e) => setRemarks(e.target.value)} />
-        </Field>
+        <CollapsibleField>
+          <Field label="Remarks">
+            <TextArea rows={2} value={remarks} onChange={(e) => setRemarks(e.target.value)} />
+          </Field>
+        </CollapsibleField>
 
         <Alert kind="warning">
           <strong>This cannot be undone.</strong> Cloth gets cut and issued to the unit. There is no

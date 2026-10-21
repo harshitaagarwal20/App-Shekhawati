@@ -49,7 +49,8 @@ what to do with it.
 
 | Excel list | Why |
 |---|---|
-| `Operation`, `InformTo`, `RejectReason`, `SentFor`, `StatusDispatch`, `StatusRecon`, `StatusQC`, `YesNo`, `InspDefect26` | Each belongs to a **post-Cutting-Issue module** — stitching, QC records, dispatch, reconciliation — which is explicitly out of scope. Seeding them would imply a module that does not exist. |
+| `RejectReason`, `SentFor`, `StatusDispatch`, `StatusRecon`, `StatusQC`, `YesNo`, `InspDefect26` | Each belongs to a module not yet built — final QC, dispatch, reconciliation. Seeding them would imply a module that does not exist. |
+| `InformTo` | Used by Inline QC (Phase 3), but **not seeded as a list**. Its values are job titles (Unit Incharge, QC Head, Supervisor, Production Manager, Dinesh Sir), and a job title has no Action needed list to send a defect to. Inform To is a login holding `INLINE_QC.RESOLVE` instead — see §14a. |
 | `ShipMode` → "Courier" | Not in the reference specification (Ship / Air / Road). Removed rather than left as invented master data. Nothing referenced it. If the office does courier shipments, the value is added on the List Master screen — which is where master values belong. |
 
 ---
@@ -402,6 +403,43 @@ of attempts can be walked in either direction.
 
 ---
 
+## 14a. QC Size + QC Defects  →  Inline QC
+
+Phase 3. The two sheets ("Role Acess - QC Dept (Checker)") are the same row
+except for Operation and Size, so they are **one register** with a Check Type:
+SIZE is QC Size, WORKMANSHIP is QC Defects. Each defect is its own row in
+`inline_qc_defects`, which is what the Inform To person's Action needed list
+is built from. See [INLINE-QC-NOTES.md](INLINE-QC-NOTES.md).
+
+| Excel field | Sheet | Source | ERP field | Database column | API field | React field |
+|---|---|---|---|---|---|---|
+| *(which sheet)* | both | — | `checkType` | `inline_qc_entries.check_type` | `checkType` | Size / Workmanship toggle |
+| Date | both | Auto | `entryDate` | `entry_date` | `entryDate` | Date |
+| Order No | both | Dropdown → Order | `orderId` | `order_id` | `order.orderNo` | Order No |
+| Unit | both | Dropdown → L_StitchingUnit | `unit` | `unit` | `unit` | Unit (**Auto** from the tailor) |
+| Tailor Name | both | Dropdown → Employee Master | `tailorId` | `tailor_id` | `tailor.empName` | Tailor |
+| Style No / Style | both | Dropdown → Style Master | `styleId` | `style_id` | `style.styleNo` | Style |
+| Operation | QC Size | Dropdown → L_Operation | `operation` | `operation` | `operation` | Operation (Size only) |
+| Size | QC Size | Manual | `sizeMeasurement` | `size_measurement` | `sizeMeasurement` | Size measurement (Size only) |
+| Psc Checked/Reject | both | Manual | `pcsChecked`, `pcsRejected` | `pcs_checked`, `pcs_rejected` | `pcsChecked`, `pcsRejected` | Pcs checked, Pcs rejected |
+| Defects found | both | Dropdown → L_DefectType | `defects[].defect` | `inline_qc_defects.defect` | `defects` | Defects found (several) |
+| Inform To | both | Dropdown → L_InformTo | `informToUserId` | `inform_to_user_id` | `informToName` | Inform to (a person) |
+
+**Changed from the sheet, on purpose:**
+
+- **Psc Checked/Reject** is one cell in the workbook (one number, so it is not
+  clear which it is). It is two numbers here, and rejected can never be more
+  than checked.
+- **Defects found** holds one value per row in the workbook and several here.
+- **Unit** is a dropdown in the workbook but follows the tailor here, so a
+  check cannot name a tailor on one unit and a different unit.
+- **Inform To** names a person instead of a job title (see §1).
+
+**Added beyond the sheet:** each defect's status (Open / Resolved), who
+resolved it, when and a note; Remarks; who recorded the check.
+
+---
+
 ## 15. Tables the workbook has no sheet for
 
 These exist because the workbook's process **implies** them without recording
@@ -428,8 +466,8 @@ Nothing important is silently omitted. This is the complete list.
 
 | Excel field | Sheet | Why |
 |---|---|---|
-| Every column of **Stitching Record**, **Hourly Monitoring**, **QC Size**, **QC Defects**, **Internal Quality Check**, **Internal / Final Checker Report**, **Finished Checker**, **External Secondary Checking**, **Alter Report**, **Spot Rectification-Scrap**, **Rejected**, **Packing**, **Needle Checking**, **Dispatch**, **Reconciliation Report** | those sheets | **Out of scope.** The application ends at Cutting Issue. `npm run verify:scope` fails the build if any of these appears in the schema — including as a stray column name. |
-| `Operation`, `InformTo`, `RejectReason`, `SentFor`, `StatusDispatch`, `StatusRecon`, `StatusQC`, `YesNo`, `InspDefect26` | Master Lists | Dropdowns for the sheets above. Seeding them would imply modules that do not exist. |
+| Every column of **Internal Quality Check**, **Internal / Final Checker Report**, **Finished Checker**, **Spot Rectification-Scrap**, **Packing**, **Needle Checking**, **Dispatch**, **Reconciliation Report** | those sheets | **Not built yet.** `npm run verify:scope` fails the build if any of these appears in the schema, including as a stray column name. (Stitching Record, Hourly Monitoring, QC Size, QC Defects, External Secondary Checking, Alter Report and Rejected have since been built. See §14a and the phase notes.) |
+| `RejectReason`, `SentFor`, `StatusDispatch`, `StatusRecon`, `StatusQC`, `YesNo`, `InspDefect26` | Master Lists | Dropdowns for the sheets above. Seeding them would imply modules that do not exist. |
 | Gate Pass — validating **Item** against `L_ItemCategory` | Gate Pass | The sheet's own values ("Dyed Fabric", "Cut Panels") are not category values. Kept as free text, matching the workbook. |
 | Printing — a **return quantity** | Printing | The sheet has no such column. Job-work returns are recorded on the Dyeing Receipt sheet, which does. |
 | GRN — **Roll No** as a single value on multi-roll receipts | GRN | Blank in every sample row. Superseded by one `FabricRoll` per roll; the column is kept for single-roll receipts so the printed field still reconciles. |

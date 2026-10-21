@@ -31,6 +31,11 @@ import dashboardRoutes from './dashboard.routes.js';
 import auditRoutes from './audit.routes.js';
 import notificationRoutes from './notification.routes.js';
 import costSheetRoutes from './costSheet.routes.js';
+import stitchingRoutes from './stitching.routes.js';
+import inlineQcRoutes from './inlineQc.routes.js';
+import ironingRoutes from './ironing.routes.js';
+import externalQcRoutes from './externalQc.routes.js';
+import alterationRoutes, { rejectedRegisterRoutes } from './alteration.routes.js';
 import { exportRoutes, importRoutes } from './dataTransfer.routes.js';
 
 const router = Router();
@@ -88,6 +93,16 @@ router.use('/plan-approvals', planApprovalRoutes);
 router.use('/cutting-challans', cuttingChallanRoutes);
 router.use('/cut-pieces-receipts', cutPiecesReceiptRoutes);
 router.use('/cutting-issues', cuttingIssueRoutes);
+// Production Phase 2 - stitching, hourly monitoring, printing after stitching.
+router.use('/stitching', stitchingRoutes);
+// Phase 3 - Inline QC, on the line beside stitching.
+router.use('/inline-qc', inlineQcRoutes);
+// After stitching, before final QC.
+router.use('/ironing', ironingRoutes);
+// Phase 4 - External QC, the Alteration Unit and the Rejected Register.
+router.use('/external-qc', externalQcRoutes);
+router.use('/alteration', alterationRoutes);
+router.use('/rejected-register', rejectedRegisterRoutes);
 router.use('/excess', excessRoutes);
 // C2 / C3 - the date-versioned tolerance masters, and the gap report.
 router.use('/tolerances', toleranceRoutes);

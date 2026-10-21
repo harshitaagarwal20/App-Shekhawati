@@ -3,10 +3,11 @@
  * "Shekwati Impex formats.xlsx" (row 4 = list name, rows 5+ = values).
  *
  * Only the lists consumed by an IN-SCOPE module are seeded. The workbook also
- * carries Operation, InformTo, RejectReason, SentFor, StatusDispatch,
- * StatusRecon, StatusQC, YesNo and InspDefect26, all of which belong to the
- * post-Cutting-Issue modules that are explicitly out of scope; they are
- * deliberately left out.
+ * carries RejectReason, SentFor, StatusDispatch, StatusRecon, StatusQC, YesNo
+ * and InspDefect26, all of which belong to modules not yet built (final QC,
+ * packing, dispatch); they are deliberately left out. InformTo is not a list
+ * here either: Inline QC names a person with a login, not a job title, so the
+ * Action needed list has someone to land on.
  *
  * Lists whose values drive workflow logic (StatusGeneral, StatusApproval,
  * StatusActive, GatePassType, Decision, StatusGatePass, StatusDyeRecv,
@@ -239,13 +240,16 @@ export const masterLists = [
       'QC',
       'Packing',
       'Dispatch',
+      'Finishing',
+      // Phase 4 - the Alteration Staff dropdown lists this department.
+      'Alteration',
     ],
   },
   {
     code: 'Designation',
     name: 'Designation',
     description: 'Employee Master - Designation (L_Designation)',
-    values: ['Checker', 'Operator', 'Tailor', 'Supervisor', 'Manager', 'GM', 'Director'],
+    values: ['Checker', 'Operator', 'Tailor', 'Supervisor', 'Manager', 'GM', 'Director', 'Ironer'],
   },
   {
     code: 'StitchingUnit',
@@ -257,6 +261,35 @@ export const masterLists = [
       'Unit 3 - Ramesh',
       'Unit 4 - Suresh',
     ],
+  },
+  {
+    /*
+     * Phase 2 - the Hourly Monitoring columns, in the order shown. The office
+     * changes the slots here, on the Dropdown Lists screen; nothing is coded.
+     * "1:00" .. "6:30" are afternoon times, as the floor writes them.
+     */
+    code: 'HourlySlot',
+    name: 'Hourly Slot',
+    description: 'Hourly Monitoring - the time-slot columns, in the order shown (L_HourlySlot)',
+    values: ['10:00', '11:00', '12:00', '1:00', '2:00', '3:00', '4:00', '5:30', '6:30'],
+  },
+  {
+    /*
+     * Phase 3 - the stitching operation an Inline QC Size check looked at.
+     * The defects themselves come from DefectType below, the workbook's one
+     * shared defect list.
+     */
+    code: 'Operation',
+    name: 'Operation',
+    description: 'Inline QC (Size check) - the stitching operation checked (L_Operation)',
+    values: ['Body Stitch', 'Handle Attach', 'Hemming', 'Label Attach', 'Lupi Stitch', 'Gusset Stitch', 'Final Trim'],
+  },
+  {
+    /* Ironing - why a piece was damaged at the ironing table. */
+    code: 'IroningDamage',
+    name: 'Ironing Damage',
+    description: 'Ironing - the damage type of a piece damaged at the ironing table (L_IroningDamage)',
+    values: ['Iron Shine', 'Scorch-Burn', 'Water Mark'],
   },
   {
     code: 'ContainerNo',
@@ -295,7 +328,7 @@ export const masterLists = [
     code: 'DefectType',
     name: 'Defect Type',
     description:
-      'Fabric Scrutiny Report - Defect Type (L_DefectType). The workbook keeps one shared defect list; the fabric-side values are the ones used in scope.',
+      'Fabric Scrutiny Report and Inline QC - Defect Type (L_DefectType). The workbook keeps one shared defect list for fabric and stitching defects.',
     values: [
       'Dyeing Shade Variation',
       'Weaving Defect',

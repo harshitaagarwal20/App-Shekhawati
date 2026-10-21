@@ -7,14 +7,16 @@
  * code owns it, and that code runs on the server.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   orders as ordersApi,
   quotations as quotationsApi,
+  styles as stylesApi,
   vendors as vendorsApi,
 } from '../../services/erp.js';
 import {
   Alert,
+  CollapsibleField,
   Field,
   MasterSelect,
   RecordSelect,
@@ -81,6 +83,61 @@ export default function QuotationForm({ quotation, onSaved, onCancel }) {
     vendorsApi.options().then(setVendorOptions).catch(loadFailed(setVendorOptions, 'vendors'));
     ordersApi.options().then(setOrderOptions).catch(loadFailed(setOrderOptions, 'orders'));
   }, []);
+
+  /*
+   * THE ORDER NARROWS WHAT CAN BE QUOTED.
+   *
+   * With an order chosen, the item dropdowns offer only what its styles' BOMs
+   * call for - the same explosion Planning and the PO ceiling read, so fabric
+   * held on the Style Master header counts even without a fabric BOM row.
+   * `null` means no narrowing: no order, or its BOM could not be read.
+   */
+  const [bomLines, setBomLines] = useState(null);
+  useEffect(() => {
+    const order = orderOptions?.find((o) => o.id === form.orderId);
+    if (!order) {
+      setBomLines(null);
+      return;
+    }
+    const styleIds = [
+      ...new Set([order.style?.id, ...(order.lines ?? []).map((l) => l.styleId)].filter(Boolean)),
+    ];
+    let cancelled = false;
+    Promise.all(styleIds.map((id) => stylesApi.requirement(id, 1)))
+      .then((rs) => {
+        if (!cancelled) setBomLines(rs.flatMap((r) => r.lines ?? []));
+      })
+      .catch(() => {
+        if (!cancelled) setBomLines(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [form.orderId, orderOptions]);
+
+  /** A MasterSelect filter keeping only the values the BOM uses, or none. */
+  const bomFilter = (field, where = () => true) => {
+    if (!bomLines?.length) return undefined;
+    const allowed = new Set(bomLines.filter(where).map((l) => l[field]).filter(Boolean));
+    return allowed.size ? (v) => allowed.has(v.value) : undefined;
+  };
+  const itemFilter = bomFilter('itemCategory');
+  const subCategoryFilter = bomFilter('subCategory', (l) => l.itemCategory === form.item);
+  const accessoriesFilter = bomFilter('accessoriesItem');
+
+  /*
+   * Choosing a DIFFERENT order clears an item its BOM does not call for. Only
+   * on the user's change - a quotation opened for edit keeps what it holds.
+   */
+  const orderChanged = useRef(false);
+  useEffect(() => {
+    if (!orderChanged.current || !bomLines?.length) return;
+    orderChanged.current = false;
+    if (form.item && !bomLines.some((l) => l.itemCategory === form.item)) {
+      setForm((f) => ({ ...f, item: '', subCategory: '', accessoriesItem: '', accessoryType: '' }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bomLines]);
 
   // Ask the SERVER for the amount. Debounced, because it fires as the buyer
   // types a quantity or a rate.
@@ -185,14 +242,13 @@ export default function QuotationForm({ quotation, onSaved, onCancel }) {
         )}
 
         <div className="form-grid">
-          <Field
-            label="Quotation No"
-            error={fieldErrors.quotationNo}
-            hint={isNew ? 'Left blank, the system issues one (QT-001).' : undefined}
-            htmlFor="q-no"
-          >
-            <TextInput id="q-no" value={form.quotationNo} onChange={set('quotationNo')} />
-          </Field>
+          {/* A new quotation is numbered on save (QT-001), so the box only
+              appears once there is a number to correct. */}
+          {!isNew && (
+            <Field label="Quotation No" error={fieldErrors.quotationNo} htmlFor="q-no">
+              <TextInput id="q-no" value={form.quotationNo} onChange={set('quotationNo')} />
+            </Field>
+          )}
 
           <Field label="Date" required error={fieldErrors.quotationDate} htmlFor="q-date">
             <TextInput id="q-date" type="date" value={form.quotationDate} onChange={set('quotationDate')} />
@@ -225,16 +281,26 @@ export default function QuotationForm({ quotation, onSaved, onCancel }) {
               getLabel={(o) => `${o.orderNo} - ${o.style?.styleNo ?? ''}`}
               placeholder="No order reference"
               value={form.orderId}
-              onChange={set('orderId')}
+              onChange={(e) => {
+                orderChanged.current = true;
+                set('orderId')(e);
+              }}
             />
           </Field>
 
           <div className="fieldset-title">What is being quoted</div>
 
-          <Field label="Item" required error={fieldErrors.item} htmlFor="q-item">
+          <Field
+            label="Item"
+            required
+            error={fieldErrors.item}
+            hint={itemFilter ? "Only what this order's BOM calls for." : undefined}
+            htmlFor="q-item"
+          >
             <MasterSelect
               id="q-item"
               listCode="ItemCategory"
+              filter={itemFilter}
               currentValue={form.item}
               value={form.item}
               // Sub Category is a fabric weight on one item and a stationery
@@ -274,6 +340,7 @@ export default function QuotationForm({ quotation, onSaved, onCancel }) {
               <MasterSelect
                 id="q-sub"
                 listCode="FabricSubCat"
+                filter={subCategoryFilter}
                 currentValue={form.subCategory}
                 value={form.subCategory}
                 onChange={set('subCategory')}
@@ -290,6 +357,7 @@ export default function QuotationForm({ quotation, onSaved, onCancel }) {
             <MasterSelect
               id="q-acc"
               listCode="AccessoriesItem"
+              filter={accessoriesFilter}
               currentValue={form.accessoriesItem}
               value={form.accessoriesItem}
               // A button variety means nothing on a zipper.
@@ -337,9 +405,11 @@ export default function QuotationForm({ quotation, onSaved, onCancel }) {
             />
           </Field>
 
-          <Field label="Remarks" className="span-2" htmlFor="q-remarks">
-            <TextArea id="q-remarks" rows={2} value={form.remarks} onChange={set('remarks')} />
-          </Field>
+          <CollapsibleField className="span-2">
+            <Field label="Remarks" htmlFor="q-remarks">
+              <TextArea id="q-remarks" rows={2} value={form.remarks} onChange={set('remarks')} />
+            </Field>
+          </CollapsibleField>
         </div>
 
         <AmountPanel preview={preview} loading={previewing} />

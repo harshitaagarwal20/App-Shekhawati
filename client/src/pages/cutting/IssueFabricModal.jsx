@@ -24,7 +24,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { employees as employeesApi, fabricIssues as fiApi } from '../../services/erp.js';
-import { Alert, Field, Modal, Spinner, TextArea, TextInput } from '../../components/ui.jsx';
+import { Alert, CollapsibleField, Field, Modal, Spinner, TextArea, TextInput } from '../../components/ui.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
 import { fmtNum, todayInput } from '../../utils/format.js';
 import { suggestRolls } from '../../utils/rollSuggest.js';
@@ -300,9 +300,11 @@ export default function IssueFabricModal({ challan, line, onClose, onIssued }) {
               />
             </Field>
           </div>
-          <Field label="Remarks">
-            <TextInput value={remarks} onChange={(e) => setRemarks(e.target.value)} />
-          </Field>
+          <CollapsibleField>
+            <Field label="Remarks">
+              <TextInput value={remarks} onChange={(e) => setRemarks(e.target.value)} />
+            </Field>
+          </CollapsibleField>
         </>
       )}
     </Modal>

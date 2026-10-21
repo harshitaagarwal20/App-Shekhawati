@@ -22,6 +22,8 @@ import { z } from 'zod';
 import { buyers as buyersApi, orders as ordersApi, styles as stylesApi } from '../../services/erp.js';
 import {
   Alert,
+  CollapsibleField,
+  CollapsibleSection,
   EnumSelect,
   Field,
   MasterSelect,
@@ -447,7 +449,9 @@ export default function OrderForm({ order, onSaved, onCancel }) {
       exFactoryDate: values.exFactoryDate || null,
       priceTerms: values.priceTerms ?? '',
       paymentTerms: values.paymentTerms ?? '',
-      exchangeRate: values.exchangeRate ? values.exchangeRate : null,
+      // The box is gone for INR, but a rate typed before switching to INR
+      // would still be in the form's values.
+      exchangeRate: !isInr && values.exchangeRate ? values.exchangeRate : null,
       // The value is the server's: only the price per piece is sent.
       ...(multiLine ? {} : { unitPrice: values.unitPrice ? values.unitPrice : null }),
       // Only the requested excess is sent. effectiveQty and the approved
@@ -513,14 +517,25 @@ export default function OrderForm({ order, onSaved, onCancel }) {
         )}
 
         <div className="form-grid">
-          <Field
-            label="Order No"
-            error={errors.orderNo?.message}
-            hint={isNew ? 'The buyer PO number. Left blank, the system issues one.' : undefined}
-            htmlFor="orderNo"
-          >
-            <TextInput id="orderNo" error={errors.orderNo} {...register('orderNo')} />
-          </Field>
+          {/*
+            ONE BOX FOR THE BUYER'S NUMBER, AND IT IS "BUYER PO NO".
+
+            Order No is this system's own number for the order, issued on save -
+            so a new order has no box for it, and an existing one shows it only
+            so it can be corrected. Its old hint called it "the buyer PO number"
+            while a separate Buyer PO No sat further down, and nobody could tell
+            which of the two to type into.
+          */}
+          {!isNew && (
+            <Field
+              label="Order No"
+              error={errors.orderNo?.message}
+              hint="This system's number for the order. The buyer's own is Buyer PO No."
+              htmlFor="orderNo"
+            >
+              <TextInput id="orderNo" error={errors.orderNo} {...register('orderNo')} />
+            </Field>
+          )}
 
           <Field label="Order Date" required error={errors.orderDate?.message} htmlFor="orderDate">
             <TextInput id="orderDate" type="date" error={errors.orderDate} {...register('orderDate')} />
@@ -662,22 +677,23 @@ export default function OrderForm({ order, onSaved, onCancel }) {
             entries with the one needed today missing. Recorded here so the
             number is booked once, on the order, instead of first appearing at
             Planning where somebody retypes it from an email.
+
+            Not on a NEW order, though: nothing is booked when an order is taken,
+            so the box only appears when the order is edited later, once it is.
           */}
-          <Field
-            label="Container No"
-            error={errors.containerNo?.message}
-            htmlFor="containerNo"
-            hint="As printed on the container. Leave blank until it is booked."
-          >
-            <TextInput id="containerNo" placeholder="e.g. MSKU7654321" {...register('containerNo')} />
-          </Field>
+          {!isNew && (
+            <Field
+              label="Container No"
+              error={errors.containerNo?.message}
+              htmlFor="containerNo"
+              hint="As printed on the container, once it is booked."
+            >
+              <TextInput id="containerNo" placeholder="e.g. MSKU7654321" {...register('containerNo')} />
+            </Field>
+          )}
 
           <Field label="Buyer Delivery Date" error={errors.buyerDeliveryDate?.message} htmlFor="deliveryDate">
             <TextInput id="deliveryDate" type="date" {...register('buyerDeliveryDate')} />
-          </Field>
-
-          <Field label="Bill To" hint="Defaults from the Buyer Master." className="span-2" htmlFor="billTo">
-            <TextArea id="billTo" rows={2} {...register('billTo')} />
           </Field>
 
           <Field
@@ -754,30 +770,40 @@ export default function OrderForm({ order, onSaved, onCancel }) {
             />
           </Field>
 
-          <Field
-            label="Exchange Rate"
-            error={errors.exchangeRate?.message}
-            hint={isInr ? 'Not needed for an INR order.' : `Rupees per 1 ${currency || 'unit of currency'}.`}
-            htmlFor="exchangeRate"
-          >
-            <TextInput
-              id="exchangeRate"
-              type="number"
-              min="0"
-              step="0.0001"
-              disabled={isInr}
-              error={errors.exchangeRate}
-              {...register('exchangeRate')}
-            />
-          </Field>
+          {/* An INR order has nothing to convert, so no box at all. */}
+          {!isInr && (
+            <Field
+              label="Exchange Rate"
+              error={errors.exchangeRate?.message}
+              hint={`Rupees per 1 ${currency || 'unit of currency'}.`}
+              htmlFor="exchangeRate"
+            >
+              <TextInput
+                id="exchangeRate"
+                type="number"
+                min="0"
+                step="0.0001"
+                error={errors.exchangeRate}
+                {...register('exchangeRate')}
+              />
+            </Field>
+          )}
 
-          <Field label="Price Terms" hint="Incoterm - FOB, CIF. Defaults from the buyer." htmlFor="priceTerms">
-            <TextInput id="priceTerms" {...register('priceTerms')} />
-          </Field>
+          {/* Filled from the Buyer Master when the buyer is chosen, so folded:
+              opened only to change them for this one order. */}
+          <CollapsibleSection title="Buyer terms" summary="Bill To, Price Terms, Payment Terms — from the buyer">
+            <Field label="Bill To" hint="Defaults from the Buyer Master." className="span-2" htmlFor="billTo">
+              <TextArea id="billTo" rows={2} {...register('billTo')} />
+            </Field>
 
-          <Field label="Payment Terms" hint="Defaults from the buyer." className="span-2" htmlFor="paymentTerms">
-            <TextInput id="paymentTerms" {...register('paymentTerms')} />
-          </Field>
+            <Field label="Price Terms" hint="Incoterm - FOB, CIF. Defaults from the buyer." htmlFor="priceTerms">
+              <TextInput id="priceTerms" {...register('priceTerms')} />
+            </Field>
+
+            <Field label="Payment Terms" hint="Defaults from the buyer." className="span-2" htmlFor="paymentTerms">
+              <TextInput id="paymentTerms" {...register('paymentTerms')} />
+            </Field>
+          </CollapsibleSection>
 
           <div className="fieldset-title">Excess &mdash; approved by the Director</div>
 
@@ -818,9 +844,11 @@ export default function OrderForm({ order, onSaved, onCancel }) {
             <TextArea id="excessJustification" rows={2} disabled={!excessRequested} {...register('excessJustification')} />
           </Field>
 
-          <Field label="Remarks" className="span-2" htmlFor="remarks">
-            <TextArea id="remarks" rows={2} {...register('remarks')} />
-          </Field>
+          <CollapsibleField className="span-2">
+            <Field label="Remarks" htmlFor="remarks">
+              <TextArea id="remarks" rows={2} {...register('remarks')} />
+            </Field>
+          </CollapsibleField>
         </div>
       </div>
 

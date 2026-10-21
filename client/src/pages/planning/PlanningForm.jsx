@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { orders as ordersApi, plannings as planningsApi } from '../../services/erp.js';
 import {
   Alert,
+  CollapsibleField,
   EnumSelect,
   Field,
   MasterSelect,
@@ -574,9 +575,11 @@ export default function PlanningForm({ plan, onSaved, onCancel }) {
             </>
           )}
 
-          <Field label="Remarks" className="span-2" htmlFor="pl-remarks">
-            <TextArea id="pl-remarks" rows={2} value={header.remarks} onChange={setField('remarks')} />
-          </Field>
+          <CollapsibleField className="span-2">
+            <Field label="Remarks" htmlFor="pl-remarks">
+              <TextArea id="pl-remarks" rows={2} value={header.remarks} onChange={setField('remarks')} />
+            </Field>
+          </CollapsibleField>
         </div>
 
         {/* What is already planned on this STYLE, so a clash is visible before

@@ -91,6 +91,21 @@ export default function NotificationBell() {
     setUnread(0);
   }
 
+  // Optimistic: the row goes at once, and a failed call puts it back on the
+  // next open rather than interrupting with an error.
+  function dismissOne(n) {
+    setRows((r) => (r ?? []).filter((x) => x.id !== n.id));
+    if (!n.readAt) setUnread((u) => Math.max(0, u - 1));
+    api.dismiss([n.id]).catch(() => {});
+  }
+
+  function clearRead() {
+    setRows((r) => (r ?? []).filter((x) => !x.readAt));
+    api.dismiss().catch(() => {});
+  }
+
+  const anyRead = rows?.some((n) => n.readAt);
+
   return (
     <div className="notify" ref={ref}>
       <button
@@ -119,6 +134,11 @@ export default function NotificationBell() {
                   Mark all read
                 </button>
               )}
+              {anyRead && (
+                <button type="button" className="link-button" onClick={clearRead}>
+                  Clear read
+                </button>
+              )}
               <button
                 type="button"
                 className="link-button"
@@ -138,16 +158,28 @@ export default function NotificationBell() {
               <div className="notify-empty">Nothing yet. Approvals waiting for you and decisions on your documents appear here.</div>
             )}
             {rows?.map((n) => (
-              <button
-                type="button"
-                key={n.id}
-                className={`notify-item ${n.readAt ? '' : 'is-unread'}`}
-                onClick={() => openOne(n)}
-              >
-                <span className="notify-title">{n.title}</span>
-                {n.body && <span className="notify-body">{n.body}</span>}
-                <span className="notify-time">{fmtDateTime(n.createdAt)}</span>
-              </button>
+              <div key={n.id} className="notify-row">
+                <button
+                  type="button"
+                  className={`notify-item ${n.readAt ? '' : 'is-unread'}`}
+                  onClick={() => openOne(n)}
+                >
+                  <span className="notify-title">{n.title}</span>
+                  {n.body && <span className="notify-body">{n.body}</span>}
+                  <span className="notify-time">{fmtDateTime(n.createdAt)}</span>
+                </button>
+                <button
+                  type="button"
+                  className="notify-dismiss"
+                  onClick={() => dismissOne(n)}
+                  aria-label={`Dismiss: ${n.title}`}
+                  title="Dismiss"
+                >
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+                    <path d="M18 6 6 18M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
             ))}
           </div>
         </div>
@@ -163,6 +195,16 @@ function NotificationSettings({ onClose }) {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [preview, setPreview] = useState(null);
+
+  async function showPreview() {
+    setError('');
+    try {
+      setPreview(await api.dailySummary());
+    } catch (e) {
+      setError(e.message);
+    }
+  }
 
   useEffect(() => {
     api
@@ -180,6 +222,7 @@ function NotificationSettings({ onClose }) {
         notifyByEmail: prefs.notifyByEmail,
         notifyByWhatsapp: prefs.notifyByWhatsapp,
         whatsappNumber: prefs.whatsappNumber || null,
+        ...(prefs.dailySummary?.eligible ? { notifyDailySummary: prefs.notifyDailySummary } : {}),
       });
       setPrefs({ ...p, whatsappNumber: p.whatsappNumber ?? '' });
       setSaved(true);
@@ -253,6 +296,36 @@ function NotificationSettings({ onClose }) {
                 style={{ marginTop: 6 }}
               />
             </Field>
+            {/* Offered only to holders of REPORT.SUMMARY - the server says so. */}
+            {prefs.dailySummary?.eligible && (
+              <Field
+                label="Daily summary"
+                hint={
+                  prefs.dailySummary.enabled
+                    ? `Every evening at ${prefs.dailySummary.time}: pieces cut and stitched, QC, rejections and approvals waiting. Sent here and to the places ticked above.`
+                    : 'The daily summary is switched off on the server.'
+                }
+              >
+                <label className="checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(prefs.notifyDailySummary)}
+                    onChange={(e) => setPrefs((p) => ({ ...p, notifyDailySummary: e.target.checked }))}
+                  />{' '}
+                  Send me the daily summary
+                </label>
+                <button type="button" className="btn btn-sm" style={{ marginTop: 6, width: 'auto', alignSelf: 'flex-start' }} onClick={showPreview}>
+                  Preview today&apos;s
+                </button>
+                {preview && (
+                  <pre className="summary-preview">
+                    {preview.message
+                      ? `${preview.message.title}\n\n${preview.message.body}`
+                      : 'Nothing in it for you today.'}
+                  </pre>
+                )}
+              </Field>
+            )}
           </>
         )}
       </div>

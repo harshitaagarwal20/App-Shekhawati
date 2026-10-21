@@ -34,6 +34,7 @@ import { STATE_BADGE, STATE_LABEL, fmtDate, fmtEnum, fmtQty } from './planningSh
 import { loadFailed } from '../../services/loadFailures.js';
 import { ExportButton } from '../../components/dataTransfer.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
+import { fmtOrder } from '../../utils/format.js';
 
 const DEPARTMENT_OPTIONS = [
   { value: 'CUTTING', label: 'Cutting' },
@@ -170,7 +171,7 @@ export default function PlanningList({ title = 'Planning' }) {
               id="p-order"
               options={orderOptions}
               getValue={(o) => o.id}
-              getLabel={(o) => o.orderNo}
+              getLabel={fmtOrder}
               placeholder="All orders"
               value={list.filters.orderId ?? ''}
               onChange={(e) => list.setFilter('orderId', e.target.value)}

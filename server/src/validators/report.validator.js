@@ -46,6 +46,11 @@ export const reportQuery = z
       ])
       .optional(),
 
+    /** Job work process - jobworker-performance. */
+    process: z.enum(['DYEING', 'PRINTING', 'WASHING', 'FINISHING']).optional(),
+    /** Which QC stage's defects - defect-reasons. */
+    qcStage: z.enum(['FABRIC_SCRUTINY', 'CUT_PIECES', 'INLINE_QC', 'EXTERNAL_QC', 'REJECTED']).optional(),
+
     // What state
     status: z.string().trim().max(30).optional(),
     approvalStatus: z.enum(['PENDING', 'APPROVED', 'REJECTED']).optional(),

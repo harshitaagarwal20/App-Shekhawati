@@ -7,10 +7,15 @@ Everything here is read out of the code, not out of a design deck. Where a
 diagram states a rule, the file that enforces it is named beside it — so a
 diagram that drifts from the application can be caught by opening one file.
 
-**The pipeline ends at Cutting Issue.** Nothing downstream of it exists here —
-no stitching, no hourly monitoring, no QC record, no alter, no packing, no
-needle checking, no dispatch, no reconciliation. `npm run verify:scope` fails
-the build if any of it appears.
+**The pipeline this document draws in detail ends at Cutting Issue.** Since it
+was written, production has been opened after it: Stitching and Hourly
+Monitoring ([PRODUCTION-PHASE-2-NOTES.md](PRODUCTION-PHASE-2-NOTES.md)),
+**Inline QC beside stitching** ([INLINE-QC-NOTES.md](INLINE-QC-NOTES.md)),
+Ironing ([IRONING-NOTES.md](IRONING-NOTES.md)), and External QC with the
+Alteration Unit ([PHASE-4-EXTERNAL-QC-NOTES.md](PHASE-4-EXTERNAL-QC-NOTES.md)).
+They are summarised at the foot of §2. Nothing after them exists: no final QC,
+no packing, no needle checking, no dispatch, no reconciliation.
+`npm run verify:scope` fails the build if any of it appears.
 
 - [1. Entry](#1-entry)
 - [2. The pipeline](#2-the-pipeline)
@@ -177,8 +182,27 @@ disabled account takes effect on the next call, not at token expiry.
    │  then the document is permanently locked                     │
    └──────────────────────────────┬───────────────────────────────┘
                                   ▼
+   ┌──────────────────────────────────────────────────────────────┐
+   │  STITCHING  (per unit)            INLINE QC  (beside it)     │
+   │  Stitching Record, per day        a checker walks the line:  │
+   │  Hourly Monitoring, per tailor    Size or Workmanship check  │
+   │  never more than was cut          on one tailor's work;      │
+   │  for the unit                     each defect goes to the    │
+   │                                   Inform To supervisor's     │
+   │                                   ACTION NEEDED list, and    │
+   │                                   only they mark it RESOLVED │
+   │                                   moves no pieces            │
+   └──────────────────────────────┬───────────────────────────────┘
+                                  ▼
+          IRONING  ──►  EXTERNAL QC  ──►  ALTERATION UNIT / REJECTED
+                                  ▼
                               ■  END OF SCOPE
 ```
+
+Inline QC draws on the same thing stitching does: the cutting posted to the
+tailor's unit (`inlineQc.service.js`, which reuses the stitching order list).
+It neither waits for a stitching record nor feeds ironing. The rules are in
+`domain/inlineQc.js`; the stages after it are in their phase notes.
 
 ---
 
@@ -348,6 +372,9 @@ moment it is.
 | Planning Approval | Plan Approval | `/plan-approvals` | `PLAN_APPROVAL.VIEW` |
 | Cutting | Cutting Challan | `/cutting-challans` | `CUTTING_CHALLAN.VIEW` — **see the note below** |
 | Cutting | Cutting Issue | `/cutting-issues` | `CUTTING_ISSUE.VIEW`; posting needs `CUTTING_ISSUE.APPROVE` |
+| Stitching | Stitching Record · Hourly Monitoring | `/stitching`, `/stitching/hourly` | `STITCHING_RECORD.VIEW`, `HOURLY_MONITORING.VIEW` |
+| Stitching | Inline QC · QC Action Needed | `/inline-qc`, `/inline-qc/actions` | `INLINE_QC.VIEW`; recording needs `INLINE_QC.CREATE`; being named in Inform To needs `INLINE_QC.RESOLVE`, and only the person named marks a defect Resolved |
+| Finishing | Ironing · External QC · Alteration Unit · Rejected Register | `/ironing`, `/external-qc`, `/alteration`, `/rejected-register` | `IRONING.VIEW`, `EXTERNAL_QC.VIEW`, `ALTERATION.VIEW`, `REJECTED_REGISTER.VIEW` |
 | Everywhere | Reports (fourteen) | `/reports` | `REPORT.VIEW`, then each report's own permission |
 | Everywhere | Print | `/print/:kind/:id` | the source document's |
 | Admin | Users · Roles · Audit | `/admin/*` | `USER.VIEW`, `ROLE.VIEW`, `AUDIT.VIEW` |

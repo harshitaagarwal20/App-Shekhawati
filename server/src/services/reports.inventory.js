@@ -573,8 +573,35 @@ async function supplierYieldReport(q) {
   const best = ranked
     .filter((r) => r.yieldRatio != null)
     .reduce((top, r) => (!top || r.yieldRatio.greaterThan(top.yieldRatio) ? r : top), null);
+  /*
+   * THE WASTAGE CHART - every supplier and item that has been cut, highest
+   * wastage first. One bar per supplier AND item, because the rule above holds
+   * for wastage too: canvas and drill do not cut alike. Built from `ranked`,
+   * not `rows`, so it covers the whole report rather than the page on screen.
+   */
+  const wastageBars = ranked
+    .filter((r) => r.used.greaterThan(0))
+    .map((r) => ({ r, w: r.s.wasted.div(r.used).mul(100) }))
+    .sort((a, b) => b.w.comparedTo(a.w))
+    .slice(0, 15)
+    .map(({ r, w }) => ({
+      label: `${r.s.vendorName} · ${r.s.itemName}${r.s.colorCode ? ` (${r.s.colorCode})` : ''}`,
+      value: w.toDecimalPlaces(1).toFixed(1),
+      display: `${w.toDecimalPlaces(1).toFixed(1)}%`,
+      sub: `${q4(r.s.wasted)} wasted of ${q4(r.used)} ${[...r.s.uoms].sort().join(' + ')} used`,
+    }));
+
   return {
     rows,
+    charts: [
+      {
+        key: 'wastage',
+        title: 'Cutting wastage by supplier',
+        note: 'Wastage and fabric damage as a share of the fabric used at the cutting table. Compare suppliers of the same item.',
+        unit: '%',
+        bars: wastageBars,
+      },
+    ],
     totals: {
       suppliers: new Set(rows.map((r) => r.vendorName)).size,
       items: new Set(rows.map((r) => r.itemKey)).size,

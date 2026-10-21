@@ -10,6 +10,7 @@ import {
   startNotificationDispatcher,
   stopNotificationDispatcher,
 } from './services/notification.service.js';
+import { startDailySummary, stopDailySummary } from './services/dailySummary.service.js';
 
 const app = createApp();
 
@@ -17,6 +18,11 @@ const app = createApp();
 // WhatsApp keys are set; in-app notifications need no background work.
 if (startNotificationDispatcher()) {
   process.stdout.write('Notification outbox dispatcher started.\n');
+}
+
+// The evening summary of the day's work, to holders of REPORT.SUMMARY.
+if (startDailySummary()) {
+  process.stdout.write(`Daily summary scheduled for ${env.DAILY_SUMMARY_TIME} India time.\n`);
 }
 
 const server = app.listen(env.PORT, () => {
@@ -34,6 +40,7 @@ const server = app.listen(env.PORT, () => {
 async function shutdown(signal) {
   process.stdout.write(`\n${signal} received, shutting down...\n`);
   stopNotificationDispatcher();
+  stopDailySummary();
   stopPoolWarmer();
   server.close(async () => {
     await prisma.$disconnect();

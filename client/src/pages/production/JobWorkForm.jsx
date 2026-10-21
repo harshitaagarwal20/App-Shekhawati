@@ -21,14 +21,13 @@ import {
   FormShell,
   RHFEnumSelect,
   RHFInput,
-  RHFMasterSelect,
   RHFQty,
   RHFRecordSelect,
   RHFTextArea,
   useSubmit,
   useZodForm,
 } from '../../components/form.jsx';
-import { Alert, RecordSelect, Spinner, TextInput } from '../../components/ui.jsx';
+import { Alert, CollapsibleField, Field, RecordSelect, Spinner, TextInput } from '../../components/ui.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
 import { fmtNum, todayInput } from '../../utils/format.js';
 import { loadFailed } from '../../services/loadFailures.js';
@@ -124,6 +123,15 @@ export default function JobWorkForm({ processes = [], onSaved, onCancel }) {
 
   const meta = processes.find((p) => p.process === process);
 
+  /** "Navy · 100% cotton · 240 GSM · Mtr" - whichever of them the roll has. */
+  const gsm = form.watch('gsm');
+  const fabricLine = [
+    form.watch('colourCode'),
+    form.watch('content'),
+    gsm && `${gsm} GSM`,
+    form.watch('uom'),
+  ].filter(Boolean).join(' · ');
+
   useEffect(() => {
     fiApi.rolls({ includeEmpty: 'true' }).then(setRolls).catch(loadFailed(setRolls, 'rolls'));
     ordersApi.options().then(setOrders).catch(loadFailed(setOrders, 'orders'));
@@ -176,13 +184,12 @@ export default function JobWorkForm({ processes = [], onSaved, onCancel }) {
       });
       setPreview(p);
 
-      // Fill the fabric characteristics from the roll, once.
-      if (p.roll && !form.getValues('colourCode')) {
-        form.setValue('colourCode', p.roll.colorCode ?? '');
-        form.setValue('content', p.roll.content ?? '');
-        form.setValue('gsm', p.roll.gsm ?? '');
-        form.setValue('uom', p.roll.uom ?? '');
-      }
+      // The fabric characteristics are the lead roll's, shown read-only, so
+      // they follow the roll every time it changes rather than only the first.
+      form.setValue('colourCode', p.roll?.colorCode ?? '');
+      form.setValue('content', p.roll?.content ?? '');
+      form.setValue('gsm', p.roll?.gsm ?? '');
+      form.setValue('uom', p.roll?.uom ?? '');
       if (standardShrinkagePct === '') {
         form.setValue('standardShrinkagePct', Number(p.standardShrinkagePctDisplay));
       }
@@ -395,12 +402,8 @@ export default function JobWorkForm({ processes = [], onSaved, onCancel }) {
             type="date"
             hint="When the fabric is due back from the job worker."
           />
-          <RHFInput
-            form={form}
-            name="dyeIssueNo"
-            label="Job No"
-            hint="Left blank, the process's own series issues one."
-          />
+          {/* No Job No box: this form only creates, and the process's own
+              series numbers the job - the footer says which number. */}
           <RHFEnumSelect
             form={form}
             name="fabricStage"
@@ -457,12 +460,17 @@ export default function JobWorkForm({ processes = [], onSaved, onCancel }) {
           />
         </FieldGroup>
 
-        <FieldGroup title="Fabric" hint="copied from the roll — edit only if the roll record is wrong">
-          <RHFMasterSelect form={form} name="colourCode" label="Color" listCode="ColorCode" />
-          <RHFMasterSelect form={form} name="content" label="Content" listCode="FabricContent" />
-          <RHFMasterSelect form={form} name="gsm" label="GSM" listCode="GSM" />
-          <RHFMasterSelect form={form} name="uom" label="UOM" listCode="UOM" />
-          <RHFTextArea form={form} name="remark" label="Remark" className="span-2" />
+        <FieldGroup title="Fabric" hint="as recorded on the roll">
+          {/* Not dropdowns: these belong to the roll, and a second copy here
+              that anybody could change would drift from it. */}
+          <Field label="Color · Content · GSM · UOM" className="span-2">
+            <div style={{ padding: '6px 0' }}>
+              {fabricLine || <span className="faint">Choose a roll — these come from it.</span>}
+            </div>
+          </Field>
+          <CollapsibleField label="Remark" className="span-2">
+            <RHFTextArea form={form} name="remark" label="Remark" />
+          </CollapsibleField>
         </FieldGroup>
       </div>
 

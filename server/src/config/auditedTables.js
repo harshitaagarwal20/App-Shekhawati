@@ -46,6 +46,24 @@ export const AUDITED = {
   fabric_scrutinies: { label: 'Fabric scrutiny', route: (id) => `/scrutinies/${id}` },
   plan_approvals: { label: 'Plan approval', route: (id) => `/plan-approvals/${id}` },
   cutting_issues: { label: 'Cutting issue', route: (id) => `/cutting-issues/${id}` },
+  // Production Phase 2. A cleared hourly cell is a hard delete, so this trail
+  // is the only place its old count survives.
+  stitching_records: { label: 'Stitching record', route: (id) => `/stitching/${id}` },
+  hourly_monitoring_entries: { label: 'Hourly count', route: () => '/stitching/hourly' },
+  printings: { label: 'Printing', route: (id) => `/stitching/printing/${id}` },
+  // Phase 3. A defect taken off a check is a hard delete, and Resolved can be
+  // undone, so this trail is where both histories survive.
+  inline_qc_entries: { label: 'Inline QC check', route: (id) => `/inline-qc/${id}` },
+  inline_qc_defects: { label: 'Inline QC defect', route: () => '/inline-qc/actions' },
+  ironing_entries: { label: 'Ironing entry', route: (id) => `/ironing/${id}` },
+  pending_rejects: { label: 'Pending reject', route: () => '/ironing' },
+  // Phase 4. The inspection report files are not here: auditing them would
+  // store every photo and PDF a second time.
+  external_qc_entries: { label: 'External QC entry', route: (id) => `/external-qc/${id}` },
+  external_qc_checker_lines: { label: 'External QC checker code', route: () => '/external-qc' },
+  alteration_receipts: { label: 'Alteration bag', route: () => '/alteration' },
+  alteration_entries: { label: 'Alteration entry', route: (id) => `/alteration/entries/${id}` },
+  rejected_register_entries: { label: 'Rejected register', route: () => '/rejected-register' },
   excess_rules: { label: 'Excess rule', route: () => '/masters/excess-rules' },
   excess_approvals: { label: 'Excess authorisation', route: () => '/approvals' },
   buyers: { label: 'Buyer', route: () => '/masters/buyers' },

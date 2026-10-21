@@ -68,7 +68,7 @@ import {
   QtyStepper,
   FloorStep,
 } from '../../components/mobile.jsx';
-import { Field, PageHeader, TextArea } from '../../components/ui.jsx';
+import { CollapsibleField, Field, PageHeader, TextArea } from '../../components/ui.jsx';
 import { fmtEnum, fmtNum, todayInput } from '../../utils/format.js';
 import { loadFailed } from '../../services/loadFailures.js';
 import { suggestRolls } from '../../utils/rollSuggest.js';
@@ -738,9 +738,11 @@ export default function FabricIssueForm() {
             />
           </Field>
 
-          <Field label="Remarks">
-            <TextArea rows={2} value={remarks} onChange={(e) => setRemarks(e.target.value)} />
-          </Field>
+          <CollapsibleField>
+            <Field label="Remarks">
+              <TextArea rows={2} value={remarks} onChange={(e) => setRemarks(e.target.value)} />
+            </Field>
+          </CollapsibleField>
 
           <div className="floor-actions">
             <BigButton kind="ghost" onClick={() => navigate('/fabric-issues')}>
