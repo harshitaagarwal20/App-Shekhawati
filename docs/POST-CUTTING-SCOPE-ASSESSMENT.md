@@ -1,6 +1,28 @@
 # Post-Cutting scope — what building the production flow would take
 
-**Status: assessment only. Nothing in this document has been built.**
+**Status: built, except Packing, Needle Checking and Dispatch.** The stitching,
+QC and reconciliation sheets were built in migrations
+`20261021000100_after_cutting_registers` and
+`20261021000200_after_cutting_lists_and_access`. How the open questions below
+were settled for that build:
+
+| Question (§5) | What was built |
+|---|---|
+| 1. Unit of work | **Order and style**, as the workbook keeps it. Each register row is dated and kept against an order and one of its styles; the stitching record may also name the cutting issue (challan) its lot came on. No bundle model - the sheets have no bundle column. |
+| 4. Six QC sheets or one register | **One table per sheet.** The sheets' columns differ too much (a 17-defect grid, a 26-line inspection report, a tailor/operation check) for one table not to be mostly empty. They share one service engine instead, so the rules are still written once. |
+| 5. How a reworked piece counts | As the sheet does: Variance = Cutting Issued - Stitched - Scrap - Rejected. Alter pieces are shown and **not** subtracted - an altered piece is still a stitched piece. |
+| 6. Hourly monitoring | Built: one row per operator, order and day, with each hour's slot time-stamped by the server when keyed. |
+| 7. Who approves | Nothing is routed through the approval engine. "Authorised By" (spot rectification) and "Status" (internal QC, reconciliation) are recorded as the sheets record them. |
+| 8. Finished-goods stock | **Neither.** No register moves stock; the ledger stays fabric-only. Counts are reconciled by the Reconciliation Report, read live from the registers. |
+
+Roles: a new **STITCHING** role (Stitching Dept (Supervisor)) owns the stitching
+record, hourly monitoring and alter report; **QC** owns the eight QC sheets;
+**MERCHANDISING** (Planning Dept (GM)) owns the reconciliation. The Director
+views and exports everything.
+
+The original assessment follows unchanged.
+
+---
 
 The production flowchart (Cutting → Stitching → QC → Finishing → Packing →
 Dispatch) describes work that is **explicitly out of scope** for this

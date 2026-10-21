@@ -19,6 +19,14 @@
  *   Fabric Scrutiny Report ......................... QC (decision by DIRECTOR)
  *   Plan Approval .................................. MERCHANDISING (approved by DIRECTOR)
  *   Cutting Issue .................................. STORE_MANAGER
+ *   Stiching Record / Hourly Monitoring /
+ *     Alter Report ................................. STITCHING
+ *   QC Size / QC Defects / Internal Quality Check /
+ *     Final Checker Report / Finished Checker /
+ *     Rejected ..................................... QC
+ *   External Secondary Checking (External Agency) .. QC
+ *   Spot Rectification-Scrap (QC / Packing Dept) ... QC
+ *   Reconciliation Report (Planning Dept (GM)) ..... MERCHANDISING
  *
  * Three notes on that mapping:
  *
@@ -42,7 +50,11 @@
  *    a role row - no schema change.
  */
 
-/** Every in-scope module. Nothing after CUTTING_ISSUE exists. */
+/**
+ * Every in-scope module. After CUTTING_ISSUE come the stitching, quality and
+ * reconciliation registers; packing, needle checking and dispatch are not
+ * built yet and have no module.
+ */
 export const MODULES = [
   'MASTER_LIST',
   'BUYER',
@@ -81,11 +93,36 @@ export const MODULES = [
   // Cut pieces counted in from the cutting floor, before they are issued.
   'CUT_PIECES_RECEIPT',
   'CUTTING_ISSUE',
+  // After cutting, in the order the work happens: stitched, checked, altered
+  // or scrapped, and reconciled against what was cut.
+  ...PRODUCTION_MODULES(),
   'REPORT',
   // Not a document - the trail of who changed what. Read-only by
   // construction: see services/audit.service.js.
   'AUDIT',
 ];
+
+/**
+ * The twelve registers kept after cutting, one per workbook sheet. A function
+ * rather than a constant only so MODULES above can spread it before this line
+ * is reached.
+ */
+function PRODUCTION_MODULES() {
+  return [
+    'STITCHING_RECORD',
+    'HOURLY_MONITORING',
+    'QC_SIZE_RECORD',
+    'QC_DEFECT_RECORD',
+    'INTERNAL_QUALITY_CHECK',
+    'FINAL_CHECKER_REPORT',
+    'FINISHED_CHECKER',
+    'EXTERNAL_SECONDARY_CHECK',
+    'ALTER_REPORT',
+    'SPOT_RECTIFICATION',
+    'REJECTED_RECORD',
+    'RECONCILIATION_REPORT',
+  ];
+}
 
 export const ACTIONS = ['VIEW', 'CREATE', 'EDIT', 'DELETE', 'APPROVE', 'EXPORT'];
 
@@ -243,6 +280,13 @@ export const roles = [
       'FABRIC_ISSUE.VIEW',
       'INVENTORY.VIEW',
       'STOCK_LEDGER.VIEW',
+      // The Reconciliation Report is the Planning Dept (GM)'s sheet: what was
+      // cut, against what came back stitched, altered, scrapped and rejected.
+      // It reads every register below it, and decides only its own status.
+      ...owns('RECONCILIATION_REPORT'),
+      ...PRODUCTION_MODULES()
+        .filter((m) => m !== 'RECONCILIATION_REPORT')
+        .map((m) => `${m}.VIEW`),
       ...READS_MASTERS,
       'REPORT.*',
     ],
@@ -339,10 +383,29 @@ export const roles = [
   {
     code: 'QC',
     name: 'QC',
-    description: 'Records the Fabric Scrutiny Report. The decision itself rests with the Director.',
+    description:
+      'Records the Fabric Scrutiny Report (the decision rests with the Director), and keeps '
+      + 'the QC registers after stitching: tailor size and defects, internal, final and '
+      + 'finished checking, external inspection, spot rectification and rejections.',
     isSystem: true,
     permissions: [
       ...owns('FABRIC_SCRUTINY'),
+      // After stitching. "QC Dept (Checker)" on six sheets, "QC Dept (External
+      // Agency)" on the inspection report - the agency's report is keyed in by
+      // this desk - and "QC / Packing Dept" on spot rectification.
+      ...owns('QC_SIZE_RECORD'),
+      ...owns('QC_DEFECT_RECORD'),
+      ...owns('INTERNAL_QUALITY_CHECK'),
+      ...owns('FINAL_CHECKER_REPORT'),
+      ...owns('FINISHED_CHECKER'),
+      ...owns('EXTERNAL_SECONDARY_CHECK'),
+      ...owns('SPOT_RECTIFICATION'),
+      ...owns('REJECTED_RECORD'),
+      'STITCHING_RECORD.VIEW',
+      'ALTER_REPORT.VIEW',
+      'RECONCILIATION_REPORT.VIEW',
+      // The rejected record's cutting quantity is offered from the issues.
+      'CUTTING_ISSUE.VIEW',
       'FABRIC_ROLL.VIEW',
       // Grading a roll's shade and dye lot is an inspection judgement, made
       // at the light box by the same desk that writes the scrutiny report.
@@ -351,6 +414,38 @@ export const roles = [
       'GRN.VIEW',
       'BUYER_ORDER.VIEW',
       'EMPLOYEE.VIEW',
+      ...READS_MASTERS,
+    ],
+  },
+  {
+    /**
+     * THE STITCHING UNITS.
+     *
+     * "Stitching Dept (Supervisor)" heads three sheets: the stitching record,
+     * the hourly monitoring and the alter report. None of it is store or QC
+     * work, and the units are separate firms on the shop floor, so this is
+     * the one desk added after cutting rather than folded into another.
+     *
+     * The QC registers are readable here because the internal quality check
+     * names a unit to transfer rejected work back to, and the unit needs to
+     * see what it has been sent.
+     */
+    code: 'STITCHING',
+    name: 'Stitching Supervisor',
+    description:
+      'The stitching units. Keeps the stitching record, the hourly monitoring and the alter '
+      + 'report, and reads the QC registers that send work back to the unit.',
+    isSystem: true,
+    permissions: [
+      ...owns('STITCHING_RECORD'),
+      ...owns('HOURLY_MONITORING'),
+      ...owns('ALTER_REPORT'),
+      'QC_SIZE_RECORD.VIEW',
+      'QC_DEFECT_RECORD.VIEW',
+      'INTERNAL_QUALITY_CHECK.VIEW',
+      'CUTTING_ISSUE.VIEW',
+      'EMPLOYEE.VIEW',
+      'BUYER_ORDER.VIEW',
       ...READS_MASTERS,
     ],
   },

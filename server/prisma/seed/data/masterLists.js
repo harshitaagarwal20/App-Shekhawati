@@ -2,11 +2,11 @@
  * Master Lists - seeded verbatim from the "Master Lists" sheet of
  * "Shekwati Impex formats.xlsx" (row 4 = list name, rows 5+ = values).
  *
- * Only the lists consumed by an IN-SCOPE module are seeded. The workbook also
- * carries Operation, InformTo, RejectReason, SentFor, StatusDispatch,
- * StatusRecon, StatusQC, YesNo and InspDefect26, all of which belong to the
- * post-Cutting-Issue modules that are explicitly out of scope; they are
- * deliberately left out.
+ * Only the lists consumed by a module that exists are seeded. Operation,
+ * InformTo, StatusQC, RejectReason, InspDefect26 and StatusRecon feed the
+ * registers kept after cutting (stitching, QC, reconciliation). SentFor,
+ * StatusDispatch and YesNo belong to packing and dispatch, which are not
+ * built yet, and are left out until they are.
  *
  * Lists whose values drive workflow logic (StatusGeneral, StatusApproval,
  * StatusActive, GatePassType, Decision, StatusGatePass, StatusDyeRecv,
@@ -314,6 +314,70 @@ export const masterLists = [
       'Double Stitch',
       'Without Stitch',
     ],
+  },
+  // --- After cutting: the stitching, QC and reconciliation registers -------
+  {
+    code: 'Operation',
+    name: 'Operation',
+    description: 'QC Size - Operation (L_Operation)',
+    values: ['Body Stitch', 'Handle Attach', 'Hemming', 'Label Attach', 'Lupi Stitch', 'Gusset Stitch', 'Final Trim'],
+  },
+  {
+    code: 'InformTo',
+    name: 'Inform To',
+    description: 'QC Size / QC Defects - Inform To (L_InformTo)',
+    values: ['Unit Incharge', 'QC Head', 'Supervisor', 'Production Manager', 'Dinesh Sir'],
+  },
+  {
+    code: 'StatusQC',
+    name: 'Status QC',
+    description: 'Internal Quality Check - Status (L_StatusQC)',
+    values: ['Approved', 'Rejected', 'Alteration'],
+  },
+  {
+    code: 'RejectReason',
+    name: 'Reject Reason',
+    description: 'Rejected - Reason of Defects (L_RejectReason)',
+    values: ['Fabric', 'Handle Out', 'Stitching', 'Hard Stain', 'Dye'],
+  },
+  {
+    code: 'InspDefect26',
+    name: 'Inspection Defect',
+    description: 'External Secondary Checking - Particulars, the 26 inspection defects (L_InspDefect26)',
+    values: [
+      'Stitch skipping',
+      'Open stitch',
+      'Sewing shifted / Uneven',
+      'Sewing shifted / Gathering',
+      'Over / Double stitch',
+      'Yarn cutting / Uncut thread',
+      'Blind-stitch defect / Open seam',
+      'Pilling / Fly yarn',
+      'Press',
+      'Over / Doubling stitch',
+      'Fabric no strength / Fabric fault',
+      'Side stitch / Overlock',
+      'Colour difference / Shade',
+      'Size difference',
+      'Breakage / Damage / Eyelet breakage',
+      'Needle hole',
+      'Thread breakage / Broken stitch',
+      'Dirt / Spot',
+      'Walking shade / Running shade',
+      'Overlock tension',
+      'Label mistake',
+      'Handle placement',
+      'Pressing mark',
+      'Oil spot / Stain',
+      'Chalk mark',
+      'Fastener opening / Closing defect',
+    ],
+  },
+  {
+    code: 'StatusRecon',
+    name: 'Status Recon',
+    description: 'Reconciliation Report - Status (L_StatusRecon)',
+    values: ['Matched', 'Variance Found'],
   },
   {
     code: 'PaymentTerms',

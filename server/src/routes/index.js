@@ -32,6 +32,21 @@ import auditRoutes from './audit.routes.js';
 import notificationRoutes from './notification.routes.js';
 import costSheetRoutes from './costSheet.routes.js';
 import { exportRoutes, importRoutes } from './dataTransfer.routes.js';
+import {
+  alterReportRoutes,
+  externalCheckRoutes,
+  finalCheckerRoutes,
+  finishedCheckerRoutes,
+  hourlyMonitoringRoutes,
+  internalQcRoutes,
+  productionLookupRoutes,
+  qcDefectRoutes,
+  qcSizeRoutes,
+  reconciliationRoutes,
+  rejectedRecordRoutes,
+  spotRectificationRoutes,
+  stitchingRecordRoutes,
+} from './productionRegister.routes.js';
 
 const router = Router();
 
@@ -48,8 +63,8 @@ router.get(
     return ok(res, {
       status: database === 'up' ? 'ok' : 'degraded',
       database,
-      phase: 'Phase 18 - complete: Masters through Cutting Issue',
-      pipelineEndsAt: 'CUTTING_ISSUE',
+      phase: 'Masters through Cutting Issue, then stitching, QC and reconciliation',
+      pipelineEndsAt: 'RECONCILIATION_REPORT',
       time: new Date().toISOString(),
     });
   }),
@@ -88,6 +103,21 @@ router.use('/plan-approvals', planApprovalRoutes);
 router.use('/cutting-challans', cuttingChallanRoutes);
 router.use('/cut-pieces-receipts', cutPiecesReceiptRoutes);
 router.use('/cutting-issues', cuttingIssueRoutes);
+// After cutting: one register per workbook sheet, from Stiching Record to
+// Reconciliation Report. Packing, Needle Checking and Dispatch are not built.
+router.use('/stitching-records', stitchingRecordRoutes);
+router.use('/hourly-monitoring', hourlyMonitoringRoutes);
+router.use('/qc-size-records', qcSizeRoutes);
+router.use('/qc-defect-records', qcDefectRoutes);
+router.use('/internal-quality-checks', internalQcRoutes);
+router.use('/final-checker-reports', finalCheckerRoutes);
+router.use('/finished-checker-records', finishedCheckerRoutes);
+router.use('/external-secondary-checks', externalCheckRoutes);
+router.use('/alter-reports', alterReportRoutes);
+router.use('/spot-rectifications', spotRectificationRoutes);
+router.use('/rejected-records', rejectedRecordRoutes);
+router.use('/reconciliation-reports', reconciliationRoutes);
+router.use('/production-lookups', productionLookupRoutes);
 router.use('/excess', excessRoutes);
 // C2 / C3 - the date-versioned tolerance masters, and the gap report.
 router.use('/tolerances', toleranceRoutes);

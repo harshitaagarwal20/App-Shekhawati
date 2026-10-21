@@ -76,6 +76,7 @@ import * as planApprovalService from './planApproval.service.js';
 import * as cuttingChallanService from './cuttingChallan.service.js';
 import * as cuttingIssueService from './cuttingIssue.service.js';
 import * as cutPiecesReceiptService from './cutPiecesReceipt.service.js';
+import * as productionRegisterService from './productionRegister.service.js';
 import * as excessService from './excess.service.js';
 import * as auditService from './audit.service.js';
 import { MASTER_IMPORTS, importColumns } from './import.service.js';
@@ -445,6 +446,24 @@ const DATASETS = [
     defaultDir: 'desc',
     fetch: (q) => cuttingIssueService.list(q),
   },
+
+  // =========================================================================
+  //  AFTER CUTTING - one per workbook sheet, from the one register engine.
+  //  The key is the register's own URL segment, so the export of a screen is
+  //  found where the screen is.
+  // =========================================================================
+  ...Object.entries(productionRegisterService.REGISTERS).map(([key, reg]) => ({
+    key: reg.path,
+    title: reg.title,
+    group: 'After cutting',
+    module: reg.module,
+    filters: [...reg.filters, ...(reg.dateField ? ['dateFrom', 'dateTo'] : [])],
+    sortable: reg.sortable,
+    defaultSort: productionRegisterService.defaultSortOf(key),
+    defaultDir: 'desc',
+    fetch: (q) => productionRegisterService.list(key, q),
+    ...(reg.exportHide ? { hide: reg.exportHide } : {}),
+  })),
 
   // =========================================================================
   //  THE EXCESS ENGINE

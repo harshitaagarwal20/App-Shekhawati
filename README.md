@@ -3,19 +3,31 @@
 Manufacturing ERP for a Jaipur-based bag / tote export house, replacing the
 Excel-and-paper process captured in `Shekwati Impex formats.xlsx`.
 
-**The application covers Masters → Cutting Issue and ends there.**
+**The application covers Masters → Cutting Issue, then the stitching, QC and
+reconciliation registers kept after cutting.**
 
 ```
 MASTERS → BUYER ORDER → PLANNING → VENDOR QUOTATION → QUOTATION APPROVAL
        → PURCHASE ORDER → PO APPROVAL → GATE PASS → GRN → INVENTORY
        → FABRIC ISSUE → DYEING → PRINTING → FABRIC SCRUTINY
-       → PLAN APPROVAL → CUTTING ISSUE → END
+       → PLAN APPROVAL → CUTTING ISSUE
+       → STITCHING RECORD · HOURLY MONITORING · ALTER REPORT
+       → QC SIZE · QC DEFECTS · INTERNAL / FINAL / FINISHED CHECKING
+         · EXTERNAL SECONDARY CHECKING · SPOT RECTIFICATION-SCRAP · REJECTED
+       → RECONCILIATION REPORT → END
 ```
 
-Nothing after Cutting Issue (stitching, hourly monitoring, QC records, alter,
-packing, needle checking, dispatch, reconciliation) is part of this system —
-no table, no route, no menu item, no placeholder. `npm run verify:scope` fails
-the build if any of it creeps in.
+**Packing, Needle Checking and Dispatch are not built** — no table, no route,
+no menu item, no placeholder. `npm run verify:scope` fails the build if any of
+them creeps in.
+
+The twelve registers after cutting are one sheet each, field for field (see
+[EXCEL-RECONCILIATION.md §14b](docs/EXCEL-RECONCILIATION.md)). They share one
+engine — `services/productionRegister.service.js` on the server, one
+`RegisterPage` driven by `config/registers.jsx` on the client — and every
+*Formula* column is worked out in `domain/production.js`, stored beside what
+was typed, and held again by a CHECK constraint. They count pieces; none of
+them moves stock.
 
 That one line is the whole application. Drawn out — every branch, every gate,
 who decides what, and how stock moves under it — it is
@@ -44,6 +56,7 @@ those things is **[docs/USE-CASE-DIAGRAM.md](docs/USE-CASE-DIAGRAM.md)**.
 | **16** | Cutting Issue: nine pre-post verifications, excess authorisation, permanent lock. **The pipeline ends here.** | **Delivered** |
 | **17** | Excess control: every tolerance configurable, scope precedence, authorisation workflow. No percentage is compiled into the application. | **Delivered** |
 | **18** | Approval engine: one state machine, one transition table, nine document types, a cross-module queue | **Delivered** |
+| **After cutting** | Stitching Record, Hourly Monitoring (time-captured slots, one row per operator per day), QC Size, QC Defects, Internal Quality Check, Final Checker Report, Finished Checker (17-defect grid), External Secondary Checking (26-defect inspection report), Alter Report, Spot Rectification-Scrap, Rejected, and a live Reconciliation Report. New STITCHING role; QC and Merchandising extended. Packing, Needle Checking and Dispatch not built | **Delivered** |
 | **C12** | Material Plan: the raw material requirement — fabric **and** accessories — exploded from the Style BOM, frozen at creation, prepared by planning and signed before procurement goes to the market | **Delivered** |
 | **32** | Reporting: fourteen operational reports, one per implemented module, RBAC-filtered, CSV export | **Delivered** |
 | **33** | Excel reconciliation: every workbook column traced Excel → ERP → column → API → screen, with every deliberate omission documented | **Delivered** |

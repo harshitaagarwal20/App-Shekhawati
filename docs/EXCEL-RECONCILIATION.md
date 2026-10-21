@@ -49,7 +49,7 @@ what to do with it.
 
 | Excel list | Why |
 |---|---|
-| `Operation`, `InformTo`, `RejectReason`, `SentFor`, `StatusDispatch`, `StatusRecon`, `StatusQC`, `YesNo`, `InspDefect26` | Each belongs to a **post-Cutting-Issue module** — stitching, QC records, dispatch, reconciliation — which is explicitly out of scope. Seeding them would imply a module that does not exist. |
+| `SentFor`, `StatusDispatch`, `YesNo` | They belong to **packing and dispatch**, which are not built. `Operation`, `InformTo`, `RejectReason`, `StatusRecon`, `StatusQC` and `InspDefect26` are seeded for the registers in §14b. |
 | `ShipMode` → "Courier" | Not in the reference specification (Ship / Air / Road). Removed rather than left as invented master data. Nothing referenced it. If the office does courier shipments, the value is added on the List Master screen — which is where master values belong. |
 
 ---
@@ -402,6 +402,200 @@ of attempts can be walked in either direction.
 
 ---
 
+## 14b. After cutting — stitching, quality and reconciliation
+
+Twelve sheets, one table each, built on one register engine
+(`services/productionRegister.service.js`). Every *Formula* column is computed
+by `domain/production.js`, stored beside what was typed, and held again by a
+CHECK constraint in migration `20261021000100_after_cutting_registers`.
+**Packing, Needle Checking and Dispatch are not built** — see §16.
+
+Counts after cutting are whole pieces (`INTEGER`), not `DECIMAL`: a bag is not
+divisible, and the validators refuse 2.5 rather than round it.
+
+### 14b.1 Stiching Record  →  Stitching Record  *(Role Acess — Stitching Dept (Supervisor))*
+
+| Excel field | Source | ERP field | Database column | API field | React field |
+|---|---|---|---|---|---|
+| Unit Name | Auto → L_StitchingUnit (from the challan) | `unitName` | `stitching_records.unit_name` | `unitName` | Unit Name |
+| Date | Auto | `recordDate` | `stitching_records.record_date` | `recordDate` | Date |
+| Order No | Auto → Order | `orderId` | `order_id` | `order.orderNo` | Order No |
+| Style No | Auto → Style Master | `styleId` | `style_id` | `style.styleNo` | Style No |
+| Deliverable Size | Auto — the challan's Cutting Pcs Issued | `deliverableSize` | `stitching_records.deliverable_size` | `deliverableSize` | Deliverable Size |
+| Actual | Manual | `actualQty` | `stitching_records.actual_qty` | `actualQty` | Actual |
+| Remaining | Formula = Deliverable Size − Actual | `remainingQty` | `remaining_qty` | **derived** | Remaining |
+| Remarks | Text | `remarks` | `stitching_records.remarks` | `remarks` | Remarks |
+
+**Added beyond the sheet:** `cuttingIssueId` — the challan the lot arrived on, which is what makes Unit Name and Deliverable Size *Auto*.
+
+### 14b.2 Hourly Monitoring  →  Hourly Monitoring  *(Role Acess — Stitching Dept (Supervisor))*
+
+| Excel field | Source | ERP field | Database column | API field | React field |
+|---|---|---|---|---|---|
+| Date | Auto Capture | `recordDate` | `hourly_monitorings.record_date` | `recordDate` | Date |
+| order No | Auto → Order | `orderId` | `order_id` | `order.orderNo` | Order No |
+| Emp Id | Dropdown → Employee Master | `employeeId` | `employee_id` | `employee.empId` | Emp Id |
+| 10 · 11 · 12 · 1 · 2 · 3 · 4 · 5:30 · 6:30 | Manual | `pcsAt10 … pcsAt1830` | `hourly_monitorings.pcs_at_10 … pcs_at_1830` | `pcsAt10 … pcsAt1830` | 10:00 … 6:30 |
+| TIME AUTO CAPTURE | Auto | `slotCapturedAt` | `slot_captured_at` | **derived** — stamped per slot by the server | "Hours keyed at" |
+
+**Added beyond the sheet:** `styleId` (from the order), `totalPcs` (**derived**, the day's sum). One row per operator, order and day — a partial unique index holds it, and the form offers to open the existing row.
+
+### 14b.3 QC Size  →  QC Size  *(Role Acess — QC Dept (Checker))*
+
+| Excel field | Source | ERP field | Database column | API field | React field |
+|---|---|---|---|---|---|
+| Date | Auto | `recordDate` | `qc_size_records.record_date` | `recordDate` | Date |
+| Order No | Dropdown → Order | `orderId` | `order_id` | `order.orderNo` | Order No |
+| Unit | Dropdown → L_StitchingUnit | `unitName` | `qc_size_records.unit_name` | `unitName` | Unit |
+| Tailor Name | Dropdown → Employee Master | `tailorId` + `tailorName` | `tailor_id`, `tailor_name` | `tailor.empName` / `tailorName` | Tailor Name |
+| Style No | Dropdown → Style Master | `styleId` | `style_id` | `style.styleNo` | Style No |
+| Operation | Dropdown → L_Operation | `operation` | `qc_size_records.operation` | `operation` | Operation |
+| Size | Manual (defaults to the order's size group) | `size` | `qc_size_records.size` | `size` | Size |
+| Psc Checked/Reject | Manual | `pcsCheckedRejected` | `qc_size_records.pcs_checked_rejected` | `pcsCheckedRejected` | Psc Checked/Reject |
+| Defects found | Dropdown → L_DefectType | `defectFound` | `qc_size_records.defect_found` | `defectFound` | Defects found |
+| Inform To | Dropdown → L_InformTo | `informTo` | `qc_size_records.inform_to` | `informTo` | Inform To |
+
+### 14b.4 QC Defects  →  QC Defects  *(Role Acess — QC Dept (Checker))*
+
+| Excel field | Source | ERP field | Database column | API field | React field |
+|---|---|---|---|---|---|
+| Date | Auto | `recordDate` | `qc_defect_records.record_date` | `recordDate` | Date |
+| Order No | Dropdown → Order | `orderId` | `order_id` | `order.orderNo` | Order No |
+| Unit | Dropdown → L_StitchingUnit | `unitName` | `qc_defect_records.unit_name` | `unitName` | Unit |
+| Tailor Name | Dropdown → Employee Master | `tailorId` + `tailorName` | `tailor_id`, `tailor_name` | `tailor.empName` / `tailorName` | Tailor Name |
+| Style | Dropdown → Style Master | `styleId` | `style_id` | `style.styleNo` | Style |
+| Pcs Checked/Reject | Manual | `pcsCheckedRejected` | `qc_defect_records.pcs_checked_rejected` | `pcsCheckedRejected` | Pcs Checked/Reject |
+| Defects Found | Dropdown → L_DefectType | `defectFound` | `qc_defect_records.defect_found` | `defectFound` | Defects Found |
+| Inform To | Dropdown → L_InformTo | `informTo` | `qc_defect_records.inform_to` | `informTo` | Inform To |
+
+### 14b.5 Internal Quality Check  →  Internal Quality Check  *(Role Acess — QC Dept (Checker))*
+
+| Excel field | Source | ERP field | Database column | API field | React field |
+|---|---|---|---|---|---|
+| Date | Auto | `recordDate` | `internal_quality_checks.record_date` | `recordDate` | Date |
+| Order No | Dropdown → Order | `orderId` | `order_id` | `order.orderNo` | Order No |
+| Style No | Auto | `styleId` | `style_id` | `style.styleNo` | Style No |
+| Stitching Unit | Dropdown → L_StitchingUnit | `unitName` | `internal_quality_checks.unit_name` | `unitName` | Stitching Unit |
+| Checker Code | Dropdown → Employee Master (Emp ID) | `checkerId` | `checker_id` | `checker.empId` | Checker Code |
+| Total Pcs Checked | Manual | `totalPcsChecked` | `internal_quality_checks.total_pcs_checked` | `totalPcsChecked` | Total Pcs Checked |
+| Total Defect Pcs | Manual — never more than checked | `totalDefectPcs` | `internal_quality_checks.total_defect_pcs` | `totalDefectPcs` | Total Defect Pcs |
+| Defect Type | Dropdown → L_DefectType | `defectType` | `internal_quality_checks.defect_type` | `defectType` | Defect Type |
+| Status | Dropdown → L_StatusQC | `qcStatus` | `internal_quality_checks.qc_status` | `qcStatus` | Status |
+| Transferred Back To Unit | Dropdown, required if Rejected | `transferredBackToUnit` | `internal_quality_checks.transferred_back_to_unit` | `transferredBackToUnit` | Transferred Back To Unit |
+| Remarks | Text | `remarks` | `internal_quality_checks.remarks` | `remarks` | Remarks |
+
+### 14b.6 Final Checker Report  →  Final Checker Report  *(Role Acess — QC Dept (Checker))*
+
+| Excel field | Source | ERP field | Database column | API field | React field |
+|---|---|---|---|---|---|
+| Date | Auto | `recordDate` | `final_checker_reports.record_date` | `recordDate` | Date |
+| Checker Code | Auto (from the name) | `checkerId` | `checker_id` | `checker.empId` | Checker Code |
+| Name | Dropdown → Employee Master | `checkerId` | `checker_id` | `checker.empName` | Name |
+| Style No | Auto | `styleId` | `style_id` | `style.styleNo` | Style No |
+| Total Pcs Checked | Manual | `totalPcsChecked` | `final_checker_reports.total_pcs_checked` | `totalPcsChecked` | Total Pcs Checked |
+| Total Defect | Manual | `totalDefect` | `final_checker_reports.total_defect` | `totalDefect` | Total Defect |
+| (unlabelled L_DefectType dropdown, column G) | Dropdown | `defectType` | `final_checker_reports.defect_type` | `defectType` | Defect Type |
+
+The sheet has no order column. `orderId` is optional and only fills the style. The "Checker code range: 1-25" note is informational and is not enforced.
+
+### 14b.7 Finished Checker  →  Finished Checker  *(Role Acess — QC Dept (Checker))*
+
+| Excel field | Source | ERP field | Database column | API field | React field |
+|---|---|---|---|---|---|
+| Order No | Dropdown → Order | `orderId` | `order_id` | `order.orderNo` | Order No |
+| Checker Code | Auto | `checkerId` | `checker_id` | `checker.empId` | Checker Code |
+| Name | Dropdown → Employee Master | `checkerId` | `checker_id` | `checker.empName` | Name |
+| Date | Auto | `recordDate` | `finished_checker_records.record_date` | `recordDate` | Date |
+| Checked Psc | Manual | `checkedPcs` | `finished_checker_records.checked_pcs` | `checkedPcs` | Checked Psc |
+| Untrimmed Thread … Alter (17 columns) | Manual, whole pieces | `untrimmedThread … alter` | `finished_checker_records.untrimmed_thread … alter` | `untrimmedThread … alter` | the sheet's captions |
+| Total pieces passed | Formula = Checked − Projected | `piecesPassed` | `pieces_passed` | **derived** | Total pieces passed |
+| Projected | Formula = SUM(defects) | `totalDefects` | `total_defects` | **derived** | Projected |
+| Defects % | Formula = Projected / Checked | `defectPct` | `defect_pct` | **derived** | Defects % |
+
+### 14b.8 External Secondary Checking  →  External Secondary Checking  *(Role Acess — QC Dept (External Agency))*
+
+| Excel field | Source | ERP field | Database column | API field | React field |
+|---|---|---|---|---|---|
+| Date | Auto | `recordDate` | `external_secondary_checks.record_date` | `recordDate` | Date |
+| Order No | Dropdown → Order | `orderId` | `order_id` | `order.orderNo` | Order No |
+| Style No | Auto | `styleId` | `style_id` | `style.styleNo` | Style No |
+| Particulars | Auto → L_InspDefect26 (one line each) | `lines[].particular` | `external_secondary_check_lines.particular` | `lines[].particular` | Particulars |
+| Critical · Major · Minor | Manual | `lines[].critical / major / minor` | `external_secondary_check_lines.critical / major / minor` | `lines[].critical / major / minor` | Critical · Major · Minor |
+| Total (per line) | Formula = Critical + Major + Minor | `lines[].total` | `external_secondary_check_lines.total` | **derived** | Total |
+| Remark | Text | `lines[].remark` | `external_secondary_check_lines.remark` | `lines[].remark` | Remark |
+| Total Inspection Qty | Manual | `inspectionQty` | `external_secondary_checks.inspection_qty` | `inspectionQty` | Total Inspection Qty |
+| Total Critical / Major / Minor Problems | Formula = column sums | `criticalTotal / majorTotal / minorTotal` | `critical_total / major_total / minor_total` | **derived** | grid footer |
+| Total Defect | Formula | `totalDefects` | `total_defects` | **derived** | Total Defect |
+| Total Pass Quantity | Formula = Inspection − Defect | `passQty` | `pass_qty` | **derived** | Pass Qty |
+| Total Defect Ratio | Formula = Defect / Inspection | `defectRatio` | `defect_ratio` | **derived** | Defect Ratio |
+| Person Incharge | Signature | `personIncharge` | `external_secondary_checks.person_incharge` | `personIncharge` | Person Incharge |
+
+**Added beyond the sheet:** `agencyName` — which agency inspected.
+
+### 14b.9 Alter Report  →  Alter Report  *(Role Acess — Stitching Dept (Supervisor))*
+
+| Excel field | Source | ERP field | Database column | API field | React field |
+|---|---|---|---|---|---|
+| Order No | Dropdown → Order | `orderId` | `order_id` | `order.orderNo` | Order No |
+| Style No | Auto | `styleId` | `style_id` | `style.styleNo` | Style No |
+| Time | Auto Capture — on submit | `capturedAt` | `captured_at` | **derived** — stamped by the server, kept through edits | Time |
+| Output | Manual | `outputPcs` | `alter_reports.output_pcs` | `outputPcs` | Output |
+| Pass/ok | Manual | `passPcs` | `alter_reports.pass_pcs` | `passPcs` | Pass/ok |
+| Alter piece | Manual — Pass + Alter ≤ Output | `alterPcs` | `alter_reports.alter_pcs` | `alterPcs` | Alter piece |
+| Alter% | Formula = Alter / Output | `alterPct` | `alter_pct` | **derived** | Alter% |
+| Remarks | Text | `remarks` | `alter_reports.remarks` | `remarks` | Remarks |
+
+### 14b.10 Spot Rectification-Scrap  →  Spot Rectification & Scrap  *(Role Acess — QC / Packing Dept)*
+
+| Excel field | Source | ERP field | Database column | API field | React field |
+|---|---|---|---|---|---|
+| Date | Auto | `recordDate` | `spot_rectifications.record_date` | `recordDate` | Date |
+| Order No | Dropdown → Order | `orderId` | `order_id` | `order.orderNo` | Order No |
+| Style No | Auto | `styleId` | `style_id` | `style.styleNo` | Style No |
+| Qty Received for Rectification | Manual | `qtyReceived` | `spot_rectifications.qty_received` | `qtyReceived` | Qty Received for Rectification |
+| Sold Online-Domestic Qty | Manual | `soldOnlineQty` | `spot_rectifications.sold_online_qty` | `soldOnlineQty` | Sold Online-Domestic Qty |
+| Scrap Qty | Manual — Sold + Scrap ≤ Received | `scrapQty` | `spot_rectifications.scrap_qty` | `scrapQty` | Scrap Qty |
+| Scrap % of Consignment | Formula = Scrap / Order Qty | `scrapPct` | `scrap_pct` | **derived** | Scrap % of Consignment |
+| Authorised By | Dropdown → L_AuthorisedBy | `authorisedBy` | `spot_rectifications.authorised_by` | `authorisedBy` | Authorised By |
+| Remarks | Text | `remarks` | `spot_rectifications.remarks` | `remarks` | Remarks |
+
+**Added beyond the sheet:** `orderQty` — the Order sheet quantity the percentage divides by (the style's order lines), frozen on save.
+
+### 14b.11 Rejected  →  Rejected  *(Role Acess — QC Dept (Checker))*
+
+| Excel field | Source | ERP field | Database column | API field | React field |
+|---|---|---|---|---|---|
+| Date | Auto | `recordDate` | `rejected_records.record_date` | `recordDate` | Date |
+| Order No | Dropdown → Order | `orderId` | `order_id` | `order.orderNo` | Order No |
+| Style No | Manual (defaults to the order's) | `styleId` | `style_id` | `style.styleNo` | Style No |
+| Order Qty | Auto — from Order | `orderQty` | `order_qty` | **derived**, frozen on save | Order Qty |
+| Cutting Qty | Manual — offered from Cutting Issue | `cuttingQty` | `rejected_records.cutting_qty` | `cuttingQty` | Cutting Qty |
+| Packed Qty | Manual | `packedQty` | `rejected_records.packed_qty` | `packedQty` | Packed Qty |
+| Rejected Qty | Formula = IF(Cutting=0, 0, Cutting − Packed) | `rejectedQty` | `rejected_qty` | **derived** | Rejected Qty |
+| Check By | Dropdown → Employee Master | `checkedById` + `checkedByName` | `checked_by_id`, `checked_by_name` | `checkedBy.empName` / `checkedByName` | Check By |
+| Reason of Defects | Dropdown → L_RejectReason | `rejectReason` | `rejected_records.reject_reason` | `rejectReason` | Reason of Defects |
+| Remarks | Text | `remarks` | `rejected_records.remarks` | `remarks` | Remarks |
+
+### 14b.12 Reconciliation Report  →  Reconciliation Report  *(Role Acess — Planning Dept (GM))*
+
+| Excel field | Source | ERP field | Database column | API field | React field |
+|---|---|---|---|---|---|
+| Order No | Dropdown → Order | `orderId` | `order_id` | `order.orderNo` | Order No |
+| Style No | Dropdown | `styleId` | `style_id` | `style.styleNo` | Style No |
+| Cutting Pcs Issued | Auto — Cutting Issue | — | — | **derived** `figures.cuttingIssued` | Cutting Pcs Issued |
+| Stitched Pcs Received | Auto — Stiching Record, Actual | — | — | **derived** `figures.stitched` | Stitched Pcs Received |
+| Alter Pcs | Auto — Alter Report | — | — | **derived** `figures.alter` | Alter Pcs |
+| Scrap Pcs | Auto — Spot Rectification-Scrap | — | — | **derived** `figures.scrap` | Scrap Pcs |
+| Rejected Pcs | Auto — Rejected | — | — | **derived** `figures.rejected` | Rejected Pcs |
+| Packed Pcs | Auto — Packing | — | — | **derived** `figures.packed` — the Rejected sheet's Packed Qty until Packing exists | Packed Pcs |
+| Variance | Formula = Cutting − Stitched − Scrap − Rejected | — | — | **derived** `figures.variance` | Variance |
+| Status | Dropdown → L_StatusRecon (proposed from the variance) | `reconStatus` | `reconciliation_reports.recon_status` | `reconStatus` | Status |
+| Remarks | Text | `remarks` | `reconciliation_reports.remarks` | `remarks` | Remarks |
+
+Only the decision is stored. Every count is read live from the registers each time, so the report can never disagree with them. One report per order and style.
+
+---
+
 ## 15. Tables the workbook has no sheet for
 
 These exist because the workbook's process **implies** them without recording
@@ -428,8 +622,9 @@ Nothing important is silently omitted. This is the complete list.
 
 | Excel field | Sheet | Why |
 |---|---|---|
-| Every column of **Stitching Record**, **Hourly Monitoring**, **QC Size**, **QC Defects**, **Internal Quality Check**, **Internal / Final Checker Report**, **Finished Checker**, **External Secondary Checking**, **Alter Report**, **Spot Rectification-Scrap**, **Rejected**, **Packing**, **Needle Checking**, **Dispatch**, **Reconciliation Report** | those sheets | **Out of scope.** The application ends at Cutting Issue. `npm run verify:scope` fails the build if any of these appears in the schema — including as a stray column name. |
-| `Operation`, `InformTo`, `RejectReason`, `SentFor`, `StatusDispatch`, `StatusRecon`, `StatusQC`, `YesNo`, `InspDefect26` | Master Lists | Dropdowns for the sheets above. Seeding them would imply modules that do not exist. |
+| Every column of **Packing**, **Needle Checking** and **Dispatch** | those sheets | **Not built yet.** `npm run verify:scope` fails the build if any of them appears in the schema — including as a stray column name. The other post-cutting sheets are in §14b. |
+| `SentFor`, `StatusDispatch`, `YesNo` | Master Lists | Dropdowns for the three sheets above. |
+| Reconciliation Report — **Packed Pcs from Packing** | Reconciliation Report | Packing is not built, so the figure is read from the Rejected sheet's Packed Qty, the one place a packed count is written down today. It does not enter the variance, exactly as on the sheet. |
 | Gate Pass — validating **Item** against `L_ItemCategory` | Gate Pass | The sheet's own values ("Dyed Fabric", "Cut Panels") are not category values. Kept as free text, matching the workbook. |
 | Printing — a **return quantity** | Printing | The sheet has no such column. Job-work returns are recorded on the Dyeing Receipt sheet, which does. |
 | GRN — **Roll No** as a single value on multi-roll receipts | GRN | Blank in every sample row. Superseded by one `FabricRoll` per roll; the column is kept for single-roll receipts so the printed field still reconciles. |

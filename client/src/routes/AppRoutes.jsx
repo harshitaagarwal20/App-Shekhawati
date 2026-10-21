@@ -5,6 +5,7 @@ import { RedirectIfAuthenticated, RequireAuth, RequirePermission } from './Prote
 import { Spinner } from '../components/ui.jsx';
 
 import Login from '../pages/Login.jsx';
+import { REGISTERS } from '../config/registers.jsx';
 const ChangePassword = lazy(() => import('../pages/ChangePassword.jsx'));
 const Dashboard = lazy(() => import('../pages/Dashboard.jsx'));
 const ApprovalsHub = lazy(() => import('../pages/ApprovalsHub.jsx'));
@@ -72,6 +73,9 @@ const CuttingChallanDetail = lazy(() => import('../pages/cutting/CuttingChallanP
 const CutPiecesReceiptList = lazy(() => import('../pages/cutting/CutPiecesReceiptPages.jsx').then((m) => ({ default: m.CutPiecesReceiptList })));
 const CutPiecesReceiptDetail = lazy(() => import('../pages/cutting/CutPiecesReceiptPages.jsx').then((m) => ({ default: m.CutPiecesReceiptDetail })));
 
+// After cutting - every register is the one page, driven by its descriptor.
+const RegisterPage = lazy(() => import('../pages/production/RegisterPage.jsx'));
+
 const DocumentPrint = lazy(() => import('../pages/print/DocumentPrint.jsx'));
 
 const ListMaster = lazy(() => import('../pages/masters/ListMaster.jsx'));
@@ -110,8 +114,9 @@ const Audit = lazy(() => import('../pages/admin/Audit.jsx'));
  * usability measure. The server independently authorises every request behind
  * these screens, and that is what actually protects the data.
  *
- * The routes follow the pipeline, and it ends at Cutting Issue. There is no
- * route - and no placeholder - for anything after it.
+ * The routes follow the pipeline: through Cutting Issue, then the stitching,
+ * QC and reconciliation registers. Packing, needle checking and dispatch are
+ * not built, and have no route and no placeholder.
  */
 
 /** Wraps a page in its permission guard, so the table below stays readable. */
@@ -327,6 +332,56 @@ export default function AppRoutes() {
           <Route
             path="/cutting-issues/:id"
             element={guarded('CUTTING_ISSUE.VIEW', <CuttingIssueDetail />)}
+          />
+
+          {/* After cutting: stitching, quality and reconciliation. */}
+          <Route
+            path="/stitching-records"
+            element={guarded('STITCHING_RECORD.VIEW', <RegisterPage key="stitching" descriptor={REGISTERS.stitching} />)}
+          />
+          <Route
+            path="/hourly-monitoring"
+            element={guarded('HOURLY_MONITORING.VIEW', <RegisterPage key="hourly" descriptor={REGISTERS.hourly} />)}
+          />
+          <Route
+            path="/alter-reports"
+            element={guarded('ALTER_REPORT.VIEW', <RegisterPage key="alter" descriptor={REGISTERS.alter} />)}
+          />
+          <Route
+            path="/qc-size-records"
+            element={guarded('QC_SIZE_RECORD.VIEW', <RegisterPage key="qcSize" descriptor={REGISTERS.qcSize} />)}
+          />
+          <Route
+            path="/qc-defect-records"
+            element={guarded('QC_DEFECT_RECORD.VIEW', <RegisterPage key="qcDefect" descriptor={REGISTERS.qcDefect} />)}
+          />
+          <Route
+            path="/internal-quality-checks"
+            element={guarded('INTERNAL_QUALITY_CHECK.VIEW', <RegisterPage key="internalQc" descriptor={REGISTERS.internalQc} />)}
+          />
+          <Route
+            path="/final-checker-reports"
+            element={guarded('FINAL_CHECKER_REPORT.VIEW', <RegisterPage key="finalChecker" descriptor={REGISTERS.finalChecker} />)}
+          />
+          <Route
+            path="/finished-checker-records"
+            element={guarded('FINISHED_CHECKER.VIEW', <RegisterPage key="finishedChecker" descriptor={REGISTERS.finishedChecker} />)}
+          />
+          <Route
+            path="/external-secondary-checks"
+            element={guarded('EXTERNAL_SECONDARY_CHECK.VIEW', <RegisterPage key="externalCheck" descriptor={REGISTERS.externalCheck} />)}
+          />
+          <Route
+            path="/spot-rectifications"
+            element={guarded('SPOT_RECTIFICATION.VIEW', <RegisterPage key="spotRectification" descriptor={REGISTERS.spotRectification} />)}
+          />
+          <Route
+            path="/rejected-records"
+            element={guarded('REJECTED_RECORD.VIEW', <RegisterPage key="rejected" descriptor={REGISTERS.rejected} />)}
+          />
+          <Route
+            path="/reconciliation-reports"
+            element={guarded('RECONCILIATION_REPORT.VIEW', <RegisterPage key="reconciliation" descriptor={REGISTERS.reconciliation} />)}
           />
 
           {/* --- Printing ----------------------------------------------------

@@ -1142,11 +1142,19 @@ model Employee {
   /// Excel: "Status" (Dropdown -> Active/Inactive)
   status      StatusActive @default(ACTIVE)
 
-  users             User[]
-  fabricIssues      FabricIssue[]
-  scrutinyChecks    FabricScrutiny[]
-  gatePasses        GatePass[]
-  cutPiecesReceipts CutPiecesReceipt[]
+  users                  User[]
+  fabricIssues           FabricIssue[]
+  scrutinyChecks         FabricScrutiny[]
+  gatePasses             GatePass[]
+  cutPiecesReceipts      CutPiecesReceipt[]
+  // After cutting - the people the registers name.
+  hourlyMonitorings      HourlyMonitoring[]
+  qcSizeRecords          QcSizeRecord[]
+  qcDefectRecords        QcDefectRecord[]
+  internalQualityChecks  InternalQualityCheck[]
+  finalCheckerReports    FinalCheckerReport[]
+  finishedCheckerRecords FinishedCheckerRecord[]
+  rejectedRecords        RejectedRecord[]
 
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   createdById String?   @map("created_by_id") @db.Uuid
@@ -1270,14 +1278,27 @@ model Style {
   orderLines      BuyerOrderLine[]
   plannings       Planning[]
 
-  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
-  createdById       String?            @map("created_by_id") @db.Uuid
-  updatedAt         DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
-  updatedById       String?            @map("updated_by_id") @db.Uuid
-  deletedAt         DateTime?          @map("deleted_at") @db.Timestamptz(3)
-  deletedById       String?            @map("deleted_by_id") @db.Uuid
-  dyeIssues         DyeIssue[]
-  cutPiecesReceipts CutPiecesReceipt[]
+  createdAt               DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdById             String?                  @map("created_by_id") @db.Uuid
+  updatedAt               DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
+  updatedById             String?                  @map("updated_by_id") @db.Uuid
+  deletedAt               DateTime?                @map("deleted_at") @db.Timestamptz(3)
+  deletedById             String?                  @map("deleted_by_id") @db.Uuid
+  dyeIssues               DyeIssue[]
+  cutPiecesReceipts       CutPiecesReceipt[]
+  // After cutting - the registers kept against this order.
+  stitchingRecords        StitchingRecord[]
+  hourlyMonitorings       HourlyMonitoring[]
+  qcSizeRecords           QcSizeRecord[]
+  qcDefectRecords         QcDefectRecord[]
+  internalQualityChecks   InternalQualityCheck[]
+  finalCheckerReports     FinalCheckerReport[]
+  finishedCheckerRecords  FinishedCheckerRecord[]
+  externalSecondaryChecks ExternalSecondaryCheck[]
+  alterReports            AlterReport[]
+  spotRectifications      SpotRectification[]
+  rejectedRecords         RejectedRecord[]
+  reconciliationReports   ReconciliationReport[]
 
   @@index([buyerId])
   @@index([category])
@@ -1635,13 +1656,26 @@ model BuyerOrder {
   /// Cost sheets priced for this particular order, if any.
   costSheets      StyleCostSheet[]
 
-  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
-  createdById       String?            @map("created_by_id") @db.Uuid
-  updatedAt         DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
-  updatedById       String?            @map("updated_by_id") @db.Uuid
-  deletedAt         DateTime?          @map("deleted_at") @db.Timestamptz(3)
-  deletedById       String?            @map("deleted_by_id") @db.Uuid
-  cutPiecesReceipts CutPiecesReceipt[]
+  createdAt               DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdById             String?                  @map("created_by_id") @db.Uuid
+  updatedAt               DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
+  updatedById             String?                  @map("updated_by_id") @db.Uuid
+  deletedAt               DateTime?                @map("deleted_at") @db.Timestamptz(3)
+  deletedById             String?                  @map("deleted_by_id") @db.Uuid
+  cutPiecesReceipts       CutPiecesReceipt[]
+  // After cutting - the registers kept against this order.
+  stitchingRecords        StitchingRecord[]
+  hourlyMonitorings       HourlyMonitoring[]
+  qcSizeRecords           QcSizeRecord[]
+  qcDefectRecords         QcDefectRecord[]
+  internalQualityChecks   InternalQualityCheck[]
+  finalCheckerReports     FinalCheckerReport[]
+  finishedCheckerRecords  FinishedCheckerRecord[]
+  externalSecondaryChecks ExternalSecondaryCheck[]
+  alterReports            AlterReport[]
+  spotRectifications      SpotRectification[]
+  rejectedRecords         RejectedRecord[]
+  reconciliationReports   ReconciliationReport[]
 
   @@index([buyerId])
   @@index([styleId])
@@ -3322,9 +3356,9 @@ model DyeIssue {
   dyeIssueNo String @unique @map("dye_issue_no") @db.VarChar(40)
 
   /// Excel: "Date" (Auto)
-  issueDate    DateTime       @map("issue_date") @db.Date
+  issueDate DateTime       @map("issue_date") @db.Date
   /// Excel: "Process" (Manual -> L_Process): Dyeing / Printing / Washing / Finishing
-  process      JobWorkProcess
+  process   JobWorkProcess
   /// Excel: "Roll No" (Auto-Dropdown -> FabricRoll)
   ///
   /// C16: THE LEAD ROLL - line 1's roll, kept in step by the service.
@@ -3342,8 +3376,8 @@ model DyeIssue {
   /// ANYTHING DECIDING WHETHER A ROLL MAY BE SENT MUST READ `rolls`, NOT THIS.
   /// fabricIssue.assertJobWorkAuthorised() matches on the set, because a
   /// challan for the second roll of a job would otherwise find no authority.
-  rollId       String         @map("roll_id") @db.Uuid
-  roll         FabricRoll     @relation(fields: [rollId], references: [id], onDelete: Restrict)
+  rollId    String         @map("roll_id") @db.Uuid
+  roll      FabricRoll     @relation(fields: [rollId], references: [id], onDelete: Restrict)
 
   /// C16 - every roll this job covers. THE AUTHORITY on what may be sent.
   rolls        DyeIssueRoll[]
@@ -4615,7 +4649,9 @@ model CuttingIssue {
   isLocked     Boolean   @default(false) @map("is_locked")
   lockedAt     DateTime? @map("locked_at") @db.Timestamptz(3)
 
-  gatePasses GatePass[]
+  gatePasses       GatePass[]
+  /// The stitching records kept against the lot this challan sent out.
+  stitchingRecords StitchingRecord[]
 
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   createdById String?   @map("created_by_id") @db.Uuid
@@ -4636,6 +4672,593 @@ model CuttingIssue {
   @@index([inventoryItemId])
   @@index([deletedAt])
   @@map("cutting_issues")
+}
+
+// ===========================================================================
+//  18. AFTER CUTTING - STITCHING, QUALITY AND RECONCILIATION
+//
+//  The workbook sheets from "Stiching Record" to "Reconciliation Report",
+//  less Packing, Needle Checking and Dispatch, which are not built yet.
+//  Each sheet is its own register, column for column, because each is kept
+//  by a different desk on a different day - the stitching supervisor, the
+//  QC checker, the external agency - and folding them into one table would
+//  leave most columns empty on most rows.
+//
+//  None of them moves stock. They record what the floor counted, and the
+//  Reconciliation Report reads them back against the cutting issue.
+//
+//  Every count the sheet calls a Formula or Auto is worked out by the server
+//  (domain/production.js) and stored beside what was typed, so the register,
+//  the export and the report read one number.
+// ===========================================================================
+
+/// EXCEL SHEET: "Stiching Record" (Role Acess - Stitching Dept (Supervisor))
+/// One unit's output against one lot of cut pieces.
+model StitchingRecord {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// Excel: "Date" (Auto)
+  recordDate DateTime @map("record_date") @db.Date
+  /// Excel: "Unit Name" (Auto) - L_StitchingUnit, the firm the pieces went to.
+  unitName   String   @map("unit_name") @db.VarChar(120)
+
+  orderId String     @map("order_id") @db.Uuid
+  order   BuyerOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  styleId String     @map("style_id") @db.Uuid
+  style   Style      @relation(fields: [styleId], references: [id], onDelete: Restrict)
+
+  /// The cutting issue (challan) the pieces arrived on. Optional: the
+  /// deliverable size can also be typed for a lot cut before the system.
+  cuttingIssueId String?       @map("cutting_issue_id") @db.Uuid
+  cuttingIssue   CuttingIssue? @relation(fields: [cuttingIssueId], references: [id], onDelete: SetNull)
+
+  /// Excel: "Deliverable Size" (Auto) - the pieces issued to the unit.
+  deliverableSize Int @map("deliverable_size")
+  /// Excel: "Actual" (Manual) - stitched pieces handed back.
+  actualQty       Int @map("actual_qty")
+  /// Excel: "Remaining" (Auto) = Deliverable Size - Actual. Derived.
+  remainingQty    Int @map("remaining_qty")
+
+  remarks String? @db.Text
+
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdById String?   @map("created_by_id") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  updatedById String?   @map("updated_by_id") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
+  deletedById String?   @map("deleted_by_id") @db.Uuid
+
+  @@index([orderId])
+  @@index([styleId])
+  @@index([cuttingIssueId])
+  @@index([recordDate])
+  @@index([deletedAt])
+  @@map("stitching_records")
+}
+
+/// EXCEL SHEET: "Hourly Monitoring" - Stitching Hourly Format
+/// (Role Acess - Stitching Dept (Supervisor))
+/// One operator, one order, one day; the supervisor fills a slot each hour.
+model HourlyMonitoring {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// Excel: "Date" (Auto Capture)
+  recordDate DateTime @map("record_date") @db.Date
+
+  orderId String     @map("order_id") @db.Uuid
+  order   BuyerOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  styleId String     @map("style_id") @db.Uuid
+  style   Style      @relation(fields: [styleId], references: [id], onDelete: Restrict)
+
+  /// Excel: "Emp Id" (Dropdown -> Employee Master)
+  employeeId String   @map("employee_id") @db.Uuid
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  /// Excel: the hour columns 10, 11, 12, 1, 2, 3, 4, 5:30, 6:30 (Manual).
+  pcsAt10   Int @default(0) @map("pcs_at_10")
+  pcsAt11   Int @default(0) @map("pcs_at_11")
+  pcsAt12   Int @default(0) @map("pcs_at_12")
+  pcsAt13   Int @default(0) @map("pcs_at_13")
+  pcsAt14   Int @default(0) @map("pcs_at_14")
+  pcsAt15   Int @default(0) @map("pcs_at_15")
+  pcsAt16   Int @default(0) @map("pcs_at_16")
+  pcsAt1730 Int @default(0) @map("pcs_at_1730")
+  pcsAt1830 Int @default(0) @map("pcs_at_1830")
+  /// The day's total, the sum of the slots. Derived.
+  totalPcs  Int @default(0) @map("total_pcs")
+
+  /// "TIME AUTO CAPTURE": when each slot was last keyed, { "pcsAt10": iso }.
+  /// Stamped by the server, never typed.
+  slotCapturedAt Json? @map("slot_captured_at") @db.JsonB
+
+  remarks String? @db.Text
+
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdById String?   @map("created_by_id") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  updatedById String?   @map("updated_by_id") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
+  deletedById String?   @map("deleted_by_id") @db.Uuid
+
+  @@index([orderId])
+  @@index([styleId])
+  @@index([employeeId])
+  @@index([recordDate])
+  @@index([deletedAt])
+  @@map("hourly_monitorings")
+}
+
+/// EXCEL SHEET: "QC Size" - Daily QC Record (Tailor Size)
+/// (Role Acess - QC Dept (Checker))
+model QcSizeRecord {
+  id String @id @default(uuid()) @db.Uuid
+
+  recordDate DateTime @map("record_date") @db.Date
+
+  orderId String     @map("order_id") @db.Uuid
+  order   BuyerOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  styleId String     @map("style_id") @db.Uuid
+  style   Style      @relation(fields: [styleId], references: [id], onDelete: Restrict)
+
+  /// Excel: "Unit" (Dropdown - L_StitchingUnit)
+  unitName String @map("unit_name") @db.VarChar(120)
+
+  /// Excel: "Tailor Name" (Dropdown -> Employee Master). The name is kept.
+  tailorId   String?   @map("tailor_id") @db.Uuid
+  tailor     Employee? @relation(fields: [tailorId], references: [id], onDelete: SetNull)
+  tailorName String    @map("tailor_name") @db.VarChar(120)
+
+  /// Excel: "Operation" (Dropdown - L_Operation)
+  operation String  @db.VarChar(80)
+  /// Excel: "Size" (Manual)
+  size      String? @db.VarChar(60)
+
+  /// Excel: "Psc Checked/Reject" (Manual)
+  pcsCheckedRejected Int @map("pcs_checked_rejected")
+
+  /// Excel: "Defects found" (Dropdown - L_DefectType)
+  defectFound String? @map("defect_found") @db.VarChar(120)
+  /// Excel: "Inform To" (Dropdown - L_InformTo)
+  informTo    String? @map("inform_to") @db.VarChar(80)
+
+  remarks String? @db.Text
+
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdById String?   @map("created_by_id") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  updatedById String?   @map("updated_by_id") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
+  deletedById String?   @map("deleted_by_id") @db.Uuid
+
+  @@index([orderId])
+  @@index([styleId])
+  @@index([tailorId])
+  @@index([recordDate])
+  @@index([deletedAt])
+  @@map("qc_size_records")
+}
+
+/// EXCEL SHEET: "QC Defects" - Daily QC Record (Tailor Defects)
+/// (Role Acess - QC Dept (Checker))
+model QcDefectRecord {
+  id String @id @default(uuid()) @db.Uuid
+
+  recordDate DateTime @map("record_date") @db.Date
+
+  orderId String     @map("order_id") @db.Uuid
+  order   BuyerOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  styleId String     @map("style_id") @db.Uuid
+  style   Style      @relation(fields: [styleId], references: [id], onDelete: Restrict)
+
+  unitName String @map("unit_name") @db.VarChar(120)
+
+  tailorId   String?   @map("tailor_id") @db.Uuid
+  tailor     Employee? @relation(fields: [tailorId], references: [id], onDelete: SetNull)
+  tailorName String    @map("tailor_name") @db.VarChar(120)
+
+  /// Excel: "Pcs Checked/Reject" (Manual)
+  pcsCheckedRejected Int @map("pcs_checked_rejected")
+
+  /// Excel: "Defects Found" (Dropdown - L_DefectType)
+  defectFound String? @map("defect_found") @db.VarChar(120)
+  /// Excel: "Inform To" (Dropdown - L_InformTo)
+  informTo    String? @map("inform_to") @db.VarChar(80)
+
+  remarks String? @db.Text
+
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdById String?   @map("created_by_id") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  updatedById String?   @map("updated_by_id") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
+  deletedById String?   @map("deleted_by_id") @db.Uuid
+
+  @@index([orderId])
+  @@index([styleId])
+  @@index([tailorId])
+  @@index([recordDate])
+  @@index([deletedAt])
+  @@map("qc_defect_records")
+}
+
+/// EXCEL SHEET: "Internal Quality Check" - Finishing & Trimming, hourly basis
+/// (Role Acess - QC Dept (Checker))
+model InternalQualityCheck {
+  id String @id @default(uuid()) @db.Uuid
+
+  recordDate DateTime @map("record_date") @db.Date
+
+  orderId String     @map("order_id") @db.Uuid
+  order   BuyerOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  styleId String     @map("style_id") @db.Uuid
+  style   Style      @relation(fields: [styleId], references: [id], onDelete: Restrict)
+
+  /// Excel: "Stitching Unit" (Dropdown - L_StitchingUnit)
+  unitName String @map("unit_name") @db.VarChar(120)
+
+  /// Excel: "Checker Code" (Dropdown -> Employee Master Emp ID)
+  checkerId String   @map("checker_id") @db.Uuid
+  checker   Employee @relation(fields: [checkerId], references: [id], onDelete: Restrict)
+
+  totalPcsChecked Int @map("total_pcs_checked")
+  totalDefectPcs  Int @map("total_defect_pcs")
+
+  /// Excel: "Defect Type" (Dropdown - L_DefectType)
+  defectType            String? @map("defect_type") @db.VarChar(120)
+  /// Excel: "Status" (Dropdown - L_StatusQC: Approved / Rejected / Alteration)
+  qcStatus              String  @map("qc_status") @db.VarChar(40)
+  /// Excel: "Transferred Back To Unit" (Dropdown, if Rejected)
+  transferredBackToUnit String? @map("transferred_back_to_unit") @db.VarChar(120)
+
+  remarks String? @db.Text
+
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdById String?   @map("created_by_id") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  updatedById String?   @map("updated_by_id") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
+  deletedById String?   @map("deleted_by_id") @db.Uuid
+
+  @@index([orderId])
+  @@index([styleId])
+  @@index([checkerId])
+  @@index([recordDate])
+  @@index([deletedAt])
+  @@map("internal_quality_checks")
+}
+
+/// EXCEL SHEET: "Final Checker Report" - Internal Record
+/// (Role Acess - QC Dept (Checker))
+/// The sheet carries no order column; the order is optional here and only
+/// used to fill the style.
+model FinalCheckerReport {
+  id String @id @default(uuid()) @db.Uuid
+
+  recordDate DateTime @map("record_date") @db.Date
+
+  /// Excel: "Checker Code" (Auto) / "Name" (Dropdown) - one employee.
+  checkerId String   @map("checker_id") @db.Uuid
+  checker   Employee @relation(fields: [checkerId], references: [id], onDelete: Restrict)
+
+  orderId String?     @map("order_id") @db.Uuid
+  order   BuyerOrder? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  styleId String      @map("style_id") @db.Uuid
+  style   Style       @relation(fields: [styleId], references: [id], onDelete: Restrict)
+
+  totalPcsChecked Int @map("total_pcs_checked")
+  totalDefect     Int @map("total_defect")
+
+  /// The unlabelled L_DefectType dropdown beside the sheet's last column.
+  defectType String? @map("defect_type") @db.VarChar(120)
+
+  remarks String? @db.Text
+
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdById String?   @map("created_by_id") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  updatedById String?   @map("updated_by_id") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
+  deletedById String?   @map("deleted_by_id") @db.Uuid
+
+  @@index([orderId])
+  @@index([styleId])
+  @@index([checkerId])
+  @@index([recordDate])
+  @@index([deletedAt])
+  @@map("final_checker_reports")
+}
+
+/// EXCEL SHEET: "Finished Checker" - a defect count per defect type
+/// (Role Acess - QC Dept (Checker))
+model FinishedCheckerRecord {
+  id String @id @default(uuid()) @db.Uuid
+
+  recordDate DateTime @map("record_date") @db.Date
+
+  orderId String     @map("order_id") @db.Uuid
+  order   BuyerOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  styleId String     @map("style_id") @db.Uuid
+  style   Style      @relation(fields: [styleId], references: [id], onDelete: Restrict)
+
+  checkerId String   @map("checker_id") @db.Uuid
+  checker   Employee @relation(fields: [checkerId], references: [id], onDelete: Restrict)
+
+  /// Excel: "Checked Psc" (Manual)
+  checkedPcs Int @map("checked_pcs")
+
+  // The seventeen defect columns, in the sheet's order (Manual, whole numbers).
+  untrimmedThread Int @default(0) @map("untrimmed_thread")
+  handleOut       Int @default(0) @map("handle_out")
+  handleSize      Int @default(0) @map("handle_size")
+  handleAlter     Int @default(0) @map("handle_alter")
+  withoutLabel    Int @default(0) @map("without_label")
+  slantedLabel    Int @default(0) @map("slanted_label")
+  doubleLupi      Int @default(0) @map("double_lupi")
+  withoutLupi     Int @default(0) @map("without_lupi")
+  wrongSideLupi   Int @default(0) @map("wrong_side_lupi")
+  weavingDefect   Int @default(0) @map("weaving_defect")
+  cutHole         Int @default(0) @map("cut_hole")
+  improperHem     Int @default(0) @map("improper_hem")
+  doubleStitch    Int @default(0) @map("double_stitch")
+  withoutStitch   Int @default(0) @map("without_stitch")
+  torn            Int @default(0)
+  stain           Int @default(0)
+  alter           Int @default(0)
+
+  /// Excel: "Projected" = SUM(defect columns). Derived.
+  totalDefects Int     @map("total_defects")
+  /// Excel: "Total pieces passed" = Checked Psc - Projected. Derived.
+  piecesPassed Int     @map("pieces_passed")
+  /// Excel: "Defects %" = Projected / Checked Psc, as a fraction. Derived.
+  defectPct    Decimal @map("defect_pct") @db.Decimal(9, 6)
+
+  remarks String? @db.Text
+
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdById String?   @map("created_by_id") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  updatedById String?   @map("updated_by_id") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
+  deletedById String?   @map("deleted_by_id") @db.Uuid
+
+  @@index([orderId])
+  @@index([styleId])
+  @@index([checkerId])
+  @@index([recordDate])
+  @@index([deletedAt])
+  @@map("finished_checker_records")
+}
+
+/// EXCEL SHEET: "External Secondary Checking" - Inspection Report
+/// (Role Acess - QC Dept (External Agency))
+/// One inspection of one order; its lines are the 26 inspection defects.
+model ExternalSecondaryCheck {
+  id String @id @default(uuid()) @db.Uuid
+
+  recordDate DateTime @map("record_date") @db.Date
+
+  orderId String     @map("order_id") @db.Uuid
+  order   BuyerOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  styleId String     @map("style_id") @db.Uuid
+  style   Style      @relation(fields: [styleId], references: [id], onDelete: Restrict)
+
+  /// The inspecting agency, and the "Person Incharge" who signs the report.
+  agencyName     String? @map("agency_name") @db.VarChar(150)
+  personIncharge String? @map("person_incharge") @db.VarChar(120)
+
+  /// Excel: "Total Inspection Qty" (Manual)
+  inspectionQty Int @map("inspection_qty")
+
+  // The report's totals block. All derived from the lines.
+  criticalTotal Int     @map("critical_total")
+  majorTotal    Int     @map("major_total")
+  minorTotal    Int     @map("minor_total")
+  /// "Total Defect" = Critical + Major + Minor.
+  totalDefects  Int     @map("total_defects")
+  /// "Total Pass Quantity" = Total Inspection Qty - Total Defect.
+  passQty       Int     @map("pass_qty")
+  /// "Total Defect Ratio" = Total Defect / Total Inspection Qty.
+  defectRatio   Decimal @map("defect_ratio") @db.Decimal(9, 6)
+
+  remarks String? @db.Text
+
+  lines ExternalSecondaryCheckLine[]
+
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdById String?   @map("created_by_id") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  updatedById String?   @map("updated_by_id") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
+  deletedById String?   @map("deleted_by_id") @db.Uuid
+
+  @@index([orderId])
+  @@index([styleId])
+  @@index([recordDate])
+  @@index([deletedAt])
+  @@map("external_secondary_checks")
+}
+
+/// One row of the inspection grid: a defect from L_InspDefect26 and its count
+/// by severity.
+model ExternalSecondaryCheckLine {
+  id      String                 @id @default(uuid()) @db.Uuid
+  checkId String                 @map("check_id") @db.Uuid
+  check   ExternalSecondaryCheck @relation(fields: [checkId], references: [id], onDelete: Cascade)
+
+  lineNo     Int     @map("line_no")
+  /// Excel: "Particulars" (Auto - Master InspDefect26)
+  particular String  @db.VarChar(150)
+  critical   Int     @default(0)
+  major      Int     @default(0)
+  minor      Int     @default(0)
+  /// Excel: "Total" = Critical + Major + Minor. Derived.
+  total      Int     @default(0)
+  remark     String? @db.VarChar(500)
+
+  @@unique([checkId, lineNo])
+  @@index([checkId])
+  @@map("external_secondary_check_lines")
+}
+
+/// EXCEL SHEET: "Alter Report" - Alter Record
+/// (Role Acess - Stitching Dept (Supervisor))
+model AlterReport {
+  id String @id @default(uuid()) @db.Uuid
+
+  orderId String     @map("order_id") @db.Uuid
+  order   BuyerOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  styleId String     @map("style_id") @db.Uuid
+  style   Style      @relation(fields: [styleId], references: [id], onDelete: Restrict)
+
+  /// Excel: "Time" (Auto Capture - "trigger on submit button"). Stamped by
+  /// the server when the record is saved; never typed.
+  capturedAt DateTime @map("captured_at") @db.Timestamptz(3)
+
+  /// Excel: "Output" (Manual)
+  outputPcs Int     @map("output_pcs")
+  /// Excel: "Pass/ok" (Manual) - pieces passed after alteration.
+  passPcs   Int     @map("pass_pcs")
+  /// Excel: "Alter piece" (Manual)
+  alterPcs  Int     @map("alter_pcs")
+  /// Excel: "Alter%" = Alter piece / Output. Derived.
+  alterPct  Decimal @map("alter_pct") @db.Decimal(9, 6)
+
+  remarks String? @db.Text
+
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdById String?   @map("created_by_id") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  updatedById String?   @map("updated_by_id") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
+  deletedById String?   @map("deleted_by_id") @db.Uuid
+
+  @@index([orderId])
+  @@index([styleId])
+  @@index([capturedAt])
+  @@index([deletedAt])
+  @@map("alter_reports")
+}
+
+/// EXCEL SHEET: "Spot Rectification-Scrap" - Spot Rectification & Scrap /
+/// Online Sale (Role Acess - QC / Packing Dept)
+model SpotRectification {
+  id String @id @default(uuid()) @db.Uuid
+
+  recordDate DateTime @map("record_date") @db.Date
+
+  orderId String     @map("order_id") @db.Uuid
+  order   BuyerOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  styleId String     @map("style_id") @db.Uuid
+  style   Style      @relation(fields: [styleId], references: [id], onDelete: Restrict)
+
+  /// Excel: "Qty Received for Rectification" (Manual)
+  qtyReceived   Int @map("qty_received")
+  /// Excel: "Sold Online-Domestic Qty" (Manual)
+  soldOnlineQty Int @default(0) @map("sold_online_qty")
+  /// Excel: "Scrap Qty" (Manual)
+  scrapQty      Int @default(0) @map("scrap_qty")
+
+  /// The Order sheet's quantity, frozen when the record was saved.
+  orderQty Decimal @map("order_qty") @db.Decimal(18, 4)
+  /// Excel: "Scrap % of Consignment" = Scrap Qty / Order Qty. Derived.
+  scrapPct Decimal @map("scrap_pct") @db.Decimal(9, 6)
+
+  /// Excel: "Authorised By" (Dropdown - L_AuthorisedBy)
+  authorisedBy String? @map("authorised_by") @db.VarChar(120)
+
+  remarks String? @db.Text
+
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdById String?   @map("created_by_id") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  updatedById String?   @map("updated_by_id") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
+  deletedById String?   @map("deleted_by_id") @db.Uuid
+
+  @@index([orderId])
+  @@index([styleId])
+  @@index([recordDate])
+  @@index([deletedAt])
+  @@map("spot_rectifications")
+}
+
+/// EXCEL SHEET: "Rejected" - Rejected Record Format
+/// (Role Acess - QC Dept (Checker))
+model RejectedRecord {
+  id String @id @default(uuid()) @db.Uuid
+
+  recordDate DateTime @map("record_date") @db.Date
+
+  orderId String     @map("order_id") @db.Uuid
+  order   BuyerOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  styleId String     @map("style_id") @db.Uuid
+  style   Style      @relation(fields: [styleId], references: [id], onDelete: Restrict)
+
+  /// Excel: "Order Qty" (Auto - from Order), frozen when saved.
+  orderQty    Decimal @map("order_qty") @db.Decimal(18, 4)
+  /// Excel: "Cutting Qty" (Manual - from Cutting Issue). Offered from the
+  /// cutting issues, and may be corrected.
+  cuttingQty  Int     @map("cutting_qty")
+  /// Excel: "Packed Qty" (Manual)
+  packedQty   Int     @map("packed_qty")
+  /// Excel: "Rejected Qty" = IF(Cutting=0, 0, Cutting - Packed). Derived.
+  rejectedQty Int     @map("rejected_qty")
+
+  /// Excel: "Check By" (Dropdown -> Employee Master). The name is kept.
+  checkedById   String?   @map("checked_by_id") @db.Uuid
+  checkedBy     Employee? @relation(fields: [checkedById], references: [id], onDelete: SetNull)
+  checkedByName String?   @map("checked_by_name") @db.VarChar(120)
+
+  /// Excel: "Reason of Defects" (Dropdown - L_RejectReason)
+  rejectReason String? @map("reject_reason") @db.VarChar(120)
+
+  remarks String? @db.Text
+
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdById String?   @map("created_by_id") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  updatedById String?   @map("updated_by_id") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
+  deletedById String?   @map("deleted_by_id") @db.Uuid
+
+  @@index([orderId])
+  @@index([styleId])
+  @@index([checkedById])
+  @@index([recordDate])
+  @@index([deletedAt])
+  @@map("rejected_records")
+}
+
+/// EXCEL SHEET: "Reconciliation Report" - Cutting / Stitching / Packing
+/// Reconciliation (Role Acess - Planning Dept (GM))
+///
+/// Only the decision is stored: the status and the remarks. Every count on
+/// the sheet is "Auto" - read from the cutting issues and the registers above
+/// each time the report is opened - so a figure here can never disagree with
+/// the register it came from. One report per order and style.
+model ReconciliationReport {
+  id String @id @default(uuid()) @db.Uuid
+
+  orderId String     @map("order_id") @db.Uuid
+  order   BuyerOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  styleId String     @map("style_id") @db.Uuid
+  style   Style      @relation(fields: [styleId], references: [id], onDelete: Restrict)
+
+  /// Excel: "Status" (Dropdown - L_StatusRecon: Matched / Variance Found)
+  reconStatus String  @map("recon_status") @db.VarChar(40)
+  remarks     String? @db.Text
+
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdById String?   @map("created_by_id") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  updatedById String?   @map("updated_by_id") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
+  deletedById String?   @map("deleted_by_id") @db.Uuid
+
+  @@index([orderId])
+  @@index([styleId])
+  @@index([deletedAt])
+  @@map("reconciliation_reports")
 }
 
 // ===========================================================================

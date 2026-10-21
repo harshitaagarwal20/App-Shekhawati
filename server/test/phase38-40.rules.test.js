@@ -277,7 +277,7 @@ describe('§39 - the navigation shows the current scope and nothing else', () =>
   /** The groups the business named, in the order it named them. */
   const EXPECTED_GROUPS = [
     'Dashboard', 'Masters', 'Orders', 'Procurement', 'Stores',
-    'Job Work', 'Cutting', 'Administration',
+    'Job Work', 'Cutting', 'Stitching', 'Quality', 'Reconciliation', 'Administration',
   ];
 
   test('the groups are the ones the business named, in order', () => {
@@ -306,7 +306,7 @@ describe('§39 - the navigation shows the current scope and nothing else', () =>
   test('the pipeline groups are numbered in flow order', () => {
     const PIPELINE = [
       'Masters', 'Orders', 'Procurement', 'Stores',
-      'Job Work', 'Cutting',
+      'Job Work', 'Cutting', 'Stitching', 'Quality', 'Reconciliation',
     ];
 
     // Each group's label paired with the `stage` that follows it, if any.
@@ -320,8 +320,8 @@ describe('§39 - the navigation shows the current scope and nothing else', () =>
     );
     assert.deepEqual(
       staged.map((g) => g.stage),
-      [1, 2, 3, 4, 5, 6],
-      'the stages must run 1..6 with no gaps',
+      [1, 2, 3, 4, 5, 6, 7, 8, 9],
+      'the stages must run 1..9 with no gaps',
     );
   });
 
@@ -385,16 +385,15 @@ describe('§39 - the navigation shows the current scope and nothing else', () =>
     }
   });
 
-  test('nothing after Cutting Issue appears anywhere in the navigation', () => {
+  test('packing, needle checking and dispatch appear nowhere in the navigation', () => {
     // The scope boundary, restated where a future edit would trip over it.
-    const OUT_OF_SCOPE = [
-      'Stitching', 'Hourly', 'QC Record', 'Alter', 'Packing',
-      'Needle', 'Dispatch', 'Reconciliation',
-    ];
-    for (const word of OUT_OF_SCOPE) {
+    // Stitching, QC, alter and reconciliation were built after cutting; these
+    // three were not.
+    const NOT_BUILT = ['Packing', 'Needle', 'Dispatch'];
+    for (const word of NOT_BUILT) {
       assert.ok(
         !new RegExp(`label: '[^']*${word}`, 'i').test(nav),
-        `"${word}" appears in the navigation. The pipeline ends at Cutting Issue.`,
+        `"${word}" appears in the navigation. Packing, needle checking and dispatch are not built.`,
       );
     }
   });

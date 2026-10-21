@@ -122,7 +122,7 @@ describe('health', () => {
     const { status, body } = await call('GET', '/api/health');
     assert.equal(status, 200);
     assert.equal(body.data.database, 'up');
-    assert.equal(body.data.pipelineEndsAt, 'CUTTING_ISSUE');
+    assert.equal(body.data.pipelineEndsAt, 'RECONCILIATION_REPORT');
   });
 });
 

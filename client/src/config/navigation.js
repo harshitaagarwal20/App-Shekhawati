@@ -21,6 +21,11 @@
  *    5 Job Work                   Job Work (dyeing / printing), Fabric Scrutiny
  *    6 Cutting                   Plan Approval, Cutting Challan, Cut Pieces
  *                                Receipt, Cutting Issue
+ *    7 Stitching                 Stitching Record, Hourly Monitoring, Alter
+ *    8 Quality                   QC Size, QC Defects, Internal / Final /
+ *                                Finished checking, External inspection,
+ *                                Spot Rectification & Scrap, Rejected
+ *    9 Reconciliation            Reconciliation Report
  *      Administration            Roles, Users, Audit
  *
  *  which is the pipeline the README states and the dashboard's own STAGES list
@@ -29,6 +34,7 @@
  *      MASTERS -> BUYER ORDER -> PLANNING -> VENDOR QUOTATION -> PURCHASE ORDER
  *              -> GATE PASS -> GRN -> INVENTORY -> FABRIC ISSUE -> DYEING
  *              -> PRINTING -> FABRIC SCRUTINY -> PLAN APPROVAL -> CUTTING ISSUE
+ *              -> STITCHING -> QC -> ALTER / SCRAP / REJECTED -> RECONCILIATION
  *
  *  The `stage` number is carried as DATA rather than written into the label,
  *  so the sidebar can show the sequence without the number becoming part of the
@@ -73,9 +79,8 @@
  *  link to a catalogue the server has already filtered by permission, so a user
  *  sees only the reports they may actually run.
  *
- *  The pipeline ends at Cutting Issue. There is deliberately no entry - and no
- *  "coming soon" placeholder - for stitching, hourly monitoring, QC records,
- *  alter, packing, needle checking, dispatch or reconciliation.
+ *  Packing, needle checking and dispatch are not built. There is deliberately
+ *  no entry - and no "coming soon" placeholder - for any of them.
  * ---------------------------------------------------------------------------
  */
 
@@ -294,8 +299,46 @@ export const NAV_GROUPS = [
       { to: '/cutting-challans', label: 'Cutting Challan', permission: 'CUTTING_CHALLAN.VIEW', hint: 'What has to be cut' },
       /** Cut pieces counted in from the cutting floor, before they are issued. */
       { to: '/cut-pieces-receipts', label: 'Cut Pieces Receipt', permission: 'CUT_PIECES_RECEIPT.VIEW', hint: 'Count pieces from cutting' },
-      /** The last module in the application. Nothing follows it. */
-      { to: '/cutting-issues', label: 'Cutting Issue', permission: 'CUTTING_ISSUE.VIEW', hint: 'Final cutting record' },
+      /** The last fabric document. The registers after it count bags, not metres. */
+      { to: '/cutting-issues', label: 'Cutting Issue', permission: 'CUTTING_ISSUE.VIEW', hint: 'Cut pieces out to the units' },
+    ],
+  },
+  {
+    /**
+     * AFTER CUTTING. "Stitching Dept (Supervisor)" heads all three sheets here.
+     */
+    label: 'Stitching',
+    stage: 7,
+    items: [
+      { to: '/stitching-records', label: 'Stitching Record', permission: 'STITCHING_RECORD.VIEW', hint: 'What each unit stitched' },
+      { to: '/hourly-monitoring', label: 'Hourly Monitoring', permission: 'HOURLY_MONITORING.VIEW', hint: 'Pieces per operator per hour' },
+      { to: '/alter-reports', label: 'Alter Report', permission: 'ALTER_REPORT.VIEW', hint: 'Pieces sent for alteration' },
+    ],
+  },
+  {
+    /**
+     * "QC Dept (Checker)", "(External Agency)" and "QC / Packing Dept" - the
+     * checks in the order a bag meets them, then what failed them.
+     */
+    label: 'Quality',
+    stage: 8,
+    items: [
+      { to: '/qc-size-records', label: 'QC Size', permission: 'QC_SIZE_RECORD.VIEW', hint: 'Daily QC by tailor and operation' },
+      { to: '/qc-defect-records', label: 'QC Defects', permission: 'QC_DEFECT_RECORD.VIEW', hint: 'Daily defects by tailor' },
+      { to: '/internal-quality-checks', label: 'Internal Quality Check', permission: 'INTERNAL_QUALITY_CHECK.VIEW', hint: 'Finishing and trimming' },
+      { to: '/final-checker-reports', label: 'Final Checker Report', permission: 'FINAL_CHECKER_REPORT.VIEW', hint: "Each checker's day" },
+      { to: '/finished-checker-records', label: 'Finished Checker', permission: 'FINISHED_CHECKER.VIEW', hint: 'Defects by type' },
+      { to: '/external-secondary-checks', label: 'External Secondary Checking', permission: 'EXTERNAL_SECONDARY_CHECK.VIEW', hint: 'Agency inspection report' },
+      { to: '/spot-rectifications', label: 'Spot Rectification & Scrap', permission: 'SPOT_RECTIFICATION.VIEW', hint: 'Fixed, sold online or scrapped' },
+      { to: '/rejected-records', label: 'Rejected', permission: 'REJECTED_RECORD.VIEW', hint: 'Cut but never packed' },
+    ],
+  },
+  {
+    /** "Planning Dept (GM)" - what was cut, against where every piece went. */
+    label: 'Reconciliation',
+    stage: 9,
+    items: [
+      { to: '/reconciliation-reports', label: 'Reconciliation Report', permission: 'RECONCILIATION_REPORT.VIEW', hint: 'Cutting against stitching and QC' },
     ],
   },
   {

@@ -104,6 +104,35 @@ const ICONS = {
       <line x1="15.8" y1="16.4" x2="5" y2="4" />
     </>
   ),
+  // A needle and a running stitch.
+  Stitching: (
+    <>
+      <line x1="4" y1="20" x2="17" y2="7" />
+      <circle cx="18.5" cy="5.5" r="1.8" />
+      <line x1="3" y1="12" x2="6" y2="12" />
+      <line x1="9" y1="12" x2="12" y2="12" />
+      <line x1="15" y1="16" x2="18" y2="16" />
+      <line x1="19.5" y1="16" x2="21" y2="16" />
+    </>
+  ),
+  // A magnifier over a tick - something looked at and passed.
+  Quality: (
+    <>
+      <circle cx="10.5" cy="10.5" r="6.5" />
+      <line x1="15.3" y1="15.3" x2="21" y2="21" />
+      <polyline points="7.5 10.5 9.8 12.8 13.5 8.5" />
+    </>
+  ),
+  // Two columns that have to balance.
+  Reconciliation: (
+    <>
+      <line x1="12" y1="3" x2="12" y2="21" />
+      <line x1="4" y1="7" x2="20" y2="7" />
+      <path d="M4 7l-2.5 6h5z" />
+      <path d="M20 7l-2.5 6h5z" />
+      <line x1="8" y1="21" x2="16" y2="21" />
+    </>
+  ),
   Administration: (
     <>
       <circle cx="12" cy="8" r="3.6" />

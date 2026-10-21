@@ -78,6 +78,21 @@ function log(step) {
 // ---------------------------------------------------------------------------
 async function wipe() {
   const order = [
+    // After cutting - every one of these points at an order, a style, an
+    // employee or a cutting issue, so they go first.
+    'reconciliationReport',
+    'rejectedRecord',
+    'spotRectification',
+    'alterReport',
+    'externalSecondaryCheckLine',
+    'externalSecondaryCheck',
+    'finishedCheckerRecord',
+    'finalCheckerReport',
+    'internalQualityCheck',
+    'qcDefectRecord',
+    'qcSizeRecord',
+    'hourlyMonitoring',
+    'stitchingRecord',
     'stockLedger',
     'stockBalance',
     'cuttingIssue',
@@ -206,6 +221,7 @@ const USERS = [
   { username: 'maharaj', fullName: 'Maharaj Singh', email: 'maharaj@shekhawatiimpex.local', roleCodes: ['STORE_MANAGER'], empId: 'EMP-001' },
   { username: 'sunita', fullName: 'Sunita Devi', email: 'sunita@shekhawatiimpex.local', roleCodes: ['QC'], empId: 'EMP-004' },
   { username: 'rekha', fullName: 'Rekha Sharma', email: 'rekha@shekhawatiimpex.local', roleCodes: ['QC'], empId: 'EMP-005' },
+  { username: 'anil', fullName: 'Anil Kumar', email: 'anil@shekhawatiimpex.local', roleCodes: ['STITCHING'], empId: 'EMP-002' },
   { username: 'merch', fullName: 'Merchandising Desk', email: 'merch@shekhawatiimpex.local', roleCodes: ['MERCHANDISING'], empId: null },
   { username: 'headoffice', fullName: 'Head Office Desk', email: 'ho@shekhawatiimpex.local', roleCodes: ['HEAD_OFFICE'], empId: null },
   { username: 'planner', fullName: 'Planning Desk', email: 'planner@shekhawatiimpex.local', roleCodes: ['MERCHANDISING'], empId: null },

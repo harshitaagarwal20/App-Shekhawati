@@ -356,12 +356,9 @@ for (const r of roles) {
 }
 
 // --- 6. out-of-scope guard --------------------------------------------------
-const OUT_OF_SCOPE = [
-  'stitching_record', 'hourly_monitoring', 'qc_size', 'qc_defect',
-  'internal_quality', 'checker_report', 'finished_checker', 'external_secondary',
-  'alter_report', 'spot_rectification', 'rejected', 'packing', 'needle_checking',
-  'dispatch', 'reconciliation',
-];
+// The modules not built yet. Stitching, QC and reconciliation were; see
+// verify-scope.js for the guard itself.
+const OUT_OF_SCOPE = ['packing', 'needle_checking', 'dispatch'];
 
 // --- report ----------------------------------------------------------------
 const counts = {
