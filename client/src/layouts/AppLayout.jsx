@@ -120,6 +120,24 @@ const ICONS = {
       <path d="M10.5 9V6h7v3" />
     </>
   ),
+  // A magnifier over a tick - something looked at and passed.
+  Quality: (
+    <>
+      <circle cx="10.5" cy="10.5" r="6.5" />
+      <line x1="15.3" y1="15.3" x2="21" y2="21" />
+      <polyline points="7.5 10.5 9.8 12.8 13.5 8.5" />
+    </>
+  ),
+  // A balance - two sides that have to agree.
+  Reconciliation: (
+    <>
+      <line x1="12" y1="3" x2="12" y2="21" />
+      <line x1="4" y1="7" x2="20" y2="7" />
+      <path d="M4 7l-2.5 6h5z" />
+      <path d="M20 7l-2.5 6h5z" />
+      <line x1="8" y1="21" x2="16" y2="21" />
+    </>
+  ),
   Administration: (
     <>
       <circle cx="12" cy="8" r="3.6" />

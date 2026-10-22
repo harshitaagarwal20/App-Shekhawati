@@ -36,6 +36,14 @@ import inlineQcRoutes from './inlineQc.routes.js';
 import ironingRoutes from './ironing.routes.js';
 import externalQcRoutes from './externalQc.routes.js';
 import alterationRoutes, { rejectedRegisterRoutes } from './alteration.routes.js';
+import {
+  finalCheckerRoutes,
+  finishedCheckerRoutes,
+  internalQcRoutes,
+  productionLookupRoutes,
+  reconciliationRoutes,
+  spotRectificationRoutes,
+} from './productionRegister.routes.js';
 import { exportRoutes, importRoutes } from './dataTransfer.routes.js';
 
 const router = Router();
@@ -103,6 +111,15 @@ router.use('/ironing', ironingRoutes);
 router.use('/external-qc', externalQcRoutes);
 router.use('/alteration', alterationRoutes);
 router.use('/rejected-register', rejectedRegisterRoutes);
+// Phase 5 - final QC, spot rectification and the reconciliation: one register
+// per workbook sheet, all from one engine. Packing, Needle Checking and
+// Dispatch are not built.
+router.use('/internal-quality-checks', internalQcRoutes);
+router.use('/final-checker-reports', finalCheckerRoutes);
+router.use('/finished-checker-records', finishedCheckerRoutes);
+router.use('/spot-rectifications', spotRectificationRoutes);
+router.use('/reconciliation-reports', reconciliationRoutes);
+router.use('/production-lookups', productionLookupRoutes);
 router.use('/excess', excessRoutes);
 // C2 / C3 - the date-versioned tolerance masters, and the gap report.
 router.use('/tolerances', toleranceRoutes);

@@ -95,6 +95,13 @@ async function wipe() {
   // table left off is still full on the second run, and its foreign keys
   // refuse the delete of whatever it points at.
   const order = [
+    // Phase 5 - each points at an order, a style or an employee.
+    'reconciliationReport',
+    'spotRectification',
+    'finishedCheckerRecord',
+    'finalCheckerReport',
+    'internalQualityCheck',
+    'externalQcInspectionLine',
     'rejectedRegisterEntry',
     'alterationEntry',
     'alterationReceipt',

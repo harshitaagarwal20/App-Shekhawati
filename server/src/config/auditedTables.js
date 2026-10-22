@@ -64,6 +64,14 @@ export const AUDITED = {
   alteration_receipts: { label: 'Alteration bag', route: () => '/alteration' },
   alteration_entries: { label: 'Alteration entry', route: (id) => `/alteration/entries/${id}` },
   rejected_register_entries: { label: 'Rejected register', route: () => '/rejected-register' },
+  external_qc_inspection_lines: { label: 'External QC inspection line', route: () => '/external-qc' },
+  // Phase 5. Each register is one screen with its rows edited in place, so
+  // the trail links to the register rather than to a detail page.
+  internal_quality_checks: { label: 'Internal quality check', route: () => '/internal-quality-checks' },
+  final_checker_reports: { label: 'Final checker report', route: () => '/final-checker-reports' },
+  finished_checker_records: { label: 'Finished checker record', route: () => '/finished-checker-records' },
+  spot_rectifications: { label: 'Spot rectification', route: () => '/spot-rectifications' },
+  reconciliation_reports: { label: 'Reconciliation report', route: () => '/reconciliation-reports' },
   excess_rules: { label: 'Excess rule', route: () => '/masters/excess-rules' },
   excess_approvals: { label: 'Excess authorisation', route: () => '/approvals' },
   buyers: { label: 'Buyer', route: () => '/masters/buyers' },

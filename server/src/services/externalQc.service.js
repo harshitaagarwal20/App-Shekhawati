@@ -6,7 +6,7 @@
  *
  *    1. lock the order and style (finishingFlow.service.js)
  *    2. write the entry - offered, the three boxes, each faulty box by reason
- *    3. write its checker codes
+ *    3. write its checker codes and its inspection report grid
  *    4. keep its bags in the Alteration Unit equal to every box and reason but
  *       Iron (alteration.service.js syncBag) - Iron goes back to ironing as
  *       Re-iron and is received there, not bagged
@@ -30,6 +30,8 @@ import { QC_BOXES, QC_REASONS, REASON_FIELDS, bagsOf, ironOf, pctText, qcProblem
 import { assertFinishingFlow, finishingFlow, finishingJson, finishingSums, flowOf, lockFinishingFlow } from './finishingFlow.service.js';
 import { projectBag, syncBag } from './alteration.service.js';
 import { assertUploadable } from './attachment.service.js';
+import { listValues } from './productionRegister.service.js';
+import { checkInspection, inspectionTotals } from '../domain/quality.js';
 
 const D = (v) => new Prisma.Decimal(v ?? 0);
 const dateOnly = (iso) => new Date(`${String(iso).slice(0, 10)}T00:00:00.000Z`);
@@ -51,6 +53,7 @@ const INCLUDE = {
   style: { select: { id: true, styleNo: true, styleDescription: true } },
   agency: { select: { id: true, vendorName: true, vendorCode: true } },
   checkers: { orderBy: { checkerCode: 'asc' }, include: { employee: { select: { id: true, empId: true, empName: true } } } },
+  inspectionLines: { orderBy: { lineNo: 'asc' } },
 };
 
 function project(row) {
@@ -62,6 +65,11 @@ function project(row) {
   out.alterationPct = pctText(shareOf(row.pcsAlteration, row.pcsOffered));
   out.rejectedPct = pctText(shareOf(row.pcsRejected, row.pcsOffered));
   if (row.checkers) out.checkers = row.checkers.map((c) => ({ ...c, pcs: D(c.pcs).toString() }));
+  if (row.inspectionLines) {
+    // The inspection report's totals block, over the pieces offered.
+    const { lines: _lines, ...totals } = inspectionTotals(row.pcsOffered, row.inspectionLines);
+    out.inspection = row.inspectionLines.length ? totals : null;
+  }
   return out;
 }
 
@@ -93,6 +101,62 @@ function normaliseCheckers(lines = []) {
     out.push({ checkerCode: code, pcs: D(l.pcs) });
   }
   return out;
+}
+
+/**
+ * The inspection grid as sent: a line with nothing on it is dropped, so the
+ * screen can post all 26 particulars and only what was found is kept.
+ */
+function normaliseInspection(lines = []) {
+  return lines
+    .map((l) => ({
+      particular: String(l.particular ?? '').trim(),
+      critical: Number(l.critical ?? 0),
+      major: Number(l.major ?? 0),
+      minor: Number(l.minor ?? 0),
+      remark: l.remark?.trim() || null,
+    }))
+    .filter((l) => l.critical || l.major || l.minor || l.remark);
+}
+
+/**
+ * Every particular a value of L_InspDefect26 - or already on the entry, so a
+ * line keeps a particular the list has since withdrawn - and the defects no
+ * more than the pieces offered.
+ */
+async function assertInspection(tx, lines, pcsOffered, kept = []) {
+  if (!lines.length) return;
+  const allowed = await listValues(tx, 'InspDefect26');
+  const keep = new Set(kept.map((l) => l.particular));
+  for (const l of lines) {
+    if (!allowed.has(l.particular) && !keep.has(l.particular)) {
+      throw ApiError.badRequest(`"${l.particular}" is not one of the inspection defects (L_InspDefect26)`, { field: 'inspectionLines' });
+    }
+  }
+  const rule = checkInspection(Number(pcsOffered), lines);
+  if (rule) throw ApiError.badRequest(rule.message, { field: rule.field });
+}
+
+/** Replaces the inspection grid row by row, so the audit trail sees each change. */
+async function writeInspection(tx, entryId, lines, actorId) {
+  const existing = await tx.externalQcInspectionLine.findMany({ where: { entryId } });
+  for (const row of existing) await tx.externalQcInspectionLine.delete({ where: { id: row.id } });
+  const { lines: worked } = inspectionTotals(0, lines);
+  for (const [i, l] of worked.entries()) {
+    await tx.externalQcInspectionLine.create({
+      data: {
+        entryId,
+        lineNo: i + 1,
+        particular: l.particular,
+        critical: l.critical,
+        major: l.major,
+        minor: l.minor,
+        total: l.total,
+        remark: l.remark,
+        createdById: actorId,
+      },
+    });
+  }
 }
 
 // ===========================================================================
@@ -309,6 +373,7 @@ function dataOf(input) {
 export async function create(auth, input) {
   const entryDate = checkedDate(input.entryDate);
   const checkerLines = normaliseCheckers(input.checkers);
+  const inspectionLines = normaliseInspection(input.inspectionLines);
   const data = {
     entryDate,
     orderId: input.orderId,
@@ -324,11 +389,13 @@ export async function create(auth, input) {
     await lockFinishingFlow(tx, data.orderId, data.styleId);
     const label = await resolveRefs(tx, data);
     await assertAgency(tx, data.agencyId);
+    await assertInspection(tx, inspectionLines, data.pcsOffered);
 
     const row = await tx.externalQcEntry.create({
       data: { ...data, recordedById: auth.userId, recordedByName: auth.fullName, createdById: auth.userId, updatedById: auth.userId },
     });
     await writeCheckers(tx, row.id, checkerLines, auth.userId);
+    await writeInspection(tx, row.id, inspectionLines, auth.userId);
     await syncBags(tx, row, auth.userId);
     await assertFinishingFlow(tx, row, label);
 
@@ -339,7 +406,10 @@ export async function create(auth, input) {
 /** Everything but the order and style, which are what the entry IS. */
 export async function update(auth, id, input) {
   return prisma.$transaction(async (tx) => {
-    const existing = await tx.externalQcEntry.findFirst({ where: { id, deletedAt: null }, include: { checkers: true } });
+    const existing = await tx.externalQcEntry.findFirst({
+      where: { id, deletedAt: null },
+      include: { checkers: true, inspectionLines: { orderBy: { lineNo: 'asc' } } },
+    });
     if (!existing) throw ApiError.notFound('External QC entry');
     await lockFinishingFlow(tx, existing.orderId, existing.styleId);
     const label = await resolveRefs(tx, existing);
@@ -351,6 +421,11 @@ export async function update(auth, id, input) {
     if (input.agencyId !== undefined) merged.agencyId = input.agencyId;
     assertEntry({ ...merged, checkers: checkerLines });
     await assertAgency(tx, merged.agencyId, { keeping: existing.agencyId });
+    // A grid not sent is kept, and is still held to the pieces now offered.
+    const inspectionLines = input.inspectionLines !== undefined
+      ? normaliseInspection(input.inspectionLines)
+      : existing.inspectionLines;
+    await assertInspection(tx, inspectionLines, merged.pcsOffered, existing.inspectionLines);
 
     const row = await tx.externalQcEntry.update({
       where: { id },
@@ -364,6 +439,7 @@ export async function update(auth, id, input) {
       },
     });
     if (input.checkers !== undefined) await writeCheckers(tx, id, checkerLines, auth.userId);
+    if (input.inspectionLines !== undefined) await writeInspection(tx, id, inspectionLines, auth.userId);
     await syncBags(tx, row, auth.userId);
     await assertFinishingFlow(tx, row, label);
 

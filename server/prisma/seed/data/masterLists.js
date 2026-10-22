@@ -3,9 +3,10 @@
  * "Shekwati Impex formats.xlsx" (row 4 = list name, rows 5+ = values).
  *
  * Only the lists consumed by an IN-SCOPE module are seeded. The workbook also
- * carries RejectReason, SentFor, StatusDispatch, StatusRecon, StatusQC, YesNo
- * and InspDefect26, all of which belong to modules not yet built (final QC,
- * packing, dispatch); they are deliberately left out. InformTo is not a list
+ * carries RejectReason, SentFor, StatusDispatch and YesNo, which belong to
+ * packing and dispatch (not built) or to sheets built without them (the
+ * Rejected Register takes the stage's own reason); they are deliberately left
+ * out. StatusQC, InspDefect26 and StatusRecon arrived with Phase 5. InformTo is not a list
  * here either: Inline QC names a person with a login, not a job title, so the
  * Action needed list has someone to land on.
  *
@@ -347,6 +348,57 @@ export const masterLists = [
       'Double Stitch',
       'Without Stitch',
     ],
+  },
+  {
+    /* Phase 5 - the Internal Quality Check's verdict. Rejected sends the work back to a unit. */
+    code: 'StatusQC',
+    name: 'Status QC',
+    description: 'Internal Quality Check - Status (L_StatusQC)',
+    values: ['Approved', 'Rejected', 'Alteration'],
+  },
+  {
+    /*
+     * Phase 5 - the Particulars of the agency's inspection report, one line
+     * each on the External QC entry's grid ("External Secondary Checking").
+     */
+    code: 'InspDefect26',
+    name: 'Inspection Defect',
+    description: 'External QC - inspection report Particulars, the 26 inspection defects (L_InspDefect26)',
+    values: [
+      'Stitch skipping',
+      'Open stitch',
+      'Sewing shifted / Uneven',
+      'Sewing shifted / Gathering',
+      'Over / Double stitch',
+      'Yarn cutting / Uncut thread',
+      'Blind-stitch defect / Open seam',
+      'Pilling / Fly yarn',
+      'Press',
+      'Over / Doubling stitch',
+      'Fabric no strength / Fabric fault',
+      'Side stitch / Overlock',
+      'Color difference / Shade',
+      'Size difference',
+      'Breakage / Damage / Eyelet breakage',
+      'Needle hole',
+      'Thread breakage / Broken stitch',
+      'Dirt / Spot',
+      'Walking shade / Running shade',
+      'Overlock tension',
+      'Label mistake',
+      'Handle placement',
+      'Pressing mark',
+      'Oil spot / Stain',
+      'Chalk mark',
+      'Fastener opening / Closing defect',
+    ],
+  },
+  {
+    /* Phase 5 - the planner's verdict on the Reconciliation Report. */
+    code: 'StatusRecon',
+    name: 'Status Recon',
+    description: 'Reconciliation Report - Status (L_StatusRecon)',
+    values: ['Matched', 'Variance Found'],
   },
   {
     code: 'CutPieceDefect',

@@ -82,6 +82,7 @@ import * as ironingService from './ironing.service.js';
 import * as externalQcService from './externalQc.service.js';
 import * as alterationService from './alteration.service.js';
 import * as rejectedRegisterService from './rejectedRegister.service.js';
+import * as productionRegisterService from './productionRegister.service.js';
 import * as excessService from './excess.service.js';
 import * as auditService from './audit.service.js';
 import { importColumns } from './import.service.js';
@@ -612,6 +613,23 @@ const DATASETS = [
     defaultDir: 'desc',
     fetch: (q) => rejectedRegisterService.list(q),
   },
+
+  // =========================================================================
+  //  PHASE 5 - one per workbook sheet, from the one register engine. The key
+  //  is the register's own URL segment, so the export of a screen is found
+  //  where the screen is.
+  // =========================================================================
+  ...Object.entries(productionRegisterService.REGISTERS).map(([key, reg]) => ({
+    key: reg.path,
+    title: reg.title,
+    group: key === 'reconciliation' ? 'Reconciliation' : 'Quality',
+    module: reg.module,
+    filters: [...reg.filters, ...(reg.dateField ? ['dateFrom', 'dateTo'] : [])],
+    sortable: reg.sortable,
+    defaultSort: productionRegisterService.defaultSortOf(key),
+    defaultDir: 'desc',
+    fetch: (q) => productionRegisterService.list(key, q),
+  })),
 
   // =========================================================================
   //  THE EXCESS ENGINE

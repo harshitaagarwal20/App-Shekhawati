@@ -9,6 +9,7 @@
 
 import { z } from 'zod';
 import { decimal, isoDate, listQuery, optionalText, uuid } from './common.validator.js';
+import { pieces } from './productionRegister.validator.js';
 
 const qty = (label) => decimal(label).optional();
 
@@ -16,6 +17,19 @@ const checkerLine = z.object({
   /** As written on the bag. */
   checkerCode: z.string().trim().max(30),
   pcs: decimal('Checker pcs'),
+});
+
+/**
+ * One line of the agency's inspection report ("External Secondary
+ * Checking"): a particular from L_InspDefect26 and its count by severity, in
+ * whole pieces. The line's Total and the report's totals are the service's.
+ */
+const inspectionLine = z.object({
+  particular: z.string().trim().min(1, 'Particulars is required').max(150),
+  critical: pieces('Critical').optional(),
+  major: pieces('Major').optional(),
+  minor: pieces('Minor').optional(),
+  remark: optionalText(500),
 });
 
 export const createExternalQcSchema = z.object({
@@ -39,6 +53,7 @@ export const createExternalQcSchema = z.object({
   rejSpoiled: qty('Rejected - Spoiled'),
   rejOther: qty('Rejected - Other'),
   checkers: z.array(checkerLine).max(50).optional(),
+  inspectionLines: z.array(inspectionLine).max(60, 'An inspection report cannot carry more than 60 lines').optional(),
   remarks: optionalText(2000),
 });
 

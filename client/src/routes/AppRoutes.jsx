@@ -5,6 +5,7 @@ import { RedirectIfAuthenticated, RequireAuth, RequirePermission } from './Prote
 import { Spinner } from '../components/ui.jsx';
 
 import Login from '../pages/Login.jsx';
+import { REGISTERS } from '../config/registers.jsx';
 const ChangePassword = lazy(() => import('../pages/ChangePassword.jsx'));
 const Dashboard = lazy(() => import('../pages/Dashboard.jsx'));
 const ApprovalsHub = lazy(() => import('../pages/ApprovalsHub.jsx'));
@@ -95,6 +96,10 @@ const AlterationPending = lazy(() => import('../pages/finishing/AlterationPages.
 const AlterationEntries = lazy(() => import('../pages/finishing/AlterationPages.jsx').then((m) => ({ default: m.AlterationEntries })));
 const AlterationEntryDetail = lazy(() => import('../pages/finishing/AlterationPages.jsx').then((m) => ({ default: m.AlterationEntryDetail })));
 const RejectedRegister = lazy(() => import('../pages/finishing/RejectedRegister.jsx'));
+
+// Phase 5 - the final QC sheets, spot rectification and the reconciliation,
+// one descriptor-driven screen each.
+const RegisterPage = lazy(() => import('../pages/quality/RegisterPage.jsx'));
 
 const DocumentPrint = lazy(() => import('../pages/print/DocumentPrint.jsx'));
 
@@ -388,6 +393,11 @@ export default function AppRoutes() {
           <Route path="/alteration/entries" element={guarded('ALTERATION.VIEW', <AlterationEntries />)} />
           <Route path="/alteration/entries/:id" element={guarded('ALTERATION.VIEW', <AlterationEntryDetail />)} />
           <Route path="/rejected-register" element={guarded('REJECTED_REGISTER.VIEW', <RejectedRegister />)} />
+          <Route path="/internal-quality-checks" element={guarded('INTERNAL_QUALITY_CHECK.VIEW', <RegisterPage key="internalQc" descriptor={REGISTERS.internalQc} />)} />
+          <Route path="/final-checker-reports" element={guarded('FINAL_CHECKER_REPORT.VIEW', <RegisterPage key="finalChecker" descriptor={REGISTERS.finalChecker} />)} />
+          <Route path="/finished-checker-records" element={guarded('FINISHED_CHECKER.VIEW', <RegisterPage key="finishedChecker" descriptor={REGISTERS.finishedChecker} />)} />
+          <Route path="/spot-rectifications" element={guarded('SPOT_RECTIFICATION.VIEW', <RegisterPage key="spotRectification" descriptor={REGISTERS.spotRectification} />)} />
+          <Route path="/reconciliation-reports" element={guarded('RECONCILIATION_REPORT.VIEW', <RegisterPage key="reconciliation" descriptor={REGISTERS.reconciliation} />)} />
 
           <Route
             path="/cutting-issues/:id"

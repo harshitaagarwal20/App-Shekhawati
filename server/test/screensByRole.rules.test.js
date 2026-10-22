@@ -141,6 +141,8 @@ const EXPECTED = {
     '/cutting-challans', '/cut-pieces-receipts', '/cutting-issues',
     '/stitching', '/stitching/hourly', '/inline-qc',
     '/ironing', '/external-qc', '/alteration',
+    '/internal-quality-checks', '/final-checker-reports', '/finished-checker-records', '/spot-rectifications',
+    '/reconciliation-reports',
     '/admin/roles', '/admin/users', '/admin/audit',
   ],
   HEAD_OFFICE: [
@@ -158,6 +160,8 @@ const EXPECTED = {
     '/cutting-challans', '/cut-pieces-receipts', '/cutting-issues',
     '/stitching', '/stitching/hourly', '/inline-qc',
     '/ironing', '/external-qc', '/alteration',
+    '/internal-quality-checks', '/final-checker-reports', '/finished-checker-records', '/spot-rectifications',
+    '/reconciliation-reports',
   ],
   STORE_MANAGER: [
     '/', '/reports', '/approvals',
@@ -177,6 +181,7 @@ const EXPECTED = {
     '/grns', '/inventory',
     '/scrutinies',
     '/inline-qc',
+    '/internal-quality-checks', '/final-checker-reports', '/finished-checker-records', '/spot-rectifications',
   ],
   STITCHING_SUPERVISOR: [
     '/',

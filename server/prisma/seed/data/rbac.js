@@ -100,6 +100,15 @@ export const MODULES = [
   'EXTERNAL_QC',
   'ALTERATION',
   'REJECTED_REGISTER',
+  // Phase 5. The final QC sheets kept by the checkers, what was rectified,
+  // sold online or scrapped, and the reconciliation that closes the order.
+  // None is approvable: the sheets record "Status" and "Authorised By", they
+  // do not route them through the approval engine.
+  'INTERNAL_QUALITY_CHECK',
+  'FINAL_CHECKER_REPORT',
+  'FINISHED_CHECKER',
+  'SPOT_RECTIFICATION',
+  'RECONCILIATION_REPORT',
   // The cross-module queue of everything awaiting a decision (Dashboard >
   // Approvals). It sat on REPORT.VIEW, which put it in front of every floor
   // desk that runs a report and decides nothing.
@@ -308,6 +317,17 @@ export const roles = [
       'ALTERATION.EXPORT',
       'REJECTED_REGISTER.VIEW',
       'REJECTED_REGISTER.EXPORT',
+      // Phase 5 - "Role Acess - Planning Dept (GM)" on the Reconciliation
+      // Report, and the QC sheets it is read against.
+      ...owns('RECONCILIATION_REPORT'),
+      'INTERNAL_QUALITY_CHECK.VIEW',
+      'INTERNAL_QUALITY_CHECK.EXPORT',
+      'FINAL_CHECKER_REPORT.VIEW',
+      'FINAL_CHECKER_REPORT.EXPORT',
+      'FINISHED_CHECKER.VIEW',
+      'FINISHED_CHECKER.EXPORT',
+      'SPOT_RECTIFICATION.VIEW',
+      'SPOT_RECTIFICATION.EXPORT',
       'VENDOR.VIEW',
       'CUTTING_CHALLAN.VIEW',
       'CUT_PIECES_RECEIPT.VIEW',
@@ -537,14 +557,20 @@ export const roles = [
     code: 'QC',
     name: 'QC',
     description:
-      'Records the Fabric Scrutiny Report (the decision itself rests with the Director) and the '
-      + 'Inline QC checks taken on the stitching line.',
+      'Records the Fabric Scrutiny Report (the decision itself rests with the Director), the '
+      + 'Inline QC checks taken on the stitching line, the final QC sheets and spot rectification.',
     isSystem: true,
     permissions: [
       ...owns('FABRIC_SCRUTINY'),
       // Phase 3 - "Role Acess - QC Dept (Checker)" on the QC Size and QC
       // Defects sheets. Not tied to a unit: the checker walks every line.
       ...owns('INLINE_QC'),
+      // Phase 5 - the same desk keeps the final QC sheets, and "QC / Packing
+      // Dept" keeps Spot Rectification-Scrap until Packing is built.
+      ...owns('INTERNAL_QUALITY_CHECK'),
+      ...owns('FINAL_CHECKER_REPORT'),
+      ...owns('FINISHED_CHECKER'),
+      ...owns('SPOT_RECTIFICATION'),
       'FABRIC_ROLL.VIEW',
       // Grading a roll's shade and dye lot is an inspection judgement, made
       // at the light box by the same desk that writes the scrutiny report.

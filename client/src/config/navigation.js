@@ -385,6 +385,29 @@ export const NAV_GROUPS = [
     ],
   },
   {
+    /*
+     * Phase 5. The QC desk's own sheets after the agency's check, and what was
+     * rectified, sold online or scrapped. External Secondary Checking's 26-line
+     * inspection report is on the External QC entry, not a link here.
+     */
+    label: 'Quality',
+    stage: 9,
+    items: [
+      { to: '/internal-quality-checks', label: 'Internal Quality Check', permission: 'INTERNAL_QUALITY_CHECK.VIEW', hint: 'Finishing and trimming, hour by hour' },
+      { to: '/final-checker-reports', label: 'Final Checker Report', permission: 'FINAL_CHECKER_REPORT.VIEW', hint: "Each checker's day" },
+      { to: '/finished-checker-records', label: 'Finished Checker', permission: 'FINISHED_CHECKER.VIEW', hint: 'Defects by type, 17 columns' },
+      { to: '/spot-rectifications', label: 'Spot Rectification & Scrap', permission: 'SPOT_RECTIFICATION.VIEW', hint: 'Fixed, sold online or scrapped' },
+    ],
+  },
+  {
+    /* Phase 5. The order closes here: cutting read against everything after it. */
+    label: 'Reconciliation',
+    stage: 10,
+    items: [
+      { to: '/reconciliation-reports', label: 'Reconciliation Report', permission: 'RECONCILIATION_REPORT.VIEW', hint: 'Cutting against stitching, scrap and rejects' },
+    ],
+  },
+  {
     label: 'Administration',
     items: [
       /**

@@ -1,11 +1,12 @@
 /**
  * Scope guard.
  *
- * The application ends after External QC and the Alteration Unit (Phase 4),
- * with the Rejected Register they write; Inline QC (Phase 3) runs beside
- * stitching and carries the workbook's QC Size and QC Defects sheets. The Checker Report is a report over
- * External QC's checker codes, not a table - its pattern stays forbidden. This
- * script fails the build if any
+ * The application ends at the Reconciliation Report (Phase 5), after the
+ * final QC sheets and Spot Rectification-Scrap; before them come External QC
+ * and the Alteration Unit (Phase 4), with the Rejected Register they write,
+ * and Inline QC (Phase 3) beside stitching, which carries the workbook's QC
+ * Size and QC Defects sheets. Only Packing, Needle Checking and Dispatch are
+ * still out. This script fails the build if any
  * model, table, enum or field in schema.prisma refers to a module that is
  * still out of scope, so a later phase cannot quietly grow past the agreed
  * boundary.
@@ -38,6 +39,15 @@ const DELIVERED = [
   { module: 'External Secondary Checking', phase: 'Phase 4', model: 'ExternalQcEntry' },
   { module: 'Alter Report (Alteration Unit)', phase: 'Phase 4', model: 'AlterationEntry' },
   { module: 'Rejected', phase: 'Phase 4', model: 'RejectedRegisterEntry' },
+  { module: 'Internal Quality Check', phase: 'Phase 5', model: 'InternalQualityCheck' },
+  // The workbook's sheet. The Checker Report under Reports is a different
+  // thing - a report over External QC's checker codes, with no table.
+  { module: 'Internal / Final Checker Report', phase: 'Phase 5', model: 'FinalCheckerReport' },
+  { module: 'Finished Checker', phase: 'Phase 5', model: 'FinishedCheckerRecord' },
+  // The 26-line inspection grid, on the External QC entry it belongs to.
+  { module: 'External Secondary Checking (inspection report)', phase: 'Phase 5', model: 'ExternalQcInspectionLine' },
+  { module: 'Spot Rectification-Scrap', phase: 'Phase 5', model: 'SpotRectification' },
+  { module: 'Reconciliation Report', phase: 'Phase 5', model: 'ReconciliationReport' },
 ];
 
 /**
@@ -47,14 +57,9 @@ const DELIVERED = [
  * something is absent.
  */
 const FORBIDDEN = [
-  { module: 'Internal Quality Check', patterns: [/internal_?quality/i, /InternalQuality/] },
-  { module: 'Internal / Final Checker Report', patterns: [/checker_?report/i, /CheckerReport/] },
-  { module: 'Finished Checker', patterns: [/finished_?checker/i, /FinishedChecker/] },
-  { module: 'Spot Rectification-Scrap', patterns: [/spot_?rectification/i, /SpotRectification/] },
   { module: 'Packing', patterns: [/model\s+Packing\b/, /@@map\("packings?"\)/] },
   { module: 'Needle Checking', patterns: [/needle_?check/i, /NeedleCheck/] },
   { module: 'Dispatch', patterns: [/model\s+Dispatch\b/, /@@map\("dispatch(es)?"\)/, /dispatch_/i] },
-  { module: 'Reconciliation Report', patterns: [/reconciliation/i, /Reconciliation/] },
 ];
 
 /**

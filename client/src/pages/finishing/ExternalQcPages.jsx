@@ -14,6 +14,10 @@
  *      Reasons per box: Alter, Iron, Defected, Spoiled, Other   MANUAL - must add up to the box
  *      Checker codes + pcs   MANUAL, optional - the number marked on the bag
  *      Inspection report     photo or PDF, optional
+ *      Inspection grid       MANUAL, optional - the agency's report keyed line
+ *                            by line: the 26 defects of L_InspDefect26 by
+ *                            Critical / Major / Minor ("External Secondary
+ *                            Checking"). Inspection Qty is the pcs offered.
  *      Remarks
  *
  *  WHERE THE PIECES GO: Approved waits for Humidity Checking. "Iron" in
@@ -26,6 +30,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useResourceList } from '../../hooks/useResourceList.js';
+import { useMasterList } from '../../hooks/useMasterList.js';
 import { externalQc as api } from '../../services/erp.js';
 import {
   Alert,
@@ -411,6 +416,14 @@ export function ExternalQcDetail() {
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-header">Inspection report</div>
         <div className="card-body">
+          {row.inspection && (
+            <InspectionGrid
+              particulars={[]}
+              lines={linesOf(row.inspectionLines)}
+              inspectionQty={row.pcsOffered}
+              readOnly
+            />
+          )}
           {row.attachments?.length ? (
             <ul className="plain-list">
               {row.attachments.map((a) => (
@@ -552,6 +565,28 @@ function ReasonTable({ values, onChange, readOnly = false }) {
 
 const blankCheckers = () => [{ checkerCode: '', pcs: '' }];
 
+/** Saved inspection lines -> the grid's values, keyed by particular. */
+const linesOf = (lines = []) =>
+  Object.fromEntries(lines.map((l) => [
+    l.particular,
+    { critical: String(l.critical || ''), major: String(l.major || ''), minor: String(l.minor || ''), remark: l.remark ?? '' },
+  ]));
+
+/** Grid values -> what the server takes. Empty lines are left out. */
+const inspectionBody = (lines) =>
+  Object.entries(lines)
+    .map(([particular, l]) => ({
+      particular,
+      critical: num(l.critical),
+      major: num(l.major),
+      minor: num(l.minor),
+      remark: l.remark?.trim() || null,
+    }))
+    .filter((l) => l.critical || l.major || l.minor || l.remark);
+
+const inspectionDefects = (lines) =>
+  Object.values(lines).reduce((a, l) => a + num(l.critical) + num(l.major) + num(l.minor), 0);
+
 function QcModal({ ctx, options = [], existing, onClose, onSaved }) {
   const editing = Boolean(existing);
   const [form, setForm] = useState(() => ({
@@ -569,6 +604,8 @@ function QcModal({ ctx, options = [], existing, onClose, onSaved }) {
   const [checkers, setCheckers] = useState(() =>
     existing?.checkers?.length ? existing.checkers.map((c) => ({ checkerCode: c.checkerCode, pcs: String(num(c.pcs)) })) : blankCheckers());
   const [file, setFile] = useState(null);
+  const [inspection, setInspection] = useState(() => linesOf(existing?.inspectionLines));
+  const { values: particulars } = useMasterList('InspDefect26');
   /*
    * APPROVED FOLLOWS THE OTHER TWO until somebody types in it: offered less
    * alteration less rejected, which is what it must equal anyway. Typing in
@@ -609,6 +646,8 @@ function QcModal({ ctx, options = [], existing, onClose, onSaved }) {
   }
   if (traced > num(form.pcsAlteration) + num(form.pcsRejected)) problems.push('More pieces are traced to checker codes than were faulty.');
   if (checkers.some((c) => num(c.pcs) > 0 && !c.checkerCode.trim())) problems.push('Give the checker code for every line with pieces.');
+  const inspected = inspectionDefects(inspection);
+  if (inspected > offered) problems.push(`The inspection report's defects add up to ${n0(inspected)}, more than the ${n0(offered)} pieces offered.`);
   const ready = (editing || choice) && form.agencyId && offered > 0 && !overAvailable && !boxesOff && problems.length === 0 && !busy;
   // A greyed-out Save says nothing on its own; this says what it is waiting for.
   const waitingFor = busy ? ''
@@ -630,6 +669,7 @@ function QcModal({ ctx, options = [], existing, onClose, onSaved }) {
       pcsRejected: form.pcsRejected || '0',
       ...Object.fromEntries(REASON_FIELDS.map((k) => [k, form[k] || '0'])),
       checkers: checkers.filter((c) => c.checkerCode.trim() || num(c.pcs)).map((c) => ({ checkerCode: c.checkerCode, pcs: c.pcs || '0' })),
+      inspectionLines: inspectionBody(inspection),
       remarks: form.remarks || null,
     };
     try {
@@ -756,6 +796,15 @@ function QcModal({ ctx, options = [], existing, onClose, onSaved }) {
         </>
       )}
 
+      <CollapsibleField label="Inspection report (26 defects)">
+        <InspectionGrid
+          particulars={particulars.map((v) => v.value)}
+          lines={inspection}
+          inspectionQty={form.pcsOffered}
+          onChange={setInspection}
+        />
+      </CollapsibleField>
+
       {problems.length > 0 && (
         <Alert kind="warning">
           {problems.length === 1 ? problems[0] : <ul className="plain-list" style={{ margin: 0 }}>{problems.map((p) => <li key={p}>{p}</li>)}</ul>}
@@ -794,6 +843,94 @@ function QcModal({ ctx, options = [], existing, onClose, onSaved }) {
         </CollapsibleField>
       </div>
     </Modal>
+  );
+}
+
+/**
+ * The agency's inspection report ("External Secondary Checking"): every
+ * defect of L_InspDefect26 by severity, with the report's totals block under
+ * it. Total Inspection Qty is the pieces offered. Lines the entry holds whose
+ * particular the list has since dropped are still shown.
+ */
+function InspectionGrid({ particulars, lines, inspectionQty, readOnly = false, onChange }) {
+  const rows = [...particulars, ...Object.keys(lines).filter((p) => !particulars.includes(p))];
+  const line = (p) => lines[p] ?? { critical: '', major: '', minor: '', remark: '' };
+  const setLine = (p, patch) => onChange({ ...lines, [p]: { ...line(p), ...patch } });
+
+  const totals = rows.reduce(
+    (t, p) => {
+      const l = line(p);
+      return { critical: t.critical + num(l.critical), major: t.major + num(l.major), minor: t.minor + num(l.minor) };
+    },
+    { critical: 0, major: 0, minor: 0 },
+  );
+  const totalDefect = totals.critical + totals.major + totals.minor;
+  const inspected = num(inspectionQty);
+
+  const cell = (p, key) => (readOnly ? n0(line(p)[key]) : (
+    <TextInput
+      type="number"
+      inputMode="numeric"
+      min="0"
+      step="1"
+      value={line(p)[key]}
+      onChange={(e) => setLine(p, { [key]: e.target.value })}
+      aria-label={`${p} ${key}`}
+      style={{ width: 72, textAlign: 'right' }}
+    />
+  ));
+
+  return (
+    <div className="span-2">
+      <TableWrap>
+        <table className="data">
+          <thead>
+            <tr>
+              <th>Particulars</th>
+              <th className="num">Critical</th>
+              <th className="num">Major</th>
+              <th className="num">Minor</th>
+              <th className="num">Total</th>
+              <th>Remark</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((p) => {
+              const l = line(p);
+              return (
+                <tr key={p}>
+                  <td>{p}</td>
+                  <td className="num">{cell(p, 'critical')}</td>
+                  <td className="num">{cell(p, 'major')}</td>
+                  <td className="num">{cell(p, 'minor')}</td>
+                  <td className="num">{n0(num(l.critical) + num(l.major) + num(l.minor))}</td>
+                  <td>
+                    {readOnly ? (l.remark || '') : (
+                      <TextInput value={l.remark} maxLength={500} onChange={(e) => setLine(p, { remark: e.target.value })} aria-label={`${p} remark`} />
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th>Total</th>
+              <th className="num">{n0(totals.critical)}</th>
+              <th className="num">{n0(totals.major)}</th>
+              <th className="num">{n0(totals.minor)}</th>
+              <th className="num">{n0(totalDefect)}</th>
+              <th />
+            </tr>
+          </tfoot>
+        </table>
+      </TableWrap>
+      <p className="hint">
+        Total Inspection Qty <strong>{n0(inspected)}</strong> · Total Defect <strong>{n0(totalDefect)}</strong> ·
+        Total Pass Quantity <strong>{n0(inspected - totalDefect)}</strong> · Total Defect Ratio{' '}
+        <strong>{inspected === 0 ? '0.00%' : `${((totalDefect / inspected) * 100).toFixed(2)}%`}</strong>
+      </p>
+    </div>
   );
 }
 

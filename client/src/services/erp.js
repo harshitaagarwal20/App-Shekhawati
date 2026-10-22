@@ -739,6 +739,32 @@ export const rejectedRegister = {
   get: (id) => request({ method: 'GET', url: `/rejected-register/${id}` }),
 };
 
+// --- Phase 5: final QC, spot rectification, reconciliation -----------------
+
+/**
+ * One Phase 5 register, at its own path. Every one has the same five calls -
+ * see server/src/services/productionRegister.service.js.
+ */
+export function productionRegister(path) {
+  return {
+    list: (params) => requestList({ method: 'GET', url: `/${path}`, params }),
+    get: (id) => request({ method: 'GET', url: `/${path}/${id}` }),
+    create: (body) => request({ method: 'POST', url: `/${path}`, data: body }),
+    update: (id, body) => request({ method: 'PATCH', url: `/${path}/${id}`, data: body }),
+    remove: (id) => request({ method: 'DELETE', url: `/${path}/${id}` }),
+  };
+}
+
+/** The dropdowns the registers' forms read, under the registers' own permissions. */
+export const productionLookups = {
+  orders: () => request({ method: 'GET', url: '/production-lookups/orders' }),
+  styles: () => request({ method: 'GET', url: '/production-lookups/styles' }),
+  employees: () => request({ method: 'GET', url: '/production-lookups/employees' }),
+  /** The order's styles (with quantities) and the reconciliation figures per style. */
+  orderContext: (orderId) =>
+    request({ method: 'GET', url: '/production-lookups/order-context', params: { orderId } }),
+};
+
 // --- Material Plan (C12) ----------------------------------------------------
 
 /**
