@@ -5,6 +5,9 @@
  * the stage it was rejected at (today the Alteration Unit, for the pieces it
  * found not repairable - alteration.service.js) and is kept equal to that
  * entry. Correcting a reject means correcting the entry that made it.
+ *
+ * Each row carries its order and style's packed qty beside it (Phase 6), so
+ * the register reads rejected against what went into the boxes.
  */
 
 import { Prisma } from '@prisma/client';
@@ -33,7 +36,22 @@ const INCLUDE = {
   },
 };
 
-const project = (row) => ({ ...row, qty: D(row.qty).toString() });
+const project = (row, packed) => {
+  const p = packed?.get(`${row.orderId}:${row.styleId}`);
+  return { ...row, qty: D(row.qty).toString(), orderStylePacked: p == null ? '0' : D(p).toString() };
+};
+
+/** Packed pcs of each order and style on the page. */
+async function packedOf(rows) {
+  const pairs = [...new Map(rows.map((r) => [`${r.orderId}:${r.styleId}`, { orderId: r.orderId, styleId: r.styleId }])).values()];
+  if (!pairs.length) return new Map();
+  const sums = await prisma.packingEntry.groupBy({
+    by: ['orderId', 'styleId'],
+    where: { deletedAt: null, OR: pairs },
+    _sum: { pcsPacked: true },
+  });
+  return new Map(sums.map((s) => [`${s.orderId}:${s.styleId}`, s._sum.pcsPacked]));
+}
 
 export async function list(query) {
   const { page, pageSize, skip, take, orderBy, search } = query;
@@ -49,16 +67,34 @@ export async function list(query) {
       : {}),
     ...searchFilter(search, ['reason', 'defectType', 'notRepairableReason', 'unit', 'order.orderNo', 'style.styleNo']),
   };
-  const [rows, total, sums] = await Promise.all([
+  const packedWhere = {
+    deletedAt: null,
+    ...(query.orderId ? { orderId: query.orderId } : {}),
+    ...(query.styleId ? { styleId: query.styleId } : {}),
+  };
+  const [rows, total, sums, packedSum] = await Promise.all([
     prisma.rejectedRegisterEntry.findMany({ where, orderBy: orderBy ?? { rejectDate: 'desc' }, skip, take, include: INCLUDE }),
     prisma.rejectedRegisterEntry.count({ where }),
     prisma.rejectedRegisterEntry.aggregate({ where, _sum: { qty: true } }),
+    // Only meaningful for one order: across the whole register it would add
+    // up the packing of orders with no reject at all.
+    query.orderId ? prisma.packingEntry.aggregate({ where: packedWhere, _sum: { pcsPacked: true } }) : null,
   ]);
-  return { rows: rows.map(project), total, page, pageSize, totals: { qty: D(sums._sum.qty).toString() } };
+  const packed = await packedOf(rows);
+  return {
+    rows: rows.map((r) => project(r, packed)),
+    total,
+    page,
+    pageSize,
+    totals: {
+      qty: D(sums._sum.qty).toString(),
+      ...(packedSum ? { packed: D(packedSum._sum.pcsPacked).toString() } : {}),
+    },
+  };
 }
 
 export async function getById(id) {
   const row = await prisma.rejectedRegisterEntry.findFirst({ where: { id, deletedAt: null }, include: INCLUDE });
   if (!row) throw ApiError.notFound('Rejected register entry');
-  return project(row);
+  return project(row, await packedOf([row]));
 }

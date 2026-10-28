@@ -222,9 +222,35 @@ export async function removeList(id, actorId) {
 
 // --- Values ----------------------------------------------------------------
 
+/** Case and repeated whitespace should not create a second dropdown choice. */
+function comparableListValue(listCode, value) {
+  const text = String(value ?? '').normalize('NFKC').trim().replace(/\s+/g, ' ');
+  const key = text.toLocaleLowerCase();
+  // A known duplicate in the historical ColorCode list. Keep this mapping
+  // local to dropdown maintenance too, so it cannot be reintroduced later.
+  if (listCode === 'ColorCode' && key === 'mid night blue') return 'midnight blue';
+  return key;
+}
+
+async function findEquivalentValue(listId, listCode, value, excludeId = null) {
+  const rows = await prisma.masterListValue.findMany({
+    where: { listId, ...(excludeId ? { id: { not: excludeId } } : {}) },
+    select: { id: true, value: true, deletedAt: true, isActive: true },
+  });
+  return rows.find((row) => comparableListValue(listCode, row.value) === comparableListValue(listCode, value));
+}
+
 export async function addValue(listId, input, actorId) {
   const list = await prisma.masterList.findFirst({ where: { id: listId, deletedAt: null } });
   if (!list) throw ApiError.notFound('Master list');
+
+  const equivalent = await findEquivalentValue(listId, list.code, input.value);
+  if (equivalent && equivalent.value !== input.value) {
+    throw ApiError.conflict(
+      `A matching value already exists: "${equivalent.value}". Use that spelling to keep records together.`,
+      { field: 'value', existingValue: equivalent.value },
+    );
+  }
 
   const existing = await prisma.masterListValue.findFirst({
     where: { listId, value: input.value },
@@ -272,6 +298,18 @@ export async function addValue(listId, input, actorId) {
 export async function updateValue(valueId, input, actorId) {
   const value = await prisma.masterListValue.findFirst({ where: { id: valueId, deletedAt: null } });
   if (!value) throw ApiError.notFound('List value');
+
+  if (input.value !== undefined && input.value !== value.value) {
+    const equivalent = await findEquivalentValue(value.listId, (await prisma.masterList.findFirst({
+      where: { id: value.listId }, select: { code: true },
+    }))?.code, input.value, valueId);
+    if (equivalent) {
+      throw ApiError.conflict(
+        `A matching value already exists: "${equivalent.value}". Use that spelling to keep records together.`,
+        { field: 'value', existingValue: equivalent.value },
+      );
+    }
+  }
 
   if (input.value && input.value !== value.value) {
     const clash = await prisma.masterListValue.findFirst({

@@ -32,7 +32,6 @@ const VIEWS = [
       { label: 'Job workers', value: fmtNum(t.jobWorkers) },
       { label: 'Jobs', value: fmtNum(t.jobs) },
       { label: 'Shrinkage', value: t.shrinkagePct ?? '—', sub: t.allowedPct ? `allowed ${t.allowedPct}` : undefined },
-      { label: 'Jobs over allowance', value: fmtNum(t.overAllowance), bad: t.overAllowance > 0 },
       { label: 'Overdue now', value: fmtNum(t.overdue), bad: t.overdue > 0 },
     ],
     chartEmpty: () => 'No job has been completed yet.',

@@ -3,7 +3,7 @@
 Manufacturing ERP for a Jaipur-based bag / tote export house, replacing the
 Excel-and-paper process captured in `Shekwati Impex formats.xlsx`.
 
-**The application covers Masters → Cutting Issue → Stitching (with Inline QC beside it) → Ironing → External QC → Alteration Unit, and ends there.**
+**The application covers Masters → Cutting Issue → Stitching (with Inline QC beside it) → Ironing → External QC → Needle Checking → Packing → Dispatch, and closes each order at the Reconciliation Report.**
 
 ```
 MASTERS → BUYER ORDER → PLANNING → VENDOR QUOTATION → QUOTATION APPROVAL
@@ -11,18 +11,20 @@ MASTERS → BUYER ORDER → PLANNING → VENDOR QUOTATION → QUOTATION APPROVAL
        → FABRIC ISSUE → DYEING → PRINTING → FABRIC SCRUTINY
        → PLAN APPROVAL → CUTTING ISSUE → STITCHING (+ HOURLY MONITORING,
          INLINE QC, optional PRINTING AFTER STITCHING) → IRONING
-       → EXTERNAL QC → ALTERATION UNIT / REJECTED REGISTER → END
+       → EXTERNAL QC → ALTERATION UNIT / REJECTED REGISTER
+       → NEEDLE CHECKING → PACKING → DISPATCH
+       → RECONCILIATION → END
 ```
 
 Production Phase 2 added Stitching Record and Hourly Monitoring, then Ironing.
 Phase 3 added **Inline QC**, checks taken on the line while stitching runs: it
 sits beside stitching rather than after it and moves no pieces. Phase 4 added
-External QC, the Alteration Unit and the Rejected Register. Nothing after them
-(final QC, packing, needle checking, dispatch, reconciliation) is part of this
-system yet — no table, no route, no menu item, no placeholder.
-`npm run verify:scope` fails the build if any of it creeps in, and opening the
-next stage means moving it from `FORBIDDEN` to `DELIVERED` in
-`server/prisma/verify-scope.js`.
+External QC, the Alteration Unit and the Rejected Register; Phase 5 the final
+QC sheets and the Reconciliation Report. Phase 6 takes External QC's approved
+pieces through Needle Checking into the boxes and out to the buyer. Every stage the workbook names is now built.
+`npm run verify:scope` checks every delivered module's tables are still there,
+and fails the build if anything named in `FORBIDDEN` (today: nothing) creeps
+in — see `server/prisma/verify-scope.js`.
 
 That one line is the whole application. Drawn out — every branch, every gate,
 who decides what, and how stock moves under it — it is
@@ -48,18 +50,19 @@ those things is **[docs/USE-CASE-DIAGRAM.md](docs/USE-CASE-DIAGRAM.md)**.
 | **13** | Job Work: one register for dyeing, printing, washing and finishing; returns, shrinkage, scrutiny hold | **Delivered** |
 | **14** | Fabric Scrutiny: findings, the Director’s decision, locking, and amendment with a before/after trail | **Delivered** |
 | **15** | Plan Approval: version-controlled, rectification into a successor version, approved versions immutable | **Delivered** |
-| **16** | Cutting Issue: nine pre-post verifications, excess authorisation, permanent lock. **The pipeline ends here.** | **Delivered** |
+| **16** | Cutting Issue: nine pre-post verifications, excess authorisation, permanent lock. Production carries on from here — see P2 onwards. | **Delivered** |
 | **17** | Excess control: every tolerance configurable, scope precedence, authorisation workflow. No percentage is compiled into the application. | **Delivered** |
-| **18** | Approval engine: one state machine, one transition table, nine document types, a cross-module queue | **Delivered** |
+| **18** | Approval engine: one state machine, one transition table, thirteen document types, a cross-module queue | **Delivered** |
 | **C12** | Material Plan: the raw material requirement — fabric **and** accessories — exploded from the Style BOM, frozen at creation, prepared by planning and signed before procurement goes to the market | **Delivered** |
-| **32** | Reporting: fourteen operational reports, one per implemented module, RBAC-filtered, CSV export | **Delivered** |
+| **32** | Reporting: twenty-six operational reports across every implemented module, RBAC-filtered, CSV export | **Delivered** |
 | **33** | Excel reconciliation: every workbook column traced Excel → ERP → column → API → screen, with every deliberate omission documented | **Delivered** |
 | **P2** | Production Phase 2: Stitching Record (per unit, per day, never more than was cut for the unit), Hourly Monitoring (per tailor, per slot, saved cell by cell, phone-first), optional printing after stitching. A supervisor sees only their own unit — taken from the Unit / Line on their Employee record. See [docs/PRODUCTION-PHASE-2-NOTES.md](docs/PRODUCTION-PHASE-2-NOTES.md) | **Delivered** |
 | **P3** | Inline QC: one screen with a Check Type toggle (Size / Workmanship — the workbook's QC Size and QC Defects sheets), taken on the line beside stitching. Unit follows the tailor; Pcs Checked and Pcs Rejected; several defects from the Defect Type list. Each defect goes to the **Action needed** list of the supervisor named in Inform To, who marks it Resolved. See [docs/INLINE-QC-NOTES.md](docs/INLINE-QC-NOTES.md) | **Delivered** |
 | **Ironing** | Received from a unit (never more than it stitched less out for printing), ironed, damaged with a type; every damaged piece decided re-iron or rejected (rejects held as pending rejects); receiving closes the unit's cutting challans oldest first; daily and balance reports. See [docs/IRONING-NOTES.md](docs/IRONING-NOTES.md) | **Delivered** |
 | **P4** | External QC (offered = approved + alteration + rejected, each faulty box by reason), the Alteration Unit (bags to repair or clean), and the Rejected Register. See [docs/PHASE-4-EXTERNAL-QC-NOTES.md](docs/PHASE-4-EXTERNAL-QC-NOTES.md) | **Delivered** |
+| **P6** | Needle Checking (the Size Assortment Carton sheet: Order + Style at the top, cartons numbered on row by row, ten sizes, Pcs/Carton the sum; never more than External QC approved), Packing (the Packing Details sheet, box by box: Qty = Packing × Boxes, N.W, G.W and CBM worked out; never more of a colour than Needle Checking passed), and Dispatch (order-wise: buyer and shipment details from the order, container from its plan, totals from packing; Pending / Dispatched / Delivered; sets the order Partially Shipped / Shipped; dispatch note and packing list). See [docs/PHASE-6-PACKING-DISPATCH-NOTES.md](docs/PHASE-6-PACKING-DISPATCH-NOTES.md) | **Delivered** |
 | **VP** | Vendor Performance (Dashboard → Vendor Performance): charts of job workers' shrinkage against their allowance and lots back by the due date, suppliers' PO lines received in full by the delivery date, cutting wastage by mill, and defect reasons at every QC stage. Each is a report in the registry, so it also has a table and a CSV export | **Delivered** |
-| **DS** | Daily summary: at `DAILY_SUMMARY_TIME` (default 20:00 India time), holders of `REPORT.SUMMARY` (the Director) get the day's pieces cut, issued and stitched, External and Inline QC, rejections and the approvals waiting — in the bell, and by email / WhatsApp per their settings. Each line is shown only to someone who may view that register; anyone can switch it off or preview it under Notifications → Settings | **Delivered** |
+| **DS** | Daily summary: at `DAILY_SUMMARY_TIME` (default 20:00 India time), holders of `REPORT.SUMMARY` (the Director) get the day's pieces cut, issued and stitched, External and Inline QC, rejections and the approvals waiting — in the bell, and by email / WhatsApp per their settings. Each line is shown only to someone who may view that register; anyone can switch it off or preview it under Notifications → Settings. With `ANTHROPIC_API_KEY` set, up to five **Needs attention** lines written by Claude go on top: a unit well under its usual output, a style's QC rejections up on its last 7 days, approvals waiting on the reader. They are written only from what that reader may see, and the figures stay underneath ([summaryBriefing.service.js](server/src/services/summaryBriefing.service.js)) | **Delivered** |
 
 > **Live on Azure.** The application is deployed and in use — App Service for the
 > API, a Static Web App for the client, PostgreSQL Flexible Server behind both.
@@ -75,7 +78,7 @@ those things is **[docs/USE-CASE-DIAGRAM.md](docs/USE-CASE-DIAGRAM.md)**.
 >
 > Everything verifiable without a database still is (see [Verification](#verification)):
 > the schema validates, the scope guard passes, every seed cross-reference resolves,
-> 433 rule tests pass with no database, lint is clean and the client builds.
+> 706 rule tests pass with no database, lint is clean and the client builds.
 > Two commands bring a *local* database up — see [Setup](#setup).
 
 ---
@@ -98,73 +101,57 @@ those things is **[docs/USE-CASE-DIAGRAM.md](docs/USE-CASE-DIAGRAM.md)**.
 /
 ├── server/
 │   ├── prisma/
-│   │   ├── schema.prisma                      43 models · 24 enums · ~166 indexes
-│   │   ├── migrations/
-│   │   │   ├── 20260825000000_init/           tables, indexes, foreign keys
-│   │   │   ├── 20260825000100_check_constraints/   50 CHECK constraints
-│   │   │   ├── 20260825000200_user_sessions/  refresh-token session store
-│   │   │   ├── 20260825000300_buyer_order_excess_approval/
-│   │   │   ├── 20260825000400_planning/       planned qty, approval flow, ceiling checks
-│   │   │   ├── 20260825000500_vendor_quotation/  amount = qty x rate, reasoned decisions
-│   │   │   ├── 20260825000600_purchase_order_gate_pass_grn/  three formulas, three CHECKs
-│   │   │   ├── 20260825000700_inventory_item_sequence/  item codes from the counter table
-│   │   │   ├── 20260825000800_stock_ledger_source_of_truth/  qty_in / qty_out, snapshots
-│   │   │   ├── 20260825000900_issue_jobwork_scrutiny_planapproval/  locking and versions
-│   │   │   └── 20260825001000_excess_engine_approval_engine_cutting/  no hardcoded 2%
-│   │   ├── seed/                              seeder · offline verifier · data
-│   │   └── verify-scope.js                    fails if an out-of-scope module appears
+│   │   ├── schema.prisma          73 models · 36 enums
+│   │   ├── migrations/            92 migrations, applied in name order by db:deploy
+│   │   │   ├── 20260825000000_init/                       tables, indexes, foreign keys
+│   │   │   ├── 20260825000100_check_constraints/          the CHECK constraints
+│   │   │   ├── …                                          one per change since
+│   │   │   ├── 20261020000300_stitching_and_hourly_monitoring/
+│   │   │   ├── 20261020000400_ironing/
+│   │   │   ├── 20261020000500_external_qc_and_alteration/
+│   │   │   ├── 20261021000100_inline_qc/
+│   │   │   ├── 20261021000200_daily_summary/
+│   │   │   ├── 20261021000300_approval_queue_and_excess_rule_permissions/
+│   │   │   └── 20261021000400_notification_dismiss/
+│   │   ├── seed/                  seeder · offline verifier · data
+│   │   └── verify-scope.js        delivered modules must exist; forbidden ones must not
 │   ├── src/
-│   │   ├── config/         env.js · prisma.js
-│   │   ├── middleware/     authenticate · authorize · validate · rateLimit · errorHandler
+│   │   ├── config/         env · prisma · poolWarmer · events
+│   │   │                   auditedTables · auditContext · auditSnapshot (the audit trail)
+│   │   ├── domain/         the rules as pure functions, no database:
+│   │   │                   costing · panels · cutCheck · fifo · requirement · shade
+│   │   │                   itemCategory · documentLines · makerChecker
+│   │   │                   stitching · inlineQc · ironing · finishing
+│   │   ├── middleware/     authenticate · authorize · validate · rateLimit
+│   │   │                   receiveFile (uploads) · errorHandler
 │   │   ├── services/       auth · user · role · masterList · buyer · vendor · employee · style
-│   │   │                   buyerOrder · planning · vendorQuotation · purchaseOrder
-│   │   │                   gatePass · grn · inventory · fabricIssue · jobWork
-│   │   │                   fabricScrutiny · planApproval · cuttingIssue
-│   │   │                   excess (configurable tolerances)
-│   │   │                   approvalEngine (one workflow, nine document types)
-│   │   │                   report (fourteen reports, one registry)
+│   │   │                   buyerOrder · planning · materialPlan · planApproval · costSheet
+│   │   │                   vendorQuotation · purchaseOrder · gatePass · grn · grnReversal
+│   │   │                   inventory · openingStock · fabricIssue · jobWork · fabricScrutiny
+│   │   │                   cuttingIssue · cuttingChallan · cuttingFabric · cutPiecesReceipt
+│   │   │                   stitching · inlineQc · ironing · externalQc · alteration
+│   │   │                   rejectedRegister · unitFlow · finishingFlow (pieces between stages)
+│   │   │                   excess · tolerance · tax (configurable figures, never hardcoded)
+│   │   │                   approvalEngine (one workflow, thirteen document types)
+│   │   │                   report + reports.* (twenty-six reports, one registry)
+│   │   │                   dashboard · notification · dailySummary
 │   │   │                   dataset.registry (every exportable table, in one list)
 │   │   │                   export (any table as CSV) · import (masters, from CSV)
-│   │   │                   dashboard (the first screen, RBAC-filtered section by section)
-│   │   │                   crud (shared master core) · documentNumber
-│   │   ├── controllers/    auth · user · master · buyerOrder · planning · vendorQuotation
-│   │   │                   purchaseOrder · gatePass · grn · inventory · production · report
-│   │   │                   dashboard · dataTransfer (exports and imports)
-│   │   ├── routes/         index · auth · user · master · buyerOrder · planning
-│   │   │                   vendorQuotation · purchaseOrder · gatePass · grn
-│   │   │                   inventory · production · report · dashboard
-│   │   │                   dataTransfer (/exports and /imports)
-│   │   ├── validators/     common · auth · user · master · buyerOrder · planning
-│   │   │                   vendorQuotation · purchaseOrder · gatePass · grn
-│   │   │                   production · report
-│   │   ├── utils/          ApiError · http · tokens
+│   │   │                   attachment · audit · crud (shared master core) · documentNumber
+│   │   ├── controllers/    request handlers, one file per area
+│   │   ├── routes/         index · one file per area, mounted under /api
+│   │   ├── validators/     one Zod file per area, plus common
+│   │   ├── utils/          ApiError · http · tokens · dates · figures · approvability
 │   │   │                   csv (the one reader and the one writer - see the note
 │   │   │                        at its head on why both halves live together)
 │   │   └── app.js  index.js
-│   └── test/
-│       ├── api.test.js                        auth · RBAC · masters       (needs a database)
-│       ├── orders.test.js                     buyer order · excess        (needs a database)
-│       ├── rules.test.js                      planning ceiling · amount   (no database)
-│       ├── phase6-18.rules.test.js            54 cases                    (no database)
-│       │                                      PO amount and both ceilings ·
-│       │                                      gate pass variation · GRN tolerance ·
-│       │                                      job work shrinkage · the excess
-│       │                                      engine · the transition table
-│       ├── reports.rules.test.js              55 cases                    (no database)
-│                                              the report registry · RBAC filtering ·
-│                                              the CSV writer
-│       ├── dashboard.rules.test.js            56 cases                    (no database)
-│       │                                    every descriptor · and who is shown
-│       │                                    which section, asserted against the
-│       │                                    real access decision
-│       ├── pagination.rules.test.js          14 cases                    (no database)
-│       │                                    every page boundary · the clamps ·
-│       │                                    and that no row is dropped between
-│       │                                    two pages
-│       └── urlParams.rules.test.js           14 cases                    (no database)
-│                                              what a list writes to the address
-│                                              bar · defaults omitted · foreign
-│                                              parameters preserved
+│   └── test/               44 files
+│       ├── *.rules.test.js           pure rules, no database — see Verification
+│       ├── *.db.test.js              one module against a real database
+│       └── api · orders · planning · quotations · pagination
+│           c2-c9.constraints · c2-c9.e2e · concurrency.*
+│                                     end to end over HTTP, or against the
+│                                     database's own constraints
 │
 ├── client/
 │   └── src/
@@ -172,28 +159,40 @@ those things is **[docs/USE-CASE-DIAGRAM.md](docs/USE-CASE-DIAGRAM.md)**.
 │       │                form.jsx      React Hook Form + Zod, server errors, submit-once
 │       │                workflow.jsx  StateBadge · LockNotice · progress · trail · excess
 │       │                mobile.jsx    shop floor: pickers · scan box · qty · confirm sheet
+│       │                ReportTable · TrendChart · RankedBars   report tables and charts
+│       │                NotificationBell · HubChoice · Combobox · dataTransfer (CSV buttons)
 │       ├── config/       masters.jsx (descriptors) · navigation.js
 │       ├── context/      AuthContext.jsx
-│       ├── hooks/        useMasterList · useResourceList
+│       ├── hooks/        useMasterList · useResourceList · useOptionalColumns · useIsMounted
 │       ├── layouts/      AppLayout.jsx
 │       ├── utils/        format.js    DD-MM-YYYY in Asia/Kolkata · display numbers
+│       │                 rollSuggest.js
 │       ├── pages/        Login · ChangePassword · Errors
 │       │                 Dashboard      attention · approvals · the pipeline
-│       │                 ApprovalQueue  everything awaiting a decision
-│       │                 orders/      OrderList · OrderForm · OrderDetail
-│       │                 planning/    Planning* · PlanApprovalPages (versions)
+│       │                 ApprovalsHub · ApprovalQueue   everything awaiting a decision
+│       │                 orders/      OrderList · OrderForm · OrderDetail · ColourwayGrid
+│       │                 planning/    PlanningHub · Planning* · MaterialPlanPages
+│       │                              PlanApprovalPages (versions)
+│       │                 costing/     CostSheetPages
 │       │                 quotations/  QuotationList · QuotationForm · QuotationDetail
-│       │                 procurement/ PurchaseOrder* · GatePass* · Grn*
-│       │                 inventory/   StockSummary · StockLedgerPage · RollList · RollDetail
+│       │                 procurement/ PurchaseOrder* · GatePass* · Grn* · GrnReversalDetail
+│       │                              DocumentPages
+│       │                 inventory/   InventoryHub · StockSummary · StockLedgerPage
+│       │                              RollList · RollDetail · OpeningStockPage · InventoryAnalysis
 │       │                 production/  FabricIssue* · JobWork* · ScrutinyPages
-│       │                 cutting/     CuttingIssueForm · CuttingIssuePages
-│       │                 reports/     Reports.jsx    (one screen, fourteen reports)
-│       │                 print/       DocumentPrint  (all six printed documents)
+│       │                 cutting/     CuttingIssue* · CuttingChallanPages · CutPiecesReceiptPages
+│       │                 stitching/   StitchingPages · HourlyMonitoring · PrintingPages
+│       │                              InlineQcPages · IroningPages
+│       │                 finishing/   ExternalQcPages · AlterationPages · RejectedRegister
+│       │                 reports/     Reports.jsx (one screen, twenty-six reports)
+│       │                              VendorPerformance · AnalysisScreen (the charts)
+│       │                 print/       DocumentPrint  (every printed document)
 │       │                 shared/      Detail.jsx     (TraceChain and friends)
 │       │                 masters/     MasterPage · ListMaster · Buyers · Vendors · Employees · Styles
-│       │                 admin/       Users · Roles · ExcessRules
+│       │                 admin/       Users · Roles · ExcessRules · Audit
 │       ├── routes/       AppRoutes.jsx · ProtectedRoute.jsx
 │       └── services/     api.js (axios + token refresh) · erp.js
+│                         dataTransferCache · loadFailures
 │
 └── docs/
     ├── PHASE-0-MODELLING-DECISIONS.md         26 decisions · 2 assumptions · 7 open points
@@ -202,17 +201,27 @@ those things is **[docs/USE-CASE-DIAGRAM.md](docs/USE-CASE-DIAGRAM.md)**.
     ├── PHASE-4-5-NOTES.md                     the planning ceiling rule, and the amount formula
     ├── PHASE-6-18-NOTES.md                    PO → Cutting Issue · the excess engine ·
     │                                          the approval engine · 6 assumptions · 6 open points
+    ├── PRODUCTION-PHASE-2-NOTES.md            stitching record, hourly monitoring,
+    │                                          printing after stitching
+    ├── INLINE-QC-NOTES.md                     Phase 3: two check types, Inform To, Resolved
+    ├── IRONING-NOTES.md                       received, ironed, damaged; closing a unit
+    ├── PHASE-4-EXTERNAL-QC-NOTES.md           External QC, the Alteration Unit, the
+    │                                          Rejected Register
+    ├── POST-CUTTING-SCOPE-ASSESSMENT.md       the production flow mapped stage by stage,
+    │                                          and the questions the rest still needs answered
     ├── EXCEL-RECONCILIATION.md                every workbook column, traced end to end,
     │                                          and every deliberate omission with its reason
     ├── BUSINESS-CONTROLS.md                   the twelve controls, and where each is enforced
+    ├── STOCK-VALUATION-POLICY.md              FIFO, and why
     ├── APPLICATION-FLOW.md                    the flow chart: the pipeline, every branch,
     │                                          the state machine, how stock moves, the ten
     │                                          gates on a cutting issue
-    ├── USE-CASE-DIAGRAM.md                    the nine actors, what each may do, and the
+    ├── USE-CASE-DIAGRAM.md                    the actors, what each may do, and the
     │                                          actor x use case matrix derived from the seeder
-    └── AZURE-DEPLOYMENT.md                    the whole Azure deployment: resources, every
-                                               app setting, the pipeline, the one-time seed,
-                                               and the runbook
+    ├── AZURE-DEPLOYMENT.md                    the whole Azure deployment: resources, every
+    │                                          app setting, the pipeline, the one-time seed,
+    │                                          and the runbook
+    └── HOSTING-AND-SECRETS.md                 what runs where, and Key Vault
 ```
 
 ---
@@ -295,27 +304,45 @@ Current results:
 | Check | Result |
 |---|---|
 | `npm run lint` | **0 problems** |
-| `npm run build` | **clean** — 186 modules, split per route: 402 kB initial (124 kB gzip) |
-| `prisma validate` | valid — 59 models · 25 enums · 73 migrations |
-| `verify:scope` | no out-of-scope module present; `CuttingIssue` is terminal |
+| `npm run build` | **clean** — 194 modules, split per route: 410 kB initial (124 kB gzip) |
+| `prisma validate` | valid — 73 models · 36 enums · 92 migrations |
+| `verify:scope` | all eight delivered production modules present; none of the eight forbidden stages (final checks, spot rectification, packing, needle checking, dispatch, reconciliation) |
 | `verify:seed` | all cross-references resolve (1 warning on workbook sample data) |
-| `npm run test:rules` | **433/433 pass** — every calculation, state rule, report descriptor, dashboard permission, RBAC route guard, page boundary and list URL |
+| `npm run test:rules` | **650/650 pass** — every calculation, state rule, report descriptor, dashboard permission, RBAC route guard, page boundary and list URL |
 | `npm test` | needs a seeded database — run it locally, never against production |
 
 `npm run test:rules` drives the exported pure functions directly, so it runs on a
-laptop with nothing installed but Node. The 74 cases cover:
+laptop with nothing installed but Node. What each file asserts:
 
-| Phase | What is asserted |
-|---|---|
-| 4 | a plan may never allot more than the order permits |
-| 5 | quotation amount is qty × rate |
-| 6 | PO amount; the 1% accessory and 3% material ceilings; the style requirement that bounds an order-as-per-style; the amount in words on the Indian numbering system |
-| 7 | gate pass variation, including the sheet’s sign convention and its `IFERROR` |
-| 8 | GRN amount and variance; that tolerance is measured on the **cumulative** receipt, so three 1% deliveries against a 2% tolerance are caught |
-| 13 | job work amount and shrinkage; that nothing returned yet is **zero** shrinkage rather than 100%; that the four processes are told apart |
-| 17 | all nine excess figures, the brief’s own 10,000-at-2% example, the hard ceiling, advisory thresholds, and that a 5% contracted tolerance permits what 2% would not |
-| 18 | the transition table: the happy path, the rejection loop, that `APPROVED` is terminal, and that a rejected document’s progress bar does not flatter it |
-| 32 | the report registry: that all fourteen exist and nothing else does, that every one declares a permission over an in-scope module, that the catalogue is filtered by permission, and that the CSV writer escapes commas, quotes and newlines |
+| File | Cases | What is asserted |
+|---|---|---|
+| `rules` | 20 | Phases 4–5: a plan may never allot more than the order permits; the workflow state is derived; quotation amount is qty × rate |
+| `phase6-18` | 60 | PO amount and both ceilings; the amount in words on the Indian numbering system; gate pass variation and its sign convention; GRN tolerance measured on the **cumulative** receipt; job work shrinkage; the excess engine; the transition table |
+| `phase38-40` | 64 | no status is settable from the frontend; the transition tables are total and closed; the navigation shows the current scope; the audit trail is read-only and never holds a secret |
+| `reports` | 114 | every report the brief asks for exists and nothing else does; each declares a permission over an in-scope module; the catalogue is filtered by permission; the CSV writer escapes commas, quotes and newlines |
+| `dashboard` | 62 | every descriptor is well formed; a user sees only what they hold; seeing a queue is not deciding it |
+| `rbac` | 15 | every permission a route demands is one the seeder issues; someone other than Admin can open each module |
+| `screensByRole` | 56 | the sidebar and the page guards agree; each role sees exactly its screens |
+| `tax` | 20 | GST: the state code decides the split, intra- versus inter-state, rounding, zero versus absent |
+| `c1.poMode` | 18 | order tolerance by category; As-per-style is a hard cap, Bulk is never blocked, and the mode must be stated |
+| `excessRules` | 13 | which rule applies to which item, and that a rule needing no approval still has a ceiling |
+| `improvements` | 34 | buyer order pricing; one bag, one shade; approval notifications; after-commit hooks; FOB costing; multi-line documents |
+| `costing-and-cutting` | 23 | panels from the style; the five-term fabric equation; planned versus actual consumption; FIFO cost layers; the cut-pieces sample check |
+| `accessoryVariety` | 6 | two varieties of one item are two stock items; which BOM line bounds a PO |
+| `planning.fabricStock` | 19 | which bucket a roll is in; what is still to arrive; whether the store covers a cutting plan |
+| `stitching` | 20 | remaining = deliverable − actual; never more stitched than was cut for the unit; which unit a login works for; the hourly grid; printing after stitching |
+| `inlineQc` | 21 | two check types on one screen; pieces checked and rejected; defects and Inform To; only the person named marks a defect Resolved |
+| `ironing` | 16 | the two balances every write must keep; damage %; closing the unit |
+| `finishing` | 20 | External QC's three boxes and their reasons; where each piece goes next; the Alteration Unit; no piece counted twice and none lost |
+| `dailySummary` | 8 | each line goes only to those who may see that register; when it is sent |
+| `pagination` | 14 | every page boundary, the clamps, and that no row is dropped between two pages |
+| `urlParams` | 21 | what a list writes to the address bar: defaults omitted, foreign parameters kept, values escaped |
+| `upload` | 6 | a file reaches the server as a file |
+
+Four more files hold pure rules but are not yet in the `test:rules` script, so
+they run only under `npm test`: `c2-c9.rules` (54), `c12.materialPlan.rules` (10),
+`makerChecker.rules` (9) and `approvalQueue.routes.rules` (4). All 77 pass with no
+database.
 
 `npm run verify` and `npm run test:rules` need no database.
 

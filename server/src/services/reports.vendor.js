@@ -606,13 +606,15 @@ export const DEFECT_STAGES = [
             ...between('entryDate', q.dateFrom, q.dateTo),
           },
         },
-        select: { defect: true, entry: { select: { entryDate: true, checkType: true } } },
+        select: { defect: true, qty: true, entry: { select: { entryDate: true, checkType: true } } },
       });
+      // Pieces where the defect was counted. A defect recorded before counts
+      // were taken is still one check that found it, kept apart in "checks".
       return lines.map((l) => ({
         reason: l.defect,
         detail: l.entry.checkType === 'SIZE' ? 'Size check' : 'Workmanship',
-        qty: 1,
-        unit: 'checks',
+        qty: l.qty ?? 1,
+        unit: l.qty == null ? 'checks' : 'pcs',
         date: l.entry.entryDate,
       }));
     },

@@ -23,7 +23,8 @@ const pieces = (label) =>
   );
 
 export const orderListQuery = listQuery.extend({
-  status: z.enum(['PENDING', 'IN_PROGRESS', 'COMPLETED', 'ON_HOLD', 'CANCELLED']).optional(),
+  // PARTIALLY_SHIPPED and SHIPPED are Dispatch's to set, but a list may filter on them.
+  status: z.enum(['PENDING', 'IN_PROGRESS', 'COMPLETED', 'ON_HOLD', 'CANCELLED', 'PARTIALLY_SHIPPED', 'SHIPPED']).optional(),
   excessApprovalStatus: z.enum(['NOT_REQUIRED', 'PENDING', 'APPROVED', 'REJECTED']).optional(),
   buyerId: uuid.optional(),
   styleId: uuid.optional(),

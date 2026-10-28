@@ -156,8 +156,8 @@ export const PLAN_TYPE_META = {
   SHIPPING: {
     label: 'Shipping plan',
     describes:
-      'How many pieces are planned to ship, in which container, and by when. A PLAN only - ' +
-      'this system has no dispatch module.',
+      'How many pieces are planned to ship, in which container, and by when. Dispatch ships ' +
+      'against it, container by container.',
   },
 };
 

@@ -28,12 +28,14 @@ import {
   Spinner,
   StatusBadge,
   TextInput,
+  ClearFilters,
 } from '../../components/ui.jsx';
 import { Detail, DetailGrid, TraceChain } from '../shared/Detail.jsx';
-import { fmtDate, fmtEnum, fmtNum, fmtOrder } from '../../utils/format.js';
+import { fmtDate, fmtEnum, fmtNum, fmtOrder, fmtVendor } from '../../utils/format.js';
 import { loadFailed } from '../../services/loadFailures.js';
 import { ExportButton } from '../../components/dataTransfer.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
+import DateRangeFilter from '../../components/DateRangeFilter.jsx';
 
 const PURPOSES = ['CUTTING', 'DYEING', 'PRINTING', 'STITCHING', 'RETURN', 'SAMPLING', 'OTHER'].map(
   (v) => ({ value: v, label: fmtEnum(v) }),
@@ -58,6 +60,7 @@ const COLUMNS = [
   { key: 'order', label: 'Order', optional: true },
   { key: 'style', label: 'Style', optional: true },
   { key: 'issuedBy', label: 'Issued by', optional: true },
+  { key: 'issuedTo', label: 'Issued to', optional: true },
   { key: 'destination', label: 'Destination', optional: true },
   { key: 'status', label: 'Status' },
 ];
@@ -71,7 +74,7 @@ export function FabricIssueList() {
   const list = useResourceList((params) => fiApi.list(params), {
     defaultSort: 'issueDate',
     defaultDir: 'desc',
-    initialFilters: { purpose: '', orderId: '', vendorId: '' },
+    initialFilters: { purpose: '', orderId: '', vendorId: '', dateFrom: '', dateTo: '' },
   });
 
   const [orderOptions, setOrderOptions] = useState([]);
@@ -148,12 +151,14 @@ export function FabricIssueList() {
             <RecordSelect
               id="fi-f-vendor"
               options={vendorOptions}
-              getLabel={(v) => v.vendorName}
+              getLabel={fmtVendor}
               placeholder="All"
               value={list.filters.vendorId ?? ''}
               onChange={(e) => list.setFilter('vendorId', e.target.value)}
             />
           </Field>
+          <DateRangeFilter filters={list.filters} setFilter={list.setFilter} />
+          <ClearFilters list={list} />
         </div>
 
         <TableWrap>
@@ -170,6 +175,7 @@ export function FabricIssueList() {
                 {cols.show('order') && <th>Order</th>}
                 {cols.show('style') && <th>Style</th>}
                 {cols.show('issuedBy') && <th>Issued by</th>}
+                {cols.show('issuedTo') && <th>Issued to</th>}
                 {cols.show('destination') && <th>Destination</th>}
                 <SortableTh field="status" label="Status" sortBy={list.sortBy} sortDir={list.sortDir} onSort={list.toggleSort} />
                 <ColumnMenu {...cols} />
@@ -214,6 +220,7 @@ export function FabricIssueList() {
                     {cols.show('order') && <td className="code">{f.order?.orderNo ?? '-'}</td>}
                     {cols.show('style') && <td className="code">{f.style?.styleNo ?? '-'}</td>}
                     {cols.show('issuedBy') && <td>{f.issuedByName}</td>}
+                    {cols.show('issuedTo') && <td>{f.issuedToName ?? '-'}</td>}
                     {cols.show('destination') && <td>{f.destination}</td>}
                     <td>
                       <StatusBadge status={f.status} />
@@ -348,6 +355,7 @@ export function FabricIssueDetail() {
               value={issue.issuedByName}
               sub={issue.issuedByEmployee?.designation}
             />
+            {issue.issuedToName && <Detail label="Issued to" value={issue.issuedToName} />}
             <Detail label="Job worker" value={issue.vendor?.vendorName} />
             <Detail label="From location" value={issue.location} />
             <Detail

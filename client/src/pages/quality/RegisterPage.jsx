@@ -31,14 +31,20 @@ import {
   Spinner,
   TextArea,
   TextInput,
+  ClearFilters,
 } from '../../components/ui.jsx';
 import { ExportButton } from '../../components/dataTransfer.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
 import { loadFailed } from '../../services/loadFailures.js';
-import { fmtDate, fmtNum, toDateInput, todayInput } from '../../utils/format.js';
+import { fmtDate, fmtNum, fmtOrder, toDateInput, todayInput } from '../../utils/format.js';
+import DateRangeFilter from '../../components/DateRangeFilter.jsx';
 
 const fieldsOf = (d) => d.fields;
-const SENT = new Set(['date', 'order', 'style', 'employee', 'master', 'int', 'text', 'textarea']);
+const SENT = new Set(['date', 'order', 'style', 'employee', 'master', 'int', 'text', 'textarea', 'defects']);
+
+/** A defect line nobody has started - left out of what is sent. */
+const blankLine = (l) => !l.defectType && (l.qty === '' || l.qty === undefined);
+const halfLine = (l) => !blankLine(l) && (!l.defectType || !(Number(l.qty) > 0));
 
 /** Server row -> form values. Every input starts as a string, never undefined. */
 function initialForm(d, row) {
@@ -46,7 +52,10 @@ function initialForm(d, row) {
   for (const f of fieldsOf(d)) {
     if (!SENT.has(f.type)) continue;
     const v = row?.[f.name];
-    if (f.type === 'date') out[f.name] = v ? toDateInput(v) : f.defaultToday ? todayInput() : '';
+    if (f.type === 'defects') {
+      const lines = (v ?? []).map((l) => ({ defectType: l.defectType, qty: String(l.qty) }));
+      out[f.name] = lines.length || row ? lines : [{ defectType: '', qty: '' }];
+    } else if (f.type === 'date') out[f.name] = v ? toDateInput(v) : f.defaultToday ? todayInput() : '';
     else out[f.name] = v === null || v === undefined ? '' : String(v);
   }
   return out;
@@ -58,6 +67,10 @@ function toBody(d, form) {
   for (const f of fieldsOf(d)) {
     if (!SENT.has(f.type)) continue;
     const v = form[f.name];
+    if (f.type === 'defects') {
+      body[f.name] = v.filter((l) => !blankLine(l)).map((l) => ({ defectType: l.defectType, qty: Number(l.qty) }));
+      continue;
+    }
     if (f.type === 'int') {
       if (v !== '' && v !== undefined) body[f.name] = Number(v);
       continue;
@@ -185,7 +198,7 @@ export default function RegisterPage({ descriptor: d }) {
               onChange={(e) => list.setFilter('orderId', e.target.value)}
               options={orders}
               getValue={(o) => o.id}
-              getLabel={(o) => o.orderNo}
+              getLabel={fmtOrder}
               placeholder="All orders"
             />
           </Field>
@@ -201,14 +214,10 @@ export default function RegisterPage({ descriptor: d }) {
           ))}
           {dated && (
             <>
-              <Field label="From">
-                <TextInput type="date" value={list.filters.dateFrom} onChange={(e) => list.setFilter('dateFrom', e.target.value)} />
-              </Field>
-              <Field label="To">
-                <TextInput type="date" value={list.filters.dateTo} onChange={(e) => list.setFilter('dateTo', e.target.value)} />
-              </Field>
+              <DateRangeFilter filters={list.filters} setFilter={list.setFilter} fromLabel="From" toLabel="To" />
             </>
           )}
+          <ClearFilters list={list} />
         </div>
 
         <TableWrap>
@@ -395,6 +404,7 @@ function RegisterForm({ d, api, orders, existing, readOnly, onClose, onSaved, on
 
   const missing = fields.some((f) => {
     if (!SENT.has(f.type)) return false;
+    if (f.type === 'defects') return form[f.name].some(halfLine);
     const required = f.required || f.requiredIf?.(form);
     if (!required) return false;
     if (f.type === 'style') return !form.styleId && !(d.orderOptional && form.orderId);
@@ -456,7 +466,7 @@ function RegisterForm({ d, api, orders, existing, readOnly, onClose, onSaved, on
             }}
             options={orderOptions}
             getValue={(o) => o.id}
-            getLabel={(o) => `${o.orderNo}${o.buyer?.buyerName ? ` - ${o.buyer.buyerName}` : ''}`}
+            getLabel={fmtOrder}
             placeholder={f.required ? 'Select order...' : 'No order'}
             disabled={disabled || (existing && f.required)}
             error={err}
@@ -499,6 +509,19 @@ function RegisterForm({ d, api, orders, existing, readOnly, onClose, onSaved, on
         break;
       case 'figures':
         return <FiguresCard key={f.name} figures={(ctx?.styles?.find((s) => s.id === form.styleId) ?? ctx?.styles?.[0])?.figures} />;
+      case 'defects':
+        return (
+          <DefectLines
+            key={f.name}
+            label={f.label}
+            listCode={f.listCode}
+            lines={form[f.name]}
+            onChange={(lines) => set({ [f.name]: lines })}
+            errors={errors}
+            name={f.name}
+            readOnly={disabled}
+          />
+        );
       default:
         control = null;
     }
@@ -560,6 +583,87 @@ function RegisterForm({ d, api, orders, existing, readOnly, onClose, onSaved, on
 }
 
 // ===========================================================================
+//  DEFECT LINES - a defect type and how many pieces had it
+// ===========================================================================
+
+function DefectLines({ label, listCode, lines, onChange, errors, name, readOnly }) {
+  const setLine = (i, patch) => onChange(lines.map((l, j) => (j === i ? { ...l, ...patch } : l)));
+  // The server numbers the lines it was sent, and blank ones are not sent.
+  const sentIndex = [];
+  lines.reduce((n, l, i) => {
+    sentIndex[i] = blankLine(l) ? null : n;
+    return blankLine(l) ? n : n + 1;
+  }, 0);
+  const lineError = (i, key) => (sentIndex[i] === null ? undefined : errors[`${name}.${sentIndex[i]}.${key}`]);
+  const total = lines.reduce((s, l) => s + (Number(l.qty) || 0), 0);
+
+  return (
+    <div className="span-2">
+      <Field label={label} error={errors[name]} hint="One line per defect type found, with the number of pieces that had it.">
+        <TableWrap>
+          <table className="data">
+            <thead>
+              <tr>
+                <th>Defect Type</th>
+                <th className="num">Defect Pcs</th>
+                {!readOnly && <th className="actions-head" />}
+              </tr>
+            </thead>
+            <tbody>
+              {lines.length === 0 && (
+                <tr>
+                  <td colSpan={readOnly ? 2 : 3} className="muted">No defects found.</td>
+                </tr>
+              )}
+              {lines.map((l, i) => (
+                <tr key={i}>
+                  <td>
+                    <MasterSelect
+                      listCode={listCode}
+                      value={l.defectType}
+                      currentValue={l.defectType}
+                      onChange={(e) => setLine(i, { defectType: e.target.value })}
+                      disabled={readOnly}
+                      error={lineError(i, 'defectType')}
+                    />
+                  </td>
+                  <td className="num">
+                    <TextInput type="number" min="1" step="1" inputMode="numeric" value={l.qty} placeholder="0"
+                      onChange={(e) => setLine(i, { qty: e.target.value })} disabled={readOnly}
+                      error={lineError(i, 'qty')} />
+                  </td>
+                  {!readOnly && (
+                    <td className="actions">
+                      <button type="button" className="btn btn-sm" onClick={() => onChange(lines.filter((_, j) => j !== i))}>
+                        Remove
+                      </button>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+            {lines.length > 1 && (
+              <tfoot>
+                <tr>
+                  <th>Total</th>
+                  <th className="num">{fmtNum(total)}</th>
+                  {!readOnly && <th />}
+                </tr>
+              </tfoot>
+            )}
+          </table>
+        </TableWrap>
+      </Field>
+      {!readOnly && (
+        <button type="button" className="btn btn-sm" onClick={() => onChange([...lines, { defectType: '', qty: '' }])}>
+          Add defect
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ===========================================================================
 //  THE RECONCILIATION FIGURES
 // ===========================================================================
 
@@ -573,7 +677,9 @@ function FiguresCard({ figures }) {
     ['Alter Pcs', figures.alter, 'sent to the Alteration Unit'],
     ['Scrap Pcs', figures.scrap, 'from Spot Rectification & Scrap'],
     ['Rejected Pcs', figures.rejected, 'from the Rejected Register'],
-    ['Passed External QC', figures.passedExternalQc, 'External QC Approved - Packing is not built yet'],
+    ['Passed External QC', figures.passedExternalQc, 'External QC Approved'],
+    ['Packed Pcs', figures.packed, 'from Packing'],
+    ['Dispatched Pcs', figures.dispatched, 'from Dispatch, every container that has left'],
   ];
   return (
     <div className="span-2">

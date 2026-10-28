@@ -30,13 +30,15 @@ import {
   TextArea,
   TextInput,
   ViewTabs,
+  ClearFilters,
 } from '../../components/ui.jsx';
 import { Detail, DetailGrid } from '../shared/Detail.jsx';
-import { fmtDate, fmtNum, todayInput, toDateInput } from '../../utils/format.js';
+import { fmtDate, fmtNum, fmtVendor, toDateInput, todayInput } from '../../utils/format.js';
 import { loadFailed } from '../../services/loadFailures.js';
 import { ExportButton } from '../../components/dataTransfer.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
 import { STITCHING_TABS, orderLabel } from './stitchingShared.jsx';
+import DateRangeFilter from '../../components/DateRangeFilter.jsx';
 
 const api = stitching.printings;
 const n0 = (v) => fmtNum(v, { decimals: 0 });
@@ -47,7 +49,7 @@ export function PrintingList() {
   const list = useResourceList((params) => api.list(params), {
     defaultSort: 'printingDate',
     defaultDir: 'desc',
-    initialFilters: { openOnly: '' },
+    initialFilters: { openOnly: '', dateFrom: '', dateTo: '' },
   });
   const [creating, setCreating] = useState(false);
 
@@ -80,6 +82,8 @@ export function PrintingList() {
             <option value="true">Still out (not all back)</option>
           </select>
         </Field>
+        <DateRangeFilter filters={list.filters} setFilter={list.setFilter} />
+        <ClearFilters list={list} />
       </div>
 
       <p className="hint" style={{ marginTop: 0 }}>
@@ -369,7 +373,7 @@ function PrintingModal({ existing, onClose, onSaved }) {
           </Field>
         )}
         <Field label="Vendor" required>
-          <RecordSelect value={form.vendorId} onChange={(e) => set({ vendorId: e.target.value })} options={vendorOptions} getValue={(v) => v.id} getLabel={(v) => v.vendorName} />
+          <RecordSelect value={form.vendorId} onChange={(e) => set({ vendorId: e.target.value })} options={vendorOptions} getValue={(v) => v.id} getLabel={fmtVendor} />
         </Field>
         <Field label="Pcs sent" required error={tooMany ? `At most ${n0(room)} can go out` : undefined}>
           <TextInput type="number" inputMode="numeric" min="1" value={form.qty} error={tooMany} onChange={(e) => set({ qty: e.target.value })} />

@@ -48,7 +48,6 @@ const schema = z.object({
   purchaseOrderId: z.string().uuid('Choose a purchase order'),
   billNo: z.string().trim().min(1, 'The vendor bill number is required').max(60),
   grnDate: z.string().min(1, 'Date is required'),
-  purpose: z.enum(['RAW_MATERIAL', 'DYEING', 'PRINTING', 'JOB_WORK_RETURN', 'ACCESSORIES']),
   receivingQty: z.coerce.number().positive('Receiving quantity must be greater than zero'),
   inventoryRate: z.coerce.number().min(0).optional(),
   hsnCode: z.string().trim().max(20).optional(),
@@ -59,14 +58,6 @@ const schema = z.object({
   remarks: z.string().trim().max(2000).optional(),
 });
 
-const PURPOSES = [
-  { value: 'RAW_MATERIAL', label: 'Raw material' },
-  { value: 'ACCESSORIES', label: 'Accessories' },
-  { value: 'DYEING', label: 'Dyeing' },
-  { value: 'PRINTING', label: 'Printing' },
-  { value: 'JOB_WORK_RETURN', label: 'Job work return' },
-];
-
 /**
  * One roll line on a multi-roll delivery.
  *
@@ -75,7 +66,7 @@ const PURPOSES = [
  * beginning of somebody generating them here.
  */
 let rollLineSeq = 0;
-const blankRoll = () => ({ key: `line-${(rollLineSeq += 1)}`, rollNo: '', qty: '', width: '', shade: '', dyeLot: '' });
+const blankRoll = () => ({ key: `line-${(rollLineSeq += 1)}`, rollNo: '', qty: '' });
 
 export default function GrnForm({ purchaseOrderId, gatePassId, onSaved, onCancel }) {
   const form = useZodForm(schema, {
@@ -84,7 +75,6 @@ export default function GrnForm({ purchaseOrderId, gatePassId, onSaved, onCancel
     billNo: '',
     // Blank, not today: the date the goods came in is keyed, never assumed.
     grnDate: '',
-    purpose: 'RAW_MATERIAL',
     receivingQty: '',
     inventoryRate: '',
     hsnCode: '',
@@ -140,7 +130,7 @@ export default function GrnForm({ purchaseOrderId, gatePassId, onSaved, onCancel
         inventoryRate: inventoryRate === '' ? null : String(inventoryRate),
       });
       setPreview(p);
-      // Default the rate and the purpose from the PO, once.
+      // Default the rate from the PO, once.
       if (inventoryRate === '') form.setValue('inventoryRate', p.purchaseOrder.rate);
       if (!form.getValues('hsnCode')) form.setValue('hsnCode', p.purchaseOrder.hsnCode ?? '');
     } catch {
@@ -173,7 +163,6 @@ export default function GrnForm({ purchaseOrderId, gatePassId, onSaved, onCancel
         purchaseOrderId: values.purchaseOrderId,
         billNo: values.billNo,
         grnDate: values.grnDate,
-        purpose: values.purpose,
         receivingQty: String(values.receivingQty),
         inventoryRate: values.inventoryRate === '' ? null : String(values.inventoryRate),
         hsnCode: values.hsnCode || null,
@@ -187,9 +176,6 @@ export default function GrnForm({ purchaseOrderId, gatePassId, onSaved, onCancel
             ? rolls.map((r) => ({
                 rollNo: r.rollNo || null,
                 qty: String(r.qty),
-                width: r.width === '' ? null : String(r.width),
-                shade: r.shade || undefined,
-                dyeLot: r.dyeLot || undefined,
               }))
             : undefined,
         acknowledgeToleranceBreach: acknowledge || undefined,
@@ -210,11 +196,6 @@ export default function GrnForm({ purchaseOrderId, gatePassId, onSaved, onCancel
       busyLabel="Posting..."
       onCancel={onCancel}
       disabled={!rollsBalance || (breached && !acknowledge)}
-      footerNote={
-        preview?.nextGrnNo
-          ? `Will be numbered ${preview.nextGrnNo}. Posting writes the GRN, the roll(s) and the stock ledger together.`
-          : undefined
-      }
     >
       <div className="form-grid">
         <>
@@ -233,14 +214,6 @@ export default function GrnForm({ purchaseOrderId, gatePassId, onSaved, onCancel
           />
           <RHFInput form={form} name="billNo" label="Bill No" required hint="The vendor's invoice. One bill, one receipt." />
           <RHFInput form={form} name="grnDate" label="Date" type="date" required max={todayInput()} hint="The day the goods came in." />
-          <RHFEnumSelect
-            form={form}
-            name="purpose"
-            label="Purpose"
-            required
-            includeBlank={false}
-            options={PURPOSES}
-          />
           {/* No GRN No box: this form only creates, and the server issues the
               number on save. */}
         </>
@@ -395,9 +368,6 @@ function RollLines({ rolls, setRolls, uom, receivingQty, total, balanced, nextRo
                 <tr>
                   <th>Roll No</th>
                   <th className="num">Qty ({uom})</th>
-                  <th className="num">Width</th>
-                  <th title="Shade band, if graded">Shade</th>
-                  <th title="Dye lot from the mill's packing list">Dye lot</th>
                   <th />
                 </tr>
               </thead>
@@ -419,34 +389,6 @@ function RollLines({ rolls, setRolls, uom, receivingQty, total, balanced, nextRo
                         min="0"
                         value={r.qty}
                         onChange={(e) => set(r.key, 'qty', e.target.value)}
-                      />
-                    </td>
-                    <td>
-                      <TextInput
-                        type="number"
-                        inputMode="decimal"
-                        step="any"
-                        min="0"
-                        value={r.width}
-                        onChange={(e) => set(r.key, 'width', e.target.value)}
-                      />
-                    </td>
-                    <td>
-                      <TextInput
-                        value={r.shade}
-                        placeholder="-"
-                        maxLength={20}
-                        aria-label="Shade"
-                        onChange={(e) => set(r.key, 'shade', e.target.value)}
-                      />
-                    </td>
-                    <td>
-                      <TextInput
-                        value={r.dyeLot}
-                        placeholder="-"
-                        maxLength={40}
-                        aria-label="Dye lot"
-                        onChange={(e) => set(r.key, 'dyeLot', e.target.value)}
                       />
                     </td>
                     <td className="actions">

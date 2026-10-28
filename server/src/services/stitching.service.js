@@ -39,7 +39,7 @@ export const SORTABLE = ['recordDate', 'unit', 'deliverableQty', 'actualStitched
 export const HOURLY_SORTABLE = ['entryDate', 'unit', 'slot', 'pcs', 'createdAt'];
 export const PRINTING_SORTABLE = ['printingNo', 'printingDate', 'qty', 'qtyReceived', 'createdAt'];
 
-const ORDER_SELECT = { id: true, orderNo: true, status: true, buyer: { select: { id: true, buyerName: true } } };
+const ORDER_SELECT = { id: true, orderNo: true, status: true, buyer: { select: { id: true, buyerName: true, buyerCode: true } } };
 const STYLE_SELECT = { id: true, styleNo: true, styleDescription: true, hourlyTarget: true };
 
 const RECORD_INCLUDE = { order: { select: ORDER_SELECT }, style: { select: STYLE_SELECT } };
@@ -286,6 +286,7 @@ export async function orderOptions(auth, { unit } = {}) {
         orderId: g.orderId,
         orderNo: order.orderNo,
         buyerName: order.buyer?.buyerName ?? null,
+        buyerCode: order.buyer?.buyerCode ?? null,
         styleId: g.styleId,
         styleNo: style?.styleNo ?? null,
         styleDescription: style?.styleDescription ?? null,
@@ -773,6 +774,7 @@ export async function printingOrderOptions() {
       orderId: g.orderId,
       orderNo: o.get(g.orderId).orderNo,
       buyerName: o.get(g.orderId).buyer?.buyerName ?? null,
+      buyerCode: o.get(g.orderId).buyer?.buyerCode ?? null,
       styleId: g.styleId,
       styleNo: s.get(g.styleId)?.styleNo ?? null,
       unit: g.unit,

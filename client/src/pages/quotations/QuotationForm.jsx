@@ -28,7 +28,7 @@ import {
 } from '../../components/ui.jsx';
 import { loadFailed } from '../../services/loadFailures.js';
 import { focusFirstError } from '../../components/form.jsx';
-import { todayInput } from '../../utils/format.js';
+import { fmtOrderStyle, fmtVendor, todayInput } from '../../utils/format.js';
 
 // Kolkata's calendar date, not UTC's - before 05:30 IST those differ by a day.
 const today = todayInput;
@@ -260,7 +260,7 @@ export default function QuotationForm({ quotation, onSaved, onCancel }) {
               options={vendorOptions ?? []}
               loading={vendorOptions === null}
               getValue={(v) => v.id}
-              getLabel={(v) => `${v.vendorName} (${v.vendorCode})`}
+              getLabel={fmtVendor}
               placeholder="Select vendor..."
               value={form.vendorId}
               onChange={set('vendorId')}
@@ -278,7 +278,7 @@ export default function QuotationForm({ quotation, onSaved, onCancel }) {
               options={orderOptions ?? []}
               loading={orderOptions === null}
               getValue={(o) => o.id}
-              getLabel={(o) => `${o.orderNo} - ${o.style?.styleNo ?? ''}`}
+              getLabel={fmtOrderStyle}
               placeholder="No order reference"
               value={form.orderId}
               onChange={(e) => {

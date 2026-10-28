@@ -72,6 +72,14 @@ const buyerAddressSchema = z.object({
   country: optionalText(80),
 });
 
+/** A whole count from 1 to 1000; blank or null leaves it as it is. */
+function packCount(label) {
+  return z
+    .union([z.literal(''), z.null(), z.coerce.number().int(`${label} must be a whole number`).min(1, `${label} must be at least 1`).max(1000)])
+    .optional()
+    .transform((v) => (v === '' || v === null ? undefined : v));
+}
+
 export const createBuyerSchema = z.object({
   /*
    * The whole book, replaced as one. The order of the array IS the order the
@@ -400,6 +408,12 @@ export const createStyleSchema = z.object({
     .union([z.literal(''), z.null(), decimal('Hourly target', { allowZero: false, max: 100000 })])
     .optional()
     .transform((v) => (v === '' ? null : v)),
+  /**
+   * Phase 6 - bags (one piece each) to a packet, and packets to a carton.
+   * Blank keeps what the style has; a new style starts at 10 and 10.
+   */
+  bagsPerPacket: packCount('Bags per packet'),
+  packetsPerCarton: packCount('Packets per carton'),
   imageRef: optionalText(200),
   status: statusActive.default('ACTIVE'),
   remarks: optionalText(2000),

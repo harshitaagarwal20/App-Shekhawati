@@ -94,6 +94,28 @@ const schema = z.object({
     .string()
     .regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'DAILY_SUMMARY_TIME is HH:MM in 24-hour India time - 20:00')
     .default('20:00'),
+
+  /**
+   * The "Needs attention" lines Claude writes on top of the daily summary
+   * (services/summaryBriefing.service.js). Off while the key is empty; set
+   * DAILY_SUMMARY_AI=false to switch it off without removing the key.
+   */
+  ANTHROPIC_API_KEY: z.string().default(''),
+  DAILY_SUMMARY_AI: z.enum(['true', 'false']).default('true').transform((v) => v === 'true'),
+
+  /**
+   * The assistant (services/assistant.service.js) - questions answered from the
+   * reports and the uploaded reference documents. Off while ANTHROPIC_API_KEY
+   * is empty.
+   */
+  ASSISTANT_MODEL: z.string().default('claude-sonnet-5-5'),
+  /**
+   * Where the embedding model (all-MiniLM-L6-v2, about 90 MB) is downloaded on
+   * first use. Must be writable: on App Service the app itself is mounted
+   * read-only (WEBSITE_RUN_FROM_PACKAGE), so point this under /home there.
+   * Defaults to the system temp folder.
+   */
+  ASSISTANT_MODEL_CACHE: z.string().default(''),
 });
 
 const parsed = schema.safeParse(process.env);

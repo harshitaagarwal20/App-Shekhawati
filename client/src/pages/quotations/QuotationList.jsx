@@ -28,12 +28,14 @@ import {
   Spinner,
   StatusBadge,
   TextInput,
+  ClearFilters,
 } from '../../components/ui.jsx';
 import QuotationForm from './QuotationForm.jsx';
-import { fmtDate, fmtOrder } from '../../utils/format.js';
+import { fmtDate, fmtOrder, fmtVendor } from '../../utils/format.js';
 import { loadFailed } from '../../services/loadFailures.js';
 import { ExportButton } from '../../components/dataTransfer.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
+import DateRangeFilter from '../../components/DateRangeFilter.jsx';
 
 
 const fmtNum = (v) =>
@@ -55,6 +57,8 @@ export default function QuotationList() {
       authorisationStatus: '',
       vendorId: '',
       orderId: '',
+      dateFrom: '',
+      dateTo: '',
     },
   });
 
@@ -128,7 +132,7 @@ export default function QuotationList() {
               id="q-f-vendor"
               options={vendorOptions}
               getValue={(v) => v.id}
-              getLabel={(v) => v.vendorName}
+              getLabel={fmtVendor}
               placeholder="All vendors"
               value={list.filters.vendorId ?? ''}
               onChange={(e) => list.setFilter('vendorId', e.target.value)}
@@ -156,6 +160,8 @@ export default function QuotationList() {
               onChange={(e) => list.setFilter('authorisationStatus', e.target.value)}
             />
           </Field>
+          <DateRangeFilter filters={list.filters} setFilter={list.setFilter} />
+          <ClearFilters list={list} />
         </div>
 
         <TableWrap>

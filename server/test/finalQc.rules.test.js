@@ -21,6 +21,7 @@ import {
   checkSpotRectification,
   finishedCheckerTotals,
   inspectionTotals,
+  internalQcDefectTotal,
   ratio,
   reconciliationVariance,
   scrapPct,
@@ -38,19 +39,38 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const ID = '11111111-1111-4111-8111-111111111111';
 
 describe('Internal Quality Check', () => {
+  const found = [
+    { defectType: 'Stain', qty: 80 },
+    { defectType: 'Torn', qty: 40 },
+  ];
+
+  test('Total Defect Pcs is the sum of a count per defect type', () => {
+    assert.equal(internalQcDefectTotal(found), 120);
+    assert.equal(internalQcDefectTotal([]), 0);
+  });
+
   test('defect pieces are never more than the pieces checked', () => {
-    assert.equal(
-      checkInternalQualityCheck({ totalPcsChecked: 2380, totalDefectPcs: 120, qcStatus: 'Approved' }),
-      null,
-    );
-    assert.equal(
-      checkInternalQualityCheck({ totalPcsChecked: 10, totalDefectPcs: 11, qcStatus: 'Approved' }).field,
-      'totalDefectPcs',
-    );
+    assert.equal(checkInternalQualityCheck({ totalPcsChecked: 2380, defects: found, qcStatus: 'Approved' }), null);
+    assert.equal(checkInternalQualityCheck({ totalPcsChecked: 100, defects: found, qcStatus: 'Approved' }).field, 'defects');
+  });
+
+  test('a defect type is counted on one line, not two', () => {
+    const twice = [...found, { defectType: 'Stain', qty: 1 }];
+    assert.match(checkInternalQualityCheck({ totalPcsChecked: 2380, defects: twice, qcStatus: 'Approved' }).message, /Stain/);
+  });
+
+  test('a posted Total Defect Pcs is stripped; a line needs a type and at least one piece', () => {
+    const { create } = schemasFor('internalQc');
+    const base = { orderId: ID, checkerId: ID, totalPcsChecked: 100, qcStatus: 'Approved' };
+    const parsed = create.parse({ ...base, totalDefectPcs: 999, defects: found });
+    assert.equal('totalDefectPcs' in parsed, false);
+    assert.deepEqual(parsed.defects, found);
+    assert.equal(create.safeParse({ ...base, defects: [{ defectType: 'Stain', qty: 0 }] }).success, false);
+    assert.equal(create.safeParse({ ...base, defects: [{ defectType: '', qty: 2 }] }).success, false);
   });
 
   test('"Transferred Back To Unit - if Rejected"', () => {
-    const rejected = { totalPcsChecked: 2380, totalDefectPcs: 120, qcStatus: 'Rejected' };
+    const rejected = { totalPcsChecked: 2380, defects: found, qcStatus: 'Rejected' };
     assert.equal(checkInternalQualityCheck(rejected).field, 'transferredBackToUnit');
     assert.equal(
       checkInternalQualityCheck({ ...rejected, transferredBackToUnit: 'Unit 1 - Anil Kumar' }),
@@ -234,7 +254,7 @@ describe('every register is wired end to end', () => {
 
   test('every table is on the audit trail', () => {
     for (const table of [
-      'internal_quality_checks', 'final_checker_reports', 'finished_checker_records',
+      'internal_quality_checks', 'internal_quality_defects', 'final_checker_reports', 'finished_checker_records',
       'external_qc_inspection_lines', 'spot_rectifications', 'reconciliation_reports',
     ]) {
       assert.ok(AUDITED[table], `${table} is not audited`);

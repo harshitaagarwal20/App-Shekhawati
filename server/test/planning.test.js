@@ -238,6 +238,7 @@ describe('plan creation derives what the sheet marks Auto', () => {
         orderId: order.id,
         orderLineId: await firstLineOf(order.id),
         planDepartment: 'CUTTING',
+        containerNo: 'CN-91',
         // All three of these are the server's to decide.
         plannedQty: '999999',
         plannedCuttingPcs: '999999',

@@ -75,7 +75,7 @@ export const SORTABLE = [
   'createdAt',
 ];
 
-const SEARCH = ['issueNo', 'batchNo', 'fabricName', 'colorCode', 'issuedByName', 'remarks'];
+const SEARCH = ['issueNo', 'batchNo', 'fabricName', 'colorCode', 'issuedByName', 'issuedToName', 'remarks'];
 
 const D = (v) => new Prisma.Decimal(v ?? 0);
 const ZERO = D(0);
@@ -897,8 +897,18 @@ export async function printView(id) {
       styleNo: issue.style?.styleNo ?? null,
     },
     issuedBy: issue.issuedByName,
+    issuedTo: issue.issuedToName,
     remarks: issue.remarks,
-    signatures: ['Issued By', 'Authorised By', 'Received By (Vendor)'],
+    // The receiver signs over their own name when the issue names one.
+    signatures: [
+      'Issued By',
+      'Authorised By',
+      issue.issuedToName
+        ? `Received By (${issue.issuedToName})`
+        : issue.vendor
+          ? 'Received By (Vendor)'
+          : 'Received By',
+    ],
     printedAt: new Date().toISOString(),
   };
 }
@@ -1047,11 +1057,12 @@ async function prepareIssue(input) {
   }
 
   /**
-   * C5 - THE CUTTING CHALLAN LINE THIS ISSUE FULFILS.
+   * C5 - THE CUTTING CHALLAN LINE THIS ISSUE FULFILS, WHEN IT QUOTES ONE.
    *
-   * Required on every new issue. Checked here for a fast refusal and again on
-   * the transaction, which is the check that counts - two store keepers
-   * issuing against the same line at the same moment both pass this one.
+   * Optional now that challans are not raised. Where one is quoted it is
+   * checked here for a fast refusal and again on the transaction, which is the
+   * check that counts - two store keepers issuing against the same line at the
+   * same moment both pass this one.
    *
    * A RETURN is exempt: it is this document run backwards, putting cloth back
    * on the rack, and there is no requirement being fulfilled by it.
@@ -1068,17 +1079,14 @@ async function prepareIssue(input) {
    * requirements for cloth going to a dye house, so no such line can exist and
    * fabric could never have reached a job worker at all.
    */
-  const needsChallanLine = !inward && !requiresJobWorkOrder(input.purpose);
+  /*
+   * The Cutting Challan is no longer used, so a cutting issue need not quote a
+   * line. One that does - an old link, an API caller - is still held to it.
+   */
+  const needsChallanLine =
+    Boolean(input.cuttingChallanLineId) && !inward && !requiresJobWorkOrder(input.purpose);
 
   if (needsChallanLine) {
-    if (!input.cuttingChallanLineId) {
-      throw ApiError.badRequest(
-        'A fabric issue to the cutting floor must quote the approved cutting challan line it ' +
-          'fulfils. The cutting department raises the requirement first; the store issues ' +
-          'against it.',
-        { field: 'cuttingChallanLineId', purpose: input.purpose },
-      );
-    }
     await assertLineCanTake(prisma, input.cuttingChallanLineId, qty);
     await assertShadeConsistent(prisma, input.cuttingChallanLineId, roll, input.shadeMixReason);
   }
@@ -1189,6 +1197,7 @@ async function postIssue(tx, input, ctx, actor, { batchNo = null } = {}) {
       styleId,
       issuedByEmployeeId: employee?.id ?? null,
       issuedByName: employee?.empName ?? input.issuedByName,
+      issuedToName: input.issuedToName ?? null,
       fabricQtyIssued: qty,
       // Excel: "Fabric name" and "Color Code" are attributes of the roll, not
       // of the issue. Copied from it rather than retyped on a phone.
@@ -1568,6 +1577,8 @@ export async function update(id, input, actorId) {
   const shared = {
     ...(input.issueDate !== undefined ? { issueDate: new Date(input.issueDate) } : {}),
     ...(input.remarks !== undefined ? { remarks: input.remarks } : {}),
+    // One challan, one receiver - the name moves with the batch.
+    ...(input.issuedToName !== undefined ? { issuedToName: input.issuedToName } : {}),
     ...(input.deliveryDate !== undefined
       ? { deliveryDate: input.deliveryDate ? new Date(input.deliveryDate) : null }
       : {}),

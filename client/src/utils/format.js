@@ -188,12 +188,35 @@ const ACRONYMS = new Set([
 ]);
 
 /**
- * An order as a dropdown shows it: number, then buyer - "SO-00150 · Demo Retail BV".
+ * An order as a dropdown shows it: number, then buyer - "SO-00150 · Demo Retail BV (DRB)".
  * An order number alone means nothing to somebody picking from forty of them.
+ * The buyer comes nested from /orders/options and flattened from the
+ * per-stage order lists, so both shapes are read.
  */
 export function fmtOrder(o) {
-  const buyer = o?.buyer?.buyerName ?? o?.buyerName;
-  return buyer ? `${o.orderNo} · ${buyer}` : (o?.orderNo ?? '');
+  return [o?.orderNo, orderBuyer(o)].filter(Boolean).join(' · ');
+}
+
+/** fmtOrder with the style between - "SO-00150 · ST-221 · Demo Retail BV (DRB)". */
+export function fmtOrderStyle(o) {
+  return [o?.orderNo, o?.style?.styleNo ?? o?.styleNo, orderBuyer(o)].filter(Boolean).join(' · ');
+}
+
+function orderBuyer(o) {
+  return fmtBuyer(o?.buyer ?? { buyerName: o?.buyerName, buyerCode: o?.buyerCode });
+}
+
+/**
+ * A vendor or buyer as a dropdown shows it: name, then code - "Shree Dyeing (V-014)".
+ * The office knows some parties by name and some by code, and the dropdown
+ * filters on the label, so both have to be in it.
+ */
+export function fmtVendor(v) {
+  return v?.vendorCode ? `${v.vendorName} (${v.vendorCode})` : (v?.vendorName ?? '');
+}
+
+export function fmtBuyer(b) {
+  return b?.buyerCode ? `${b.buyerName} (${b.buyerCode})` : (b?.buyerName ?? '');
 }
 
 export function fmtEnum(value, fallback = '-') {

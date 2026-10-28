@@ -25,20 +25,10 @@ const readRepoFile = (rel) =>
 
 /** Every report in the catalogue, by key. */
 const EXPECTED = [
-  'order-status',
-  // Added with buyer order pricing: the value of the orders on hand.
-  'order-book',
-  'planning-status',
-  'po-status',
-  'pending-grns',
-  'inventory',
-  'roll-wise-stock',
+  // Removed: Order status, Order book, Pending GRNs, Inventory, Roll-wise
+  // stock, Dyeing status, Printing status, Cutting issue status, Planning
+  // status, PO status, Scrutiny status and Plan approval status.
   'fabric-issued',
-  'dyeing-status',
-  'printing-status',
-  'scrutiny-status',
-  'plan-approval-status',
-  'cutting-issue-status',
   // Planned vs actual fabric per style, from posted cutting issues.
   'cutting-efficiency',
   // Stock on hand, valued first-in first-out, layer by layer.
@@ -50,15 +40,12 @@ const EXPECTED = [
   // Ironing: daily output by ironer and order, and the balance waiting.
   'ironing-daily',
   'ironing-balance',
-  // Phase 4: External QC by order / agency / reason, the Checker Report, the
-  // Alteration Unit's pending and summary, and the net pipeline.
+  // Phase 4: External QC by order / agency / reason and the Checker Report.
+  // The Alteration Unit reports and the finishing pipeline were removed.
   'external-qc-by-order',
   'external-qc-by-agency',
   'external-qc-by-reason',
   'checker-report',
-  'alteration-pending',
-  'alteration-summary',
-  'finishing-pipeline',
   // Vendor performance: job workers' shrinkage and punctuality, suppliers'
   // delivery against the PO date, and defect reasons across the QC stages.
   'jobworker-performance',
@@ -187,12 +174,12 @@ describe('Reports - the catalogue is filtered by permission', () => {
   });
 
   test('a user sees exactly the reports their permissions cover', () => {
-    // Somebody who can only see purchase orders gets the PO reports and
-    // nothing else - the PO status and its suppliers' delivery against the
-    // PO date. (Pending PO approvals was removed: the Approvals queue already
-    // lists them.)
+    // Somebody who can only see purchase orders gets the PO report and
+    // nothing else - suppliers' delivery against the PO date. (Pending PO
+    // approvals and PO status were removed: the Approvals queue lists the
+    // first, Pending GRNs and Supplier delivery cover the second.)
     const visible = catalogue((code) => code === 'PURCHASE_ORDER.VIEW').map((r) => r.key);
-    assert.deepEqual(visible.sort(), ['po-status', 'supplier-delivery']);
+    assert.deepEqual(visible.sort(), ['supplier-delivery']);
   });
 
   test('the catalogue carries the columns, so one screen can render any report', () => {

@@ -18,11 +18,10 @@
  * ---------------------------------------------------------------------------
  */
 
-import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useResourceList } from '../../hooks/useResourceList.js';
 import { useOptionalColumns } from '../../hooks/useOptionalColumns.js';
-import { inventory as invApi, orders as ordersApi } from '../../services/erp.js';
+import { inventory as invApi } from '../../services/erp.js';
 import {
   ColumnMenu,
   Alert,
@@ -32,15 +31,15 @@ import {
   MasterSelect,
   PageHeader,
   Pagination,
-  RecordSelect,
   SortableTh,
   Spinner,
   TextInput,
+  ClearFilters,
 } from '../../components/ui.jsx';
-import { fmtDate, fmtEnum, fmtNum, fmtOrder } from '../../utils/format.js';
-import { loadFailed } from '../../services/loadFailures.js';
+import { fmtDate, fmtEnum, fmtNum } from '../../utils/format.js';
 import { ExportButton } from '../../components/dataTransfer.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
+import DateRangeFilter from '../../components/DateRangeFilter.jsx';
 
 const DOC_TYPES = [
   'GRN',
@@ -52,10 +51,6 @@ const DOC_TYPES = [
   'CUTTING_ISSUE',
 ].map((v) => ({ value: v, label: fmtEnum(v) }));
 
-const DIRECTIONS = [
-  { value: 'IN', label: 'In' },
-  { value: 'OUT', label: 'Out' },
-];
 
 /** Where a reference document lives, so the register can link to it. */
 const ROUTE_FOR = {
@@ -118,18 +113,12 @@ export default function StockLedgerPage() {
     initialFilters: {
       itemId: params.get('itemId') ?? '',
       rollId: params.get('rollId') ?? '',
-      orderId: '',
       location: '',
       documentType: '',
-      direction: '',
+      dateFrom: '',
+      dateTo: '',
     },
   });
-
-  const [orderOptions, setOrderOptions] = useState([]);
-
-  useEffect(() => {
-    ordersApi.options().then(setOrderOptions).catch(loadFailed(setOrderOptions, 'orders'));
-  }, []);
 
   return (
     <>
@@ -157,16 +146,6 @@ export default function StockLedgerPage() {
           </Field>
         </div>
 
-        <Field label="Order" htmlFor="led-f-order">
-          <RecordSelect
-            id="led-f-order"
-            options={orderOptions}
-            getLabel={fmtOrder}
-            placeholder="All orders"
-            value={list.filters.orderId ?? ''}
-            onChange={(e) => list.setFilter('orderId', e.target.value)}
-          />
-        </Field>
 
         <Field label="Location" htmlFor="led-f-loc">
           <MasterSelect
@@ -188,15 +167,8 @@ export default function StockLedgerPage() {
           />
         </Field>
 
-        <Field label="Direction" htmlFor="led-f-dir">
-          <EnumSelect
-            id="led-f-dir"
-            options={DIRECTIONS}
-            placeholder="Both"
-            value={list.filters.direction ?? ''}
-            onChange={(e) => list.setFilter('direction', e.target.value)}
-          />
-        </Field>
+        <DateRangeFilter filters={list.filters} setFilter={list.setFilter} />
+        <ClearFilters list={list} />
       </div>
 
       <TableWrap>

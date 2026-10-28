@@ -267,6 +267,107 @@ export const excessRules = [
   { scope: 'DOCUMENT_TYPE', scopeKey: 'CUTTING_ISSUE',  documentType: 'CUTTING_ISSUE',  excessPct: '0.02', hardCeilingPct: '0.05', requiresApproval: true,  priority: 10, basis: 'Cutting beyond the approved plan needs the same authority as ordering beyond the style.' },
 ];
 
+/**
+ * FOB cost sheets - one of every status, so the costing screens, the
+ * approval queue and the order margin panel all have something to show.
+ *
+ * Material lines are copied from each style's BOM by the seeder, and each
+ * line's rate is the last APPROVED purchase order on or before `costDate`,
+ * else the last approved quotation - the same match costSheet.service.js
+ * suggests from, only held to the sheet's own date. `rates` overrides that
+ * by BOM line number where no document priced the material yet; a line with
+ * neither stays unpriced, which only a DRAFT may be.
+ *
+ * Percentages are fractions. Every derived figure comes from domain/costing.js.
+ *
+ *   TR-0751-008  v1 SUPERSEDED on quoted rates, v2 APPROVED on PO rates
+ *   TR-0751-009  v1 APPROVED
+ *   TR-0752-101  v1 APPROVED below its 12% margin at the buyer's target
+ *   PU-0330-045  v1 PENDING_APPROVAL - zipper priced by hand, its PO unsigned
+ *   TB-0910-012  v1 REJECTED over target, v2 DRAFT re-costed at one colour
+ *   BS-0455-003  v1 DRAFT - jute handle not priced yet
+ *   PU-0330-046  no costing yet
+ */
+export const costSheets = [
+  {
+    costSheetNo: 'CS-0001', styleNo: 'TR-0751-008', version: 1, orderNo: null, costDate: '2026-08-04',
+    status: 'SUPERSEDED', submittedDate: '2026-08-04', decidedDate: '2026-08-05',
+    currency: 'USD', exchangeRate: '83.20', targetPrice: '3.40',
+    cmtCost: '38', printCost: '0', dyeWashCost: '0', otherCost: '4', otherCostLabel: 'Polybag + carton share',
+    overheadPct: '0.08', rejectionPct: '0.02', commissionPct: '0.03', marginPct: '0.12',
+    rates: {
+      2: { rate: '11.50', rateSource: 'manual - Metro Accessories rate card' },
+      3: { rate: '2.75', rateSource: 'manual - last season label rate' },
+    },
+    remarks: 'Pre-season costing on the quoted fabric rate',
+  },
+  {
+    costSheetNo: 'CS-0002', styleNo: 'TR-0751-008', version: 2, orderNo: 'B9641IS', costDate: '2026-08-10',
+    status: 'APPROVED', submittedDate: '2026-08-10', decidedDate: '2026-08-11',
+    currency: 'USD', exchangeRate: '83.45', targetPrice: '3.45',
+    cmtCost: '38', printCost: '0', dyeWashCost: '0', otherCost: '4', otherCostLabel: 'Polybag + carton share',
+    overheadPct: '0.08', rejectionPct: '0.02', commissionPct: '0.03', marginPct: '0.12',
+    rates: { 3: { rate: '3', rateSource: 'manual - Metro Accessories, quotation awaited' } },
+    remarks: 'Revised from CS-0001 (v1) on PO rates for B9641IS',
+  },
+  {
+    costSheetNo: 'CS-0003', styleNo: 'TR-0751-009', version: 1, orderNo: 'B9646IS', costDate: '2026-08-14',
+    status: 'APPROVED', submittedDate: '2026-08-14', decidedDate: '2026-08-16',
+    currency: 'USD', exchangeRate: '83.45', targetPrice: '3.30',
+    cmtCost: '34', printCost: '0', dyeWashCost: '0', otherCost: '4', otherCostLabel: 'Polybag + carton share',
+    overheadPct: '0.08', rejectionPct: '0.02', commissionPct: '0.03', marginPct: '0.12',
+    rates: {},
+    remarks: null,
+  },
+  {
+    costSheetNo: 'CS-0004', styleNo: 'TR-0752-101', version: 1, orderNo: 'B9652IS', costDate: '2026-08-16',
+    status: 'APPROVED', submittedDate: '2026-08-16', decidedDate: '2026-08-18',
+    currency: 'GBP', exchangeRate: '105.80', targetPrice: '3.40',
+    cmtCost: '52', printCost: '0', dyeWashCost: '18', otherCost: '9', otherCostLabel: 'Base board + packing',
+    overheadPct: '0.08', rejectionPct: '0.025', commissionPct: '0.04', marginPct: '0.12',
+    rates: {},
+    approvalRemarks: 'Accepted at the buyer target - repeat programme, margin below 12% agreed',
+    remarks: 'Olive Green piece-dyed; gusset and base board',
+  },
+  {
+    costSheetNo: 'CS-0005', styleNo: 'PU-0330-045', version: 1, orderNo: 'B9658IS', costDate: '2026-08-17',
+    status: 'PENDING_APPROVAL', submittedDate: '2026-08-18', decidedDate: null,
+    currency: 'EUR', exchangeRate: '90.40', targetPrice: '1.20',
+    cmtCost: '18', printCost: '0', dyeWashCost: '0', otherCost: '2.50', otherCostLabel: 'Polybag + carton share',
+    overheadPct: '0.08', rejectionPct: '0.02', commissionPct: '0.03', marginPct: '0.12',
+    rates: { 2: { rate: '4.25', rateSource: 'manual - Metro Accessories, PO MA-003 not yet approved' } },
+    remarks: 'Zipper from Metro',
+  },
+  {
+    costSheetNo: 'CS-0006', styleNo: 'TB-0910-012', version: 1, orderNo: 'B9663IS', costDate: '2026-08-18',
+    status: 'REJECTED', submittedDate: '2026-08-18', decidedDate: '2026-08-19',
+    currency: 'USD', exchangeRate: '83.50', targetPrice: '3.60',
+    cmtCost: '36', printCost: '22', dyeWashCost: '0', otherCost: '4', otherCostLabel: 'Polybag + carton share',
+    overheadPct: '0.08', rejectionPct: '0.03', commissionPct: '0.03', marginPct: '0.15',
+    rates: {},
+    rejectionReason: 'FOB is above the Urban Tote target of USD 3.60. Re-cost the print at one colour and hold margin at 12%.',
+    remarks: 'Two-colour screen print on the front panel',
+  },
+  {
+    costSheetNo: 'CS-0007', styleNo: 'TB-0910-012', version: 2, orderNo: 'B9663IS', costDate: '2026-08-20',
+    status: 'DRAFT', submittedDate: null, decidedDate: null,
+    currency: 'USD', exchangeRate: '83.50', targetPrice: '3.60',
+    cmtCost: '36', printCost: '14', dyeWashCost: '0', otherCost: '4', otherCostLabel: 'Polybag + carton share',
+    overheadPct: '0.08', rejectionPct: '0.03', commissionPct: '0.03', marginPct: '0.12',
+    rates: {},
+    remarks: 'Revised from CS-0006 (v1) - one-colour print',
+  },
+  {
+    costSheetNo: 'CS-0008', styleNo: 'BS-0455-003', version: 1, orderNo: 'B9670IS', costDate: '2026-08-21',
+    status: 'DRAFT', submittedDate: null, decidedDate: null,
+    currency: 'EUR', exchangeRate: '90.40', targetPrice: '2.40',
+    cmtCost: '30', printCost: '0', dyeWashCost: '0', otherCost: '3', otherCostLabel: 'Polybag + carton share',
+    overheadPct: '0.08', rejectionPct: '0.02', commissionPct: '0.03', marginPct: '0.12',
+    rates: { 1: { rate: '142', rateSource: 'manual - jute mill rate card' } },
+    remarks: 'Jute handle rate awaited',
+  },
+];
+
 export const documentSequences = [
   { documentType: 'BUYER_ORDER',      scopeKey: '', prefix: 'SO',  separator: '-', padLength: 5, nextNumber: 1,  description: 'Fallback order number when the buyer PO number is not yet known' },
   { documentType: 'VENDOR',           scopeKey: '', prefix: 'VEN', separator: '-', padLength: 3, nextNumber: 8,  description: 'Vendor Master - VEN-001' },
@@ -289,7 +390,8 @@ export const documentSequences = [
   { documentType: 'PLAN_APPROVAL',    scopeKey: '', prefix: 'PA',  separator: '-', padLength: 3, nextNumber: 8,  description: 'Plan Approval log - PA-001' },
   { documentType: 'CUTTING_ISSUE',    scopeKey: '', prefix: 'CH',  separator: '-', padLength: 3, nextNumber: 8,  description: 'Cutting Issue challan - CH-001' },
   { documentType: 'CUT_PIECES_RECEIPT', scopeKey: '', prefix: 'CPR', separator: '-', padLength: 4, nextNumber: 1,  description: 'Cut pieces received from cutting - CPR-0001' },
-  { documentType: 'COST_SHEET', scopeKey: '', prefix: 'CS', separator: '-', padLength: 4, nextNumber: 1,  description: 'FOB cost sheet of a style - CS-0001' },
+  { documentType: 'COST_SHEET', scopeKey: '', prefix: 'CS', separator: '-', padLength: 4, nextNumber: 9,  description: 'FOB cost sheet of a style - CS-0001' },
+  { documentType: 'DISPATCH', scopeKey: '', prefix: 'DSP', separator: '-', padLength: 4, nextNumber: 1,  description: 'Dispatch, one order - DSP-0001' },
   /*
    * THESE THREE WERE ADDED BY MIGRATIONS AND LEFT OUT OF THIS LIST.
    *

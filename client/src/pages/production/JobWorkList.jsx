@@ -29,7 +29,6 @@ import {
   ColumnMenu,
   Alert,
   EmptyState,
-  EnumSelect,
   Field,
   Modal,
   PageHeader,
@@ -39,12 +38,14 @@ import {
   Spinner,
   StatusBadge,
   TextInput,
+  ClearFilters,
 } from '../../components/ui.jsx';
-import { fmtDate, fmtEnum, fmtMoney, fmtNum } from '../../utils/format.js';
+import { fmtDate, fmtEnum, fmtMoney, fmtNum, fmtVendor } from '../../utils/format.js';
 import JobWorkForm from './JobWorkForm.jsx';
 import { loadFailed } from '../../services/loadFailures.js';
 import { ExportButton } from '../../components/dataTransfer.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
+import DateRangeFilter from '../../components/DateRangeFilter.jsx';
 
 /**
  * What this register can show, and what it shows unasked.
@@ -89,7 +90,8 @@ export default function JobWorkList() {
       process: urlProcess,
       status: '',
       vendorId: '',
-      pendingReturn: '',
+      dateFrom: '',
+      dateTo: '',
     },
     // This screen owns `?process=` - the tabs below write it, and the effect
     // further down turns it back into a filter. The list hook reads it on the
@@ -198,23 +200,15 @@ export default function JobWorkList() {
             <RecordSelect
               id="jw-f-vendor"
               options={vendorOptions}
-              getLabel={(v) => v.vendorName}
+              getLabel={fmtVendor}
               placeholder="All vendors"
               value={list.filters.vendorId ?? ''}
               onChange={(e) => list.setFilter('vendorId', e.target.value)}
             />
           </Field>
 
-          <div className="field">
-            <label htmlFor="jw-f-pending">Show</label>
-            <EnumSelect
-              id="jw-f-pending"
-              options={[{ value: 'true', label: 'Still at the vendor' }]}
-              placeholder="All jobs"
-              value={list.filters.pendingReturn ?? ''}
-              onChange={(e) => list.setFilter('pendingReturn', e.target.value)}
-            />
-          </div>
+          <DateRangeFilter filters={list.filters} setFilter={list.setFilter} />
+          <ClearFilters list={list} />
         </div>
 
         <TableWrap>

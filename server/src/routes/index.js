@@ -37,14 +37,15 @@ import ironingRoutes from './ironing.routes.js';
 import externalQcRoutes from './externalQc.routes.js';
 import alterationRoutes, { rejectedRegisterRoutes } from './alteration.routes.js';
 import {
-  finalCheckerRoutes,
   finishedCheckerRoutes,
   internalQcRoutes,
   productionLookupRoutes,
   reconciliationRoutes,
   spotRectificationRoutes,
 } from './productionRegister.routes.js';
+import { dispatchRoutes, needleRoutes, packingRoutes } from './shipping.routes.js';
 import { exportRoutes, importRoutes } from './dataTransfer.routes.js';
+import assistantRoutes from './assistant.routes.js';
 
 const router = Router();
 
@@ -112,14 +113,17 @@ router.use('/external-qc', externalQcRoutes);
 router.use('/alteration', alterationRoutes);
 router.use('/rejected-register', rejectedRegisterRoutes);
 // Phase 5 - final QC, spot rectification and the reconciliation: one register
-// per workbook sheet, all from one engine. Packing, Needle Checking and
-// Dispatch are not built.
+// per workbook sheet, all from one engine.
 router.use('/internal-quality-checks', internalQcRoutes);
-router.use('/final-checker-reports', finalCheckerRoutes);
 router.use('/finished-checker-records', finishedCheckerRoutes);
 router.use('/spot-rectifications', spotRectificationRoutes);
 router.use('/reconciliation-reports', reconciliationRoutes);
 router.use('/production-lookups', productionLookupRoutes);
+// Phase 6 - External QC's Approved to the buyer: needle checking, packing and
+// dispatch.
+router.use('/needle-checking', needleRoutes);
+router.use('/packing', packingRoutes);
+router.use('/dispatches', dispatchRoutes);
 router.use('/excess', excessRoutes);
 // C2 / C3 - the date-versioned tolerance masters, and the gap report.
 router.use('/tolerances', toleranceRoutes);
@@ -132,6 +136,10 @@ router.use('/dashboard', dashboardRoutes);
 // Operational reports. Each one declares its own permission; the catalogue is
 // filtered by it and every run is checked against it.
 router.use('/reports', reportRoutes);
+
+// Questions answered by Claude from the reports and the uploaded documents,
+// under the asking user's own permissions - see assistant.service.js.
+router.use('/assistant', assistantRoutes);
 
 // Who changed what. Read-only, behind its own permission.
 router.use('/audit', auditRoutes);

@@ -199,6 +199,8 @@ export async function create(input, actorId) {
       avgUtilizationUom: input.avgUtilizationUom ?? 'Mtrs',
       sizeGroup: input.sizeGroup ?? null,
       qtyPerCarton: input.qtyPerCarton ?? null,
+      bagsPerPacket: input.bagsPerPacket ?? 10,
+      packetsPerCarton: input.packetsPerCarton ?? 10,
       hourlyTarget: input.hourlyTarget ?? null,
       ...specFields(input),
       imageRef: input.imageRef ?? null,

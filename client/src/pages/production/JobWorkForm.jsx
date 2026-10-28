@@ -29,7 +29,7 @@ import {
 } from '../../components/form.jsx';
 import { Alert, CollapsibleField, Field, RecordSelect, Spinner, TextInput } from '../../components/ui.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
-import { fmtNum, todayInput } from '../../utils/format.js';
+import { fmtNum, fmtOrderStyle, fmtVendor, todayInput } from '../../utils/format.js';
 import { loadFailed } from '../../services/loadFailures.js';
 
 const schema = z.object({
@@ -421,7 +421,7 @@ export default function JobWorkForm({ processes = [], onSaved, onCancel }) {
             label={meta?.vendorLabel ?? 'Vendor'}
             required
             options={vendors}
-            getLabel={(v) => `${v.vendorName} (${v.vendorCode})`}
+            getLabel={fmtVendor}
             placeholder={`Choose a ${meta?.vendorCategory?.toLowerCase() ?? ''} vendor...`}
             hint="Only vendors of the right category are offered."
           />
@@ -445,7 +445,7 @@ export default function JobWorkForm({ processes = [], onSaved, onCancel }) {
             name="orderId"
             label="Order"
             options={orders}
-            getLabel={(o) => `${o.orderNo} — ${o.style?.styleNo ?? ''}`}
+            getLabel={fmtOrderStyle}
             placeholder="No order reference"
           />
           <RHFQty form={form} name="rate" label="Rate" required hint="Job work rate per unit." />

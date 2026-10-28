@@ -41,7 +41,8 @@ import ColourwayGrid, {
   gridTotal,
   linesFromGrid,
 } from './ColourwayGrid.jsx';
-import { todayInput } from '../../utils/format.js';
+import { fmtBuyer, todayInput } from '../../utils/format.js';
+import { useDraft, useKeepDraft, useRemountKey } from '../../hooks/useDraft.js';
 
 const optional = (max) =>
   z.string().trim().max(max).optional().transform((v) => (v ? v : undefined));
@@ -85,11 +86,6 @@ const schema = z
       .trim()
       .optional()
       .refine((v) => !v || (Number.isFinite(Number(v)) && Number(v) >= 0), 'Price must be zero or more'),
-    exchangeRate: z
-      .string()
-      .trim()
-      .optional()
-      .refine((v) => !v || (Number.isFinite(Number(v)) && Number(v) > 0), 'Rate must be greater than zero'),
     excessPctInput: z
       .string()
       .trim()
@@ -116,8 +112,16 @@ const toFraction = (pct) => (pct ? String(Number(pct) / 100) : '0');
 const toPercent = (fraction) =>
   fraction === undefined || fraction === null ? '' : String(Number(fraction) * 100);
 
-export default function OrderForm({ order, onSaved, onCancel }) {
+/** Remounted blank when its draft is discarded - see useDraft. */
+export default function OrderForm(props) {
+  const [round, remount] = useRemountKey();
+  return <OrderFormFields key={round} {...props} onDiscardDraft={remount} />;
+}
+
+function OrderFormFields({ order, onSaved, onCancel, onDiscardDraft }) {
   const isNew = !order;
+  const draft = useDraft('buyer-order', { enabled: isNew, onDiscard: onDiscardDraft });
+  const saved0 = draft.initial;
   // A price on this form means ONE line. An order holding several styles is
   // priced line by line from its detail screen.
   const multiLine = !isNew && (order.lines?.length ?? 0) > 1;
@@ -128,8 +132,8 @@ export default function OrderForm({ order, onSaved, onCancel }) {
    */
   const existingGrid = isNew ? null : gridFromLines(order.lines);
   const gridEligible = isNew || existingGrid !== null;
-  const [gridMode, setGridMode] = useState(!isNew && multiLine && existingGrid !== null);
-  const [grid, setGrid] = useState(existingGrid);
+  const [gridMode, setGridMode] = useState(saved0?.gridMode ?? (!isNew && multiLine && existingGrid !== null));
+  const [grid, setGrid] = useState(saved0?.grid ?? existingGrid);
   const [serverError, setServerError] = useState('');
   const [buyerOptions, setBuyerOptions] = useState(null);
   const [styleOptions, setStyleOptions] = useState(null);
@@ -146,7 +150,7 @@ export default function OrderForm({ order, onSaved, onCancel }) {
   } = useForm({
     resolver: zodResolver(schema),
     defaultValues: isNew
-      ? { orderDate: today(), orderQty: '', excessPctInput: '' }
+      ? { orderDate: today(), orderQty: '', excessPctInput: '', ...saved0?.values }
       : {
           orderNo: order.orderNo,
           orderDate: asDateInput(order.orderDate),
@@ -168,7 +172,6 @@ export default function OrderForm({ order, onSaved, onCancel }) {
           priceTerms: order.priceTerms ?? '',
           paymentTerms: order.paymentTerms ?? '',
           unitPrice: order.lines?.length === 1 && order.lines[0].unitPrice != null ? String(Number(order.lines[0].unitPrice)) : '',
-          exchangeRate: order.exchangeRate != null ? String(Number(order.exchangeRate)) : '',
           excessPctInput: toPercent(order.excessPct),
           excessJustification: order.excessJustification ?? '',
           remarks: order.remarks ?? '',
@@ -178,6 +181,8 @@ export default function OrderForm({ order, onSaved, onCancel }) {
   const buyerId = watch('buyerId');
   const styleId = watch('styleId');
   const excessPctInput = watch('excessPctInput');
+
+  useKeepDraft(draft, { values: watch(), gridMode, grid });
 
   /*
    * THE EXCESS BAND COMES FROM THE EXCESS RULES, not from this file.
@@ -226,7 +231,9 @@ export default function OrderForm({ order, onSaved, onCancel }) {
 
   // Defaults that the workbook marks "Auto": Bill To from the buyer, and
   // currency / ship mode from the buyer's standing terms.
-  const buyerRef = useRef(null);
+  // A restored draft already holds the buyer's terms - possibly edited - so
+  // its buyer counts as filled in, not as a fresh pick to fill from.
+  const buyerRef = useRef(saved0?.values?.buyerId ?? null);
   useEffect(() => {
     if (!buyerId || !buyerOptions) return;
     const buyer = buyerOptions.find((b) => b.id === buyerId);
@@ -285,7 +292,7 @@ export default function OrderForm({ order, onSaved, onCancel }) {
    *       actually changing the style re-fills anything.
    * ---------------------------------------------------------------------------
    */
-  const styleRef = useRef(null);
+  const styleRef = useRef(saved0?.values?.styleId ?? null);
   const filledRef = useRef({});
   useEffect(() => {
     if (!styleId || !styleOptions) return;
@@ -449,9 +456,6 @@ export default function OrderForm({ order, onSaved, onCancel }) {
       exFactoryDate: values.exFactoryDate || null,
       priceTerms: values.priceTerms ?? '',
       paymentTerms: values.paymentTerms ?? '',
-      // The box is gone for INR, but a rate typed before switching to INR
-      // would still be in the form's values.
-      exchangeRate: !isInr && values.exchangeRate ? values.exchangeRate : null,
       // The value is the server's: only the price per piece is sent.
       ...(multiLine ? {} : { unitPrice: values.unitPrice ? values.unitPrice : null }),
       // Only the requested excess is sent. effectiveQty and the approved
@@ -473,6 +477,7 @@ export default function OrderForm({ order, onSaved, onCancel }) {
 
     try {
       const saved = isNew ? await ordersApi.create(payload) : await ordersApi.update(order.id, payload);
+      draft.clear();
       onSaved(saved, isNew);
     } catch (e) {
       const fields = e.fieldErrors;
@@ -496,7 +501,6 @@ export default function OrderForm({ order, onSaved, onCancel }) {
 
   // Shown, never sent: the server derives the stored value the same way.
   const currency = watch('currency');
-  const isInr = String(currency ?? '').toUpperCase() === 'INR';
   const qtyNow = Number(watch('orderQty'));
   const priceNow = Number(watch('unitPrice'));
   const valuePreview =
@@ -547,7 +551,7 @@ export default function OrderForm({ order, onSaved, onCancel }) {
               options={buyerOptions ?? []}
               loading={buyerOptions === null}
               getValue={(b) => b.id}
-              getLabel={(b) => `${b.buyerName} (${b.buyerCode})`}
+              getLabel={fmtBuyer}
               placeholder="Select buyer..."
               error={errors.buyerId}
               value={buyerId ?? ''}
@@ -587,8 +591,12 @@ export default function OrderForm({ order, onSaved, onCancel }) {
           </Field>
 
           {gridEligible && (
-            <div className="span-2 row" style={{ gap: 8, alignItems: 'center' }}>
-              <label className="row" style={{ gap: 6, alignItems: 'center' }}>
+            <div className="span-2 check-field">
+              <label
+                className="row"
+                style={{ gap: 6, alignItems: 'center' }}
+                title={styleId ? 'One style in several colors and sizes - each filled cell becomes an order line.' : 'Pick a style first.'}
+              >
                 <input
                   type="checkbox"
                   checked={gridMode}
@@ -610,11 +618,6 @@ export default function OrderForm({ order, onSaved, onCancel }) {
                 />
                 Enter as a colorway grid
               </label>
-              <span className="hint">
-                {styleId
-                  ? 'One style in several colors and sizes - each filled cell becomes an order line.'
-                  : 'Pick a style first.'}
-              </span>
             </div>
           )}
 
@@ -770,25 +773,6 @@ export default function OrderForm({ order, onSaved, onCancel }) {
             />
           </Field>
 
-          {/* An INR order has nothing to convert, so no box at all. */}
-          {!isInr && (
-            <Field
-              label="Exchange Rate"
-              error={errors.exchangeRate?.message}
-              hint={`Rupees per 1 ${currency || 'unit of currency'}.`}
-              htmlFor="exchangeRate"
-            >
-              <TextInput
-                id="exchangeRate"
-                type="number"
-                min="0"
-                step="0.0001"
-                error={errors.exchangeRate}
-                {...register('exchangeRate')}
-              />
-            </Field>
-          )}
-
           {/* Filled from the Buyer Master when the buyer is chosen, so folded:
               opened only to change them for this one order. */}
           <CollapsibleSection title="Buyer terms" summary="Bill To, Price Terms, Payment Terms — from the buyer">
@@ -853,6 +837,11 @@ export default function OrderForm({ order, onSaved, onCancel }) {
       </div>
 
       <div className="modal-footer">
+        {draft.restored && (
+          <button type="button" className="btn btn-ghost draft-discard" onClick={draft.discard}>
+            Discard draft
+          </button>
+        )}
         <button type="button" className="btn" onClick={onCancel}>
           Cancel
         </button>

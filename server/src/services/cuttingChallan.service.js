@@ -123,9 +123,10 @@ const INCLUDE = {
           fabricQtyIssued: true,
           uom: true,
           postedAt: true,
+          issuedToName: true,
           roll: { select: { id: true, rollNo: true } },
         },
-        orderBy: { issueDate: 'asc' },
+        orderBy: [{ issueDate: 'asc' }, { issueNo: 'asc' }],
       },
     },
   },
@@ -506,7 +507,7 @@ export async function assertLineCanTake(tx, lineId, qty, { excludeIssueId } = {}
 export async function list(query) {
   const {
     page, pageSize, skip, take, orderBy, search, includeDeleted,
-    status, orderId, styleId, planningId, containerNo, openOnly,
+    status, orderId, styleId, planningId, containerNo, openOnly, dateFrom, dateTo,
   } = query;
 
   const where = {
@@ -517,6 +518,7 @@ export async function list(query) {
     ...(planningId ? { planningId } : {}),
     ...(containerNo ? { containerNo } : {}),
     ...(openOnly ? { status: { in: ['PENDING', 'IN_PROGRESS'] } } : {}),
+    ...(dateFrom || dateTo ? { challanDate: { ...(dateFrom ? { gte: new Date(dateFrom) } : {}), ...(dateTo ? { lte: new Date(dateTo) } : {}) } } : {}),
     ...searchFilter(search, SEARCH),
   };
 
@@ -1119,6 +1121,19 @@ export async function printView(id) {
       /** The BOM figure this line was measured against, frozen at creation. */
       computedRequirementQty:
         l.computedRequirementQty != null ? D(l.computedRequirementQty).toFixed(4) : null,
+      /**
+       * The rolls issued against this line, roll by roll. The store issues
+       * roll-wise, so "Issued 300" alone cannot be checked against the floor;
+       * the roll numbers can.
+       */
+      issues: (l.fabricIssues ?? []).map((fi) => ({
+        issueNo: fi.issueNo,
+        issueDate: fi.issueDate,
+        rollNo: fi.roll?.rollNo ?? null,
+        qty: D(fi.fabricQtyIssued).toFixed(4),
+        uom: fi.uom,
+        issuedTo: fi.issuedToName ?? null,
+      })),
     })),
 
     /**

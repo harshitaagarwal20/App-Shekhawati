@@ -111,6 +111,8 @@ export const createFabricIssueSchema = z.object({
   /// Excel: "Name" - the person issuing, from Employee Master where possible.
   issuedByEmployeeId: uuid.nullish(),
   issuedByName: optionalText(120),
+  /// Who the fabric is handed to - the cutting contractor, for a cutting issue.
+  issuedToName: optionalText(120),
 
   /// Excel: "Fabric Qty Issued" (Manual). The one number the storeman types.
   fabricQtyIssued: decimal('Issue quantity', { min: 0, allowZero: false }),
@@ -179,6 +181,8 @@ export const updateFabricIssueSchema = z.object({
   deliveryDate: isoDate.nullish(),
   fabricName: optionalText(120),
   colorCode: optionalText(60),
+  /// Fills in the receiver on an issue posted before it was asked.
+  issuedToName: optionalText(120),
   // `status` moves through POST /fabric-issues/:id/status, checked against
   // the fulfilment transition table.
   remarks: optionalText(2000),
@@ -548,7 +552,7 @@ export const createPlanApprovalSchema = z.object({
   /// from the order, which names exactly one style.
   styleId: uuid.nullish(),
   /// Excel: "Container No" (Auto -> L_ContainerNo)
-  containerNo: optionalText(40),
+  containerNo: requiredText(40, 'Container No'),
   /// C7 - the three plans, presented together for one signature.
   plans: z.array(planApprovalLineSchema).max(3).optional(),
   /// Excel: "Prepared By", e.g. "Vinay ji (GM)"
@@ -562,7 +566,7 @@ export const createPlanApprovalSchema = z.object({
 export const updatePlanApprovalSchema = z.object({
   submittedDate: isoDate.optional(),
   styleId: uuid.nullish(),
-  containerNo: optionalText(40),
+  containerNo: requiredText(40, 'Container No').optional(),
   preparedBy: z.string().trim().min(1).max(120).optional(),
   submittedTo: z.string().trim().min(1).max(120).optional(),
   planningId: uuid.nullish(),
@@ -611,7 +615,7 @@ export const rectifyPlanApprovalSchema = z.object({
   approvalNo: optionalText(40),
   submittedDate: isoDate.optional(),
   styleId: uuid.nullish(),
-  containerNo: optionalText(40),
+  containerNo: requiredText(40, 'Container No'),
   /**
    * C7 - the three plans on the successor version.
    *

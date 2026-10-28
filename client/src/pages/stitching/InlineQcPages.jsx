@@ -14,7 +14,8 @@
  *      Size measurement  MANUAL                      - Size checks only
  *      Pcs Checked       MANUAL
  *      Pcs Rejected      MANUAL - never more than checked
- *      Defects Found     MULTI-SELECT (Defect Type list)
+ *      Defects Found     MULTI-SELECT (Defect Type list), and for each one
+ *                        MANUAL - how many pieces had it
  *      Inform To         DROPDOWN - the supervisors; the unit's own is offered
  *
  *  Every defect lands on the Inform To person's Action needed list, and they
@@ -45,11 +46,13 @@ import {
   StatusBadge,
   TextArea,
   TextInput,
+  ClearFilters,
 } from '../../components/ui.jsx';
 import { Detail, DetailGrid } from '../shared/Detail.jsx';
-import { fmtDate, fmtDateTime, fmtNum } from '../../utils/format.js';
+import { fmtDate, fmtDateTime, fmtNum, fmtOrder } from '../../utils/format.js';
 import { ExportButton } from '../../components/dataTransfer.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
+import DateRangeFilter from '../../components/DateRangeFilter.jsx';
 
 const n0 = (v) => fmtNum(v, { decimals: 0 });
 const num = (v) => Number(v || 0);
@@ -105,7 +108,7 @@ function DefectChips({ defects }) {
     <span className="chip-list">
       {defects.map((d) => (
         <span key={d.id} className={`chip ${d.status === 'RESOLVED' ? 'chip-done' : ''}`} title={d.status === 'RESOLVED' ? `Resolved by ${d.resolvedByName}` : 'Open'}>
-          {d.status === 'RESOLVED' ? '✓ ' : ''}{d.defect}
+          {d.status === 'RESOLVED' ? '✓ ' : ''}{d.defect}{d.qty != null ? ` · ${n0(d.qty)}` : ''}
         </span>
       ))}
     </span>
@@ -124,12 +127,11 @@ export function InlineQcList() {
   const list = useResourceList((params) => api.list(params), {
     defaultSort: 'entryDate',
     defaultDir: 'desc',
-    initialFilters: { checkType: '', unit: '', tailorId: '', openOnly: '', dateFrom: '', dateTo: '' },
+    initialFilters: { checkType: '', unit: '', openOnly: '', dateFrom: '', dateTo: '' },
   });
   const canRecord = can('INLINE_QC.CREATE') && ctx?.canWrite;
   const totals = list.meta?.totals;
   const showSize = list.filters.checkType !== 'WORKMANSHIP';
-  const tailors = (ctx?.tailors ?? []).filter((t) => !list.filters.unit || t.unitLine === list.filters.unit);
 
   return (
     <>
@@ -162,30 +164,20 @@ export function InlineQcList() {
           <Field label="Unit"><div className="unit-fact">{ctx.fixedUnit}</div></Field>
         ) : (
           <Field label="Unit">
-            <select value={list.filters.unit} onChange={(e) => { list.setFilter('unit', e.target.value); list.setFilter('tailorId', ''); }}>
+            <select value={list.filters.unit} onChange={(e) => list.setFilter('unit', e.target.value)}>
               <option value="">All units</option>
               {(ctx?.units ?? []).map((u) => <option key={u} value={u}>{u}</option>)}
             </select>
           </Field>
         )}
-        <Field label="Tailor">
-          <select value={list.filters.tailorId} onChange={(e) => list.setFilter('tailorId', e.target.value)}>
-            <option value="">All tailors</option>
-            {tailors.map((t) => <option key={t.id} value={t.id}>{t.empName}</option>)}
-          </select>
-        </Field>
-        <Field label="From">
-          <TextInput type="date" value={list.filters.dateFrom} onChange={(e) => list.setFilter('dateFrom', e.target.value)} />
-        </Field>
-        <Field label="To">
-          <TextInput type="date" value={list.filters.dateTo} onChange={(e) => list.setFilter('dateTo', e.target.value)} />
-        </Field>
+        <DateRangeFilter filters={list.filters} setFilter={list.setFilter} fromLabel="From" toLabel="To" />
         <Field label="Defects">
           <select value={list.filters.openOnly} onChange={(e) => list.setFilter('openOnly', e.target.value)}>
             <option value="">All checks</option>
             <option value="true">With an open defect</option>
           </select>
         </Field>
+        <ClearFilters list={list} />
       </div>
 
       {list.error && <Alert kind="error">{list.error.message ?? String(list.error)}</Alert>}
@@ -361,11 +353,12 @@ export function InlineQcDetail() {
           {row.defects?.length ? (
             <TableWrap>
               <table className="data">
-                <thead><tr><th>Defect</th><th>Status</th><th>Resolved by</th><th>What was done</th><th /></tr></thead>
+                <thead><tr><th>Defect</th><th className="num">Pcs</th><th>Status</th><th>Resolved by</th><th>What was done</th><th /></tr></thead>
                 <tbody>
                   {row.defects.map((d) => (
                     <tr key={d.id}>
                       <td>{d.defect}</td>
+                      <td className="num">{d.qty != null ? n0(d.qty) : <span className="faint" title="Recorded before counts were taken">Not counted</span>}</td>
                       <td><StatusBadge status={d.status} /></td>
                       <td>{d.resolvedByName ? <>{d.resolvedByName} <span className="faint">{fmtDateTime(d.resolvedAt)}</span></> : <span className="faint">-</span>}</td>
                       <td>{d.resolutionNote ?? <span className="faint">-</span>}</td>
@@ -479,6 +472,7 @@ export function InlineQcActions() {
             </select>
           </Field>
         )}
+        <ClearFilters list={list} />
       </div>
 
       {list.error && <Alert kind="error">{list.error.message ?? String(list.error)}</Alert>}
@@ -511,7 +505,7 @@ export function InlineQcActions() {
               {list.rows.map((a) => (
                 <tr key={a.id}>
                   <td className="nowrap">{fmtDate(a.entryDate)}</td>
-                  <td><strong>{a.defect}</strong></td>
+                  <td><strong>{a.defect}</strong>{a.qty != null && <span className="faint"> · {n0(a.qty)} pcs</span>}</td>
                   <td>{a.unit}</td>
                   <td>{a.tailor}</td>
                   <td><Link to={`/inline-qc/${a.entryId}`}>{a.orderNo} · {a.styleNo}</Link></td>
@@ -615,6 +609,7 @@ function InlineQcModal({ ctx, existing, initialType = 'SIZE', onClose, onSaved }
     pcsChecked: '',
     pcsRejected: '',
     defects: [],
+    counts: {},
     informToUserId: '',
     remarks: '',
   });
@@ -630,6 +625,7 @@ function InlineQcModal({ ctx, existing, initialType = 'SIZE', onClose, onSaved }
       pcsChecked: String(num(existing.pcsChecked)),
       pcsRejected: String(num(existing.pcsRejected)),
       defects: existing.defects.map((d) => d.defect),
+      counts: Object.fromEntries(existing.defects.map((d) => [d.defect, d.qty != null ? String(d.qty) : ''])),
       informToUserId: existing.informToUserId ?? '',
       remarks: existing.remarks ?? '',
     }
@@ -675,6 +671,11 @@ function InlineQcModal({ ctx, existing, initialType = 'SIZE', onClose, onSaved }
     set({ orderId, styleId: styles.length === 1 ? styles[0].styleId : '' });
   }
 
+  // Defects recorded before counts were taken may be saved still uncounted.
+  const uncounted = new Set((existing?.defects ?? []).filter((d) => d.qty == null).map((d) => d.defect));
+  const countOf = (d) => form.counts[d] ?? '';
+  const setCount = (d, v) => setForm((f) => ({ ...f, counts: { ...f.counts, [d]: v } }));
+
   const isSize = form.checkType === 'SIZE';
   const checked = num(form.pcsChecked);
   const rejected = num(form.pcsRejected);
@@ -683,6 +684,15 @@ function InlineQcModal({ ctx, existing, initialType = 'SIZE', onClose, onSaved }
   if (isSize && checked > 0 && !form.sizeMeasurement.trim()) problems.push('Enter the size measured.');
   if (rejected > checked && checked > 0) problems.push(`${n0(rejected)} rejected is more than the ${n0(checked)} checked.`);
   if (rejected > 0 && form.defects.length === 0) problems.push('Choose the defect(s) the rejected pieces had.');
+  const notCounted = form.defects.filter((d) => countOf(d) === '' && !uncounted.has(d));
+  if (notCounted.length) problems.push(`Enter how many pieces had ${notCounted.join(', ')}.`);
+  for (const d of form.defects) {
+    const c = countOf(d);
+    if (c === '') continue;
+    if (!Number.isInteger(Number(c)) || Number(c) < 1) problems.push(`${d}: the count must be a whole number, at least 1.`);
+    else if (rejected > 0 && Number(c) > rejected) problems.push(`${d}: ${n0(c)} pieces is more than the ${n0(rejected)} rejected.`);
+    else if (checked > 0 && Number(c) > checked) problems.push(`${d}: ${n0(c)} pieces is more than the ${n0(checked)} checked.`);
+  }
   if (form.defects.length > 0 && !form.informToUserId) problems.push('Choose who to inform - the defects go to their Action needed list.');
   if (choice && checked > num(choice.pcsIssued)) problems.push(`Only ${n0(choice.pcsIssued)} pieces were cut for ${unit}.`);
   const ready = (editing || (form.tailorId && form.orderId && form.styleId)) && checked > 0 && problems.length === 0 && !busy;
@@ -697,7 +707,7 @@ function InlineQcModal({ ctx, existing, initialType = 'SIZE', onClose, onSaved }
       sizeMeasurement: isSize ? form.sizeMeasurement || null : null,
       pcsChecked: form.pcsChecked,
       pcsRejected: form.pcsRejected || '0',
-      defects: form.defects,
+      defects: form.defects.map((d) => ({ defect: d, qty: countOf(d) === '' ? null : Number(countOf(d)) })),
       informToUserId: form.informToUserId || null,
       remarks: form.remarks || null,
     };
@@ -771,7 +781,7 @@ function InlineQcModal({ ctx, existing, initialType = 'SIZE', onClose, onSaved }
                 onChange={(e) => chooseOrder(e.target.value)}
                 options={orderChoices}
                 getValue={(o) => o.orderId}
-                getLabel={(o) => `${o.orderNo}${o.buyerName ? ` (${o.buyerName})` : ''}`}
+                getLabel={fmtOrder}
                 placeholder={unit ? 'Choose the order' : 'Choose the tailor first'}
                 disabled={!unit}
               />
@@ -808,6 +818,42 @@ function InlineQcModal({ ctx, existing, initialType = 'SIZE', onClose, onSaved }
         <Field label="Defects found" required={rejected > 0} className="span-2">
           <MultiSelect options={defectOptions} selected={form.defects} onChange={(defects) => set({ defects })} placeholder="None found" />
         </Field>
+        {form.defects.length > 0 && (
+          <div className="span-2">
+            <TableWrap>
+              <table className="data">
+                <thead>
+                  <tr>
+                    <th>Defect</th>
+                    <th className="num">Pcs with this defect</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {form.defects.map((d) => (
+                    <tr key={d}>
+                      <td>{d}</td>
+                      <td className="num">
+                        <TextInput
+                          type="number"
+                          inputMode="numeric"
+                          min="1"
+                          step="1"
+                          aria-label={`Pieces with ${d}`}
+                          value={countOf(d)}
+                          placeholder={uncounted.has(d) ? 'Not counted' : '0'}
+                          onChange={(e) => setCount(d, e.target.value)}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </TableWrap>
+            <p className="hint" style={{ marginTop: 4 }}>
+              One piece can have more than one defect, so these need not add up to Pcs rejected.
+            </p>
+          </div>
+        )}
         <Field label="Inform to" required={form.defects.length > 0} hint="The defects go to this person's Action needed list.">
           <RecordSelect
             value={form.informToUserId}

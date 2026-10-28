@@ -41,13 +41,21 @@ const head = {
   remarks: optionalText(2000),
 };
 
+/**
+ * One defect type found and how many pieces had it. Total Defect Pcs is the
+ * sum of these, so it is not accepted.
+ */
+const internalQcDefect = z.object({
+  defectType: z.string().trim().min(1, 'Choose the defect type').max(120),
+  qty: pieces('Defect Pcs').refine((v) => v > 0, 'Defect Pcs must be at least 1'),
+});
+
 const internalQc = z.object({
   ...head,
   unitName: listValue,
   checkerId: uuid,
   totalPcsChecked: pieces('Total Pcs Checked'),
-  totalDefectPcs: pieces('Total Defect Pcs'),
-  defectType: listValue,
+  defects: z.array(internalQcDefect).max(100, 'Too many defect lines').optional(),
   qcStatus: listValue,
   transferredBackToUnit: listValue,
 });

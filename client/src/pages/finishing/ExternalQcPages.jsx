@@ -20,7 +20,7 @@
  *                            Checking"). Inspection Qty is the pcs offered.
  *      Remarks
  *
- *  WHERE THE PIECES GO: Approved waits for Humidity Checking. "Iron" in
+ *  WHERE THE PIECES GO: Approved waits for Needle Checking. "Iron" in
  *  either box goes back to Ironing (source Re-iron). Every other reason goes
  *  to the Alteration Unit - never back to a stitching unit.
  * ---------------------------------------------------------------------------
@@ -48,11 +48,13 @@ import {
   TextArea,
   TextInput,
   ViewTabs,
+  ClearFilters,
 } from '../../components/ui.jsx';
 import { Detail, DetailGrid } from '../shared/Detail.jsx';
-import { fmtDate, fmtDateTime, fmtNum } from '../../utils/format.js';
+import { fmtDate, fmtDateTime, fmtNum, fmtOrder, fmtOrderStyle, fmtVendor } from '../../utils/format.js';
 import { ExportButton } from '../../components/dataTransfer.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
+import DateRangeFilter from '../../components/DateRangeFilter.jsx';
 
 /**
  * The Rejected Register is a tab here rather than a sidebar link: it is where
@@ -78,7 +80,7 @@ const BOXES = [
   { box: 'REJECTED', label: 'Rejected', total: 'pcsRejected', prefix: 'rej' },
 ];
 const REASON_FIELDS = BOXES.flatMap((b) => REASONS.map((r) => `${b.prefix}${r.suffix}`));
-const optionLabel = (o) => `${o.orderNo} · ${o.styleNo}${o.buyerName ? ` (${o.buyerName})` : ''}`;
+const optionLabel = fmtOrderStyle;
 const pct = (part, whole) => (num(whole) > 0 ? `${((num(part) / num(whole)) * 100).toFixed(1)}%` : '-');
 
 function useQcContext() {
@@ -103,7 +105,7 @@ export function ExternalQcList() {
   const list = useResourceList((params) => api.list(params), {
     defaultSort: 'entryDate',
     defaultDir: 'desc',
-    initialFilters: { orderId: '', agencyId: '', checkerCode: '', dateFrom: '', dateTo: '' },
+    initialFilters: { orderId: '', agencyId: '', dateFrom: '', dateTo: '' },
   });
   const loadOptions = useCallback(() => {
     api.orders().then(setOptions).catch(() => setOptions([]));
@@ -163,24 +165,17 @@ export function ExternalQcList() {
         <Field label="Order">
           <select value={list.filters.orderId} onChange={(e) => list.setFilter('orderId', e.target.value)}>
             <option value="">All orders</option>
-            {orders.map((o) => <option key={o.orderId} value={o.orderId}>{o.orderNo}</option>)}
+            {orders.map((o) => <option key={o.orderId} value={o.orderId}>{fmtOrder(o)}</option>)}
           </select>
         </Field>
         <Field label="Agency">
           <select value={list.filters.agencyId} onChange={(e) => list.setFilter('agencyId', e.target.value)}>
             <option value="">All agencies</option>
-            {(ctx?.agencies ?? []).map((a) => <option key={a.id} value={a.id}>{a.vendorName}</option>)}
+            {(ctx?.agencies ?? []).map((a) => <option key={a.id} value={a.id}>{fmtVendor(a)}</option>)}
           </select>
         </Field>
-        <Field label="Checker code">
-          <TextInput value={list.filters.checkerCode} onChange={(e) => list.setFilter('checkerCode', e.target.value)} placeholder="Code on the bag" />
-        </Field>
-        <Field label="From">
-          <TextInput type="date" value={list.filters.dateFrom} onChange={(e) => list.setFilter('dateFrom', e.target.value)} />
-        </Field>
-        <Field label="To">
-          <TextInput type="date" value={list.filters.dateTo} onChange={(e) => list.setFilter('dateTo', e.target.value)} />
-        </Field>
+        <DateRangeFilter filters={list.filters} setFilter={list.setFilter} fromLabel="From" toLabel="To" />
+        <ClearFilters list={list} />
       </div>
 
       {list.error && <Alert kind="error">{list.error.message ?? String(list.error)}</Alert>}
@@ -345,7 +340,7 @@ export function ExternalQcDetail() {
             <Detail label="Style" value={row.style?.styleNo} mono sub={row.style?.styleDescription} />
             <Detail label="Agency" value={row.agency?.vendorName} sub={row.inspectorName ? `Inspector: ${row.inspectorName}` : null} />
             <Detail label="Pcs offered" value={<strong>{n0(row.pcsOffered)}</strong>} />
-            <Detail label="Approved" value={n0(row.pcsApproved)} sub={`${row.approvedPct} - to Humidity Checking`} showEmpty />
+            <Detail label="Approved" value={n0(row.pcsApproved)} sub={`${row.approvedPct} - to Needle Checking`} showEmpty />
             <Detail label="Alteration" value={n0(row.pcsAlteration)} sub={row.alterationPct} showEmpty />
             <Detail label="Rejected" value={n0(row.pcsRejected)} sub={row.rejectedPct} showEmpty />
             <Detail label="Recorded by" value={row.recordedByName} sub={fmtDateTime(row.updatedAt)} />
@@ -486,7 +481,7 @@ export function FlowCard({ flow, title }) {
           <Detail label="Received at ironing from the units" value={n0(flow.receivedFromUnits)} showEmpty />
           <Detail label="At ironing" value={n0(num(flow.atIroning) + num(flow.damageUndecided))} showEmpty />
           <Detail label="Ironed, waiting for External QC" value={n0(flow.waitingForQc)} showEmpty />
-          <Detail label="Approved (to Humidity)" value={n0(flow.approved)} showEmpty />
+          <Detail label="Approved (to Needle Checking)" value={n0(flow.approved)} showEmpty />
           <Detail label="Sent back to re-iron" value={n0(flow.reIronPending)} showEmpty />
           <Detail label="At the Alteration Unit" value={n0(flow.atAlteration)} showEmpty />
           <Detail label="Altered, waiting for ironing" value={n0(flow.alteredPending)} showEmpty />
@@ -749,7 +744,7 @@ function QcModal({ ctx, options = [], existing, onClose, onSaved }) {
           </Field>
         )}
         <Field label="Agency" required>
-          <RecordSelect value={form.agencyId} onChange={(e) => set({ agencyId: e.target.value })} options={ctx.agencies} getLabel={(a) => a.vendorName} placeholder={ctx.agencies.length ? 'Choose the agency' : 'No External QC vendors on the Vendor Master'} />
+          <RecordSelect value={form.agencyId} onChange={(e) => set({ agencyId: e.target.value })} options={ctx.agencies} getLabel={fmtVendor} placeholder={ctx.agencies.length ? 'Choose the agency' : 'No External QC vendors on the Vendor Master'} />
         </Field>
         <Field label="Inspector">
           <TextInput value={form.inspectorName} maxLength={120} placeholder="Agency inspector's name" onChange={(e) => set({ inspectorName: e.target.value })} />
@@ -763,7 +758,7 @@ function QcModal({ ctx, options = [], existing, onClose, onSaved }) {
           hint: available == null ? 'Choose the order first.' : `${n0(available)} ironed and waiting.`,
           error: available != null && offered > available ? `Only ${n0(available)} available.` : undefined,
         })}
-        {qty('pcsApproved', 'Approved', { hint: 'Goes on to Humidity Checking.' })}
+        {qty('pcsApproved', 'Approved', { hint: 'Goes on to Needle Checking.' })}
         {qty('pcsAlteration', 'Alteration')}
         {qty('pcsRejected', 'Rejected')}
       </div>

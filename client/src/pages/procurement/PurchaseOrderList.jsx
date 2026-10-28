@@ -17,7 +17,6 @@ import { useOptionalColumns } from '../../hooks/useOptionalColumns.js';
 import {
   orders as ordersApi,
   purchaseOrders as poApi,
-  styles as stylesApi,
   vendors as vendorsApi,
 } from '../../services/erp.js';
 import {
@@ -34,12 +33,14 @@ import {
   Spinner,
   StatusBadge,
   TextInput,
+  ClearFilters,
 } from '../../components/ui.jsx';
-import { fmtDate, fmtMoney, fmtNum, fmtOrder } from '../../utils/format.js';
+import { fmtDate, fmtMoney, fmtNum, fmtOrder, fmtVendor } from '../../utils/format.js';
 import PurchaseOrderForm from './PurchaseOrderForm.jsx';
 import { loadFailed } from '../../services/loadFailures.js';
 import { ExportButton } from '../../components/dataTransfer.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
+import DateRangeFilter from '../../components/DateRangeFilter.jsx';
 
 const STATUS_OPTIONS = [
   { value: 'PENDING', label: 'Pending' },
@@ -49,10 +50,6 @@ const STATUS_OPTIONS = [
   { value: 'CANCELLED', label: 'Cancelled' },
 ];
 
-const ORDER_TYPE_OPTIONS = [
-  { value: 'AS_PER_STYLE', label: 'As per style' },
-  { value: 'BULK', label: 'Bulk' },
-];
 
 /**
  * What this register can show, and what it shows unasked.
@@ -96,14 +93,13 @@ export default function PurchaseOrderList() {
       status: '',
       vendorId: '',
       orderId: '',
-      styleId: '',
-      orderMode: '',
+      dateFrom: '',
+      dateTo: '',
     },
   });
 
   const [vendorOptions, setVendorOptions] = useState([]);
   const [orderOptions, setOrderOptions] = useState([]);
-  const [styleOptions, setStyleOptions] = useState([]);
   const [creating, setCreating] = useState(false);
   const [banner, setBanner] = useState(null);
 
@@ -112,7 +108,6 @@ export default function PurchaseOrderList() {
   useEffect(() => {
     vendorsApi.options().then(setVendorOptions).catch(loadFailed(setVendorOptions, 'vendors'));
     ordersApi.options().then(setOrderOptions).catch(loadFailed(setOrderOptions, 'orders'));
-    stylesApi.options().then(setStyleOptions).catch(loadFailed(setStyleOptions, 'styles'));
   }, []);
 
   return (
@@ -172,7 +167,7 @@ export default function PurchaseOrderList() {
             <RecordSelect
               id="po-f-vendor"
               options={vendorOptions}
-              getLabel={(v) => v.vendorName}
+              getLabel={fmtVendor}
               placeholder="All vendors"
               value={list.filters.vendorId ?? ''}
               onChange={(e) => list.setFilter('vendorId', e.target.value)}
@@ -190,16 +185,6 @@ export default function PurchaseOrderList() {
             />
           </Field>
 
-          <Field label="Style" htmlFor="po-f-style">
-            <RecordSelect
-              id="po-f-style"
-              options={styleOptions}
-              getLabel={(s) => s.styleNo}
-              placeholder="All styles"
-              value={list.filters.styleId ?? ''}
-              onChange={(e) => list.setFilter('styleId', e.target.value)}
-            />
-          </Field>
 
           <Field label="Status" htmlFor="po-f-status">
             <EnumSelect
@@ -210,16 +195,9 @@ export default function PurchaseOrderList() {
               onChange={(e) => list.setFilter('status', e.target.value)}
             />
           </Field>
+          <DateRangeFilter filters={list.filters} setFilter={list.setFilter} />
 
-          <Field label="Order type" htmlFor="po-f-type">
-            <EnumSelect
-              id="po-f-type"
-              options={ORDER_TYPE_OPTIONS}
-              placeholder="All"
-              value={list.filters.orderMode ?? ''}
-              onChange={(e) => list.setFilter('orderMode', e.target.value)}
-            />
-          </Field>
+          <ClearFilters list={list} />
         </div>
 
         <TableWrap>

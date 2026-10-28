@@ -30,8 +30,10 @@ import {
   Spinner,
   TextArea,
   TextInput,
+  ClearFilters,
 } from '../../components/ui.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
+import DateRangeFilter from '../../components/DateRangeFilter.jsx';
 import { fmtDate, fmtDateTime, fmtOrder } from '../../utils/format.js';
 import { loadFailed } from '../../services/loadFailures.js';
 
@@ -73,7 +75,7 @@ export function CostSheetList() {
   const list = useResourceList((params) => api.list(params), {
     defaultSort: 'costDate',
     defaultDir: 'desc',
-    initialFilters: { status: '', styleId: '' },
+    initialFilters: { status: '', styleId: '', dateFrom: '', dateTo: '' },
   });
   const [styleOptions, setStyleOptions] = useState([]);
   const [creating, setCreating] = useState(false);
@@ -129,6 +131,8 @@ export function CostSheetList() {
               onChange={(e) => list.setFilter('status', e.target.value)}
             />
           </Field>
+          <DateRangeFilter filters={list.filters} setFilter={list.setFilter} />
+          <ClearFilters list={list} />
         </div>
 
         <TableWrap>

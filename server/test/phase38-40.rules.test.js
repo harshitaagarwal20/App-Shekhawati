@@ -276,8 +276,9 @@ describe('§39 - the navigation shows the current scope and nothing else', () =>
 
   /** The groups the business named, in the order it named them. */
   const EXPECTED_GROUPS = [
-    'Dashboard', 'Masters', 'Orders', 'Procurement', 'Stores',
-    'Job Work', 'Cutting', 'Administration',
+    'Dashboard', 'Masters', 'Orders & Planning', 'Purchase & Stores',
+    'Fabric & Cutting', 'Stitching', 'Finishing & Quality', 'Packing & Dispatch',
+    'Administration',
   ];
 
   test('the groups are the ones the business named, in order', () => {
@@ -304,10 +305,11 @@ describe('§39 - the navigation shows the current scope and nothing else', () =>
    * longer has a sidebar heading to itself.
    */
   test('the pipeline groups are numbered in flow order', () => {
+    // Eleven steps merged into seven: departments that hand straight to each
+    // other share a group.
     const PIPELINE = [
-      'Masters', 'Orders', 'Procurement', 'Stores',
-      'Job Work', 'Cutting', 'Stitching', 'Finishing',
-      'Quality', 'Reconciliation',
+      'Masters', 'Orders & Planning', 'Purchase & Stores', 'Fabric & Cutting',
+      'Stitching', 'Finishing & Quality', 'Packing & Dispatch',
     ];
 
     // Each group's label paired with the `stage` that follows it, if any.
@@ -321,8 +323,8 @@ describe('§39 - the navigation shows the current scope and nothing else', () =>
     );
     assert.deepEqual(
       staged.map((g) => g.stage),
-      [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-      'the stages must run 1..10 with no gaps',
+      [1, 2, 3, 4, 5, 6, 7],
+      'the stages must run 1..7 with no gaps',
     );
   });
 
@@ -344,7 +346,7 @@ describe('§39 - the navigation shows the current scope and nothing else', () =>
     const dashboard = nav.slice(nav.indexOf("label: 'Dashboard',"), nav.indexOf("label: 'Masters',"));
     assert.ok(dashboard.includes("to: '/approvals'"), 'Approvals belongs in the Dashboard group');
 
-    const procurement = nav.slice(nav.indexOf("label: 'Procurement',"), nav.indexOf("label: 'Stores',"));
+    const procurement = nav.slice(nav.indexOf("label: 'Purchase & Stores',"), nav.indexOf("label: 'Fabric & Cutting',"));
     assert.ok(!procurement.includes("to: '/approvals'"), 'Approvals must not sit under Procurement');
   });
 
@@ -386,27 +388,28 @@ describe('§39 - the navigation shows the current scope and nothing else', () =>
     }
   });
 
-  test('nothing after the Reconciliation Report appears anywhere in the navigation', () => {
+  test('Packing & Dispatch carries the three Phase 6 screens, and the order closes at Reconciliation', () => {
     // The scope boundary, restated where a future edit would trip over it.
     // Production Phase 2 opened Stitching and Hourly Monitoring; Phase 4
-    // opened External QC, the Alteration Unit and the Rejected Register;
-    // Phase 5 the final QC sheets, Spot Rectification and the Reconciliation
-    // Report. Packing, needle checking and dispatch are still not built.
-    const OUT_OF_SCOPE = ['Packing', 'Needle', 'Dispatch'];
-    for (const word of OUT_OF_SCOPE) {
-      assert.ok(
-        !new RegExp(`label: '[^']*${word}`, 'i').test(nav),
-        `"${word}" appears in the navigation. The pipeline ends at the Reconciliation Report.`,
-      );
+    // External QC, the Alteration Unit and the Rejected Register; Phase 5 the
+    // final QC sheets, Spot Rectification and the Reconciliation Report;
+    // Phase 6 needle checking, packing and dispatch. Every stage
+    // the workbook names is now in the sidebar, and Reconciliation is last.
+    const block = nav.slice(nav.indexOf("label: 'Packing & Dispatch',"), nav.indexOf("label: 'Administration',"));
+    for (const route of ['/needle-checking', '/packing', '/dispatches', '/reconciliation-reports']) {
+      assert.ok(block.includes(`to: '${route}'`), `Packing & Dispatch is missing ${route}`);
     }
+    const stages = [...nav.matchAll(/label: '([^']+)',\s*\r?\n\s*stage: (\d+)/g)].map((m) => [m[1], Number(m[2])]);
+    assert.deepEqual(stages.at(-1), ['Packing & Dispatch', 7], 'Packing & Dispatch is the last stage');
+    assert.ok(block.indexOf("to: '/reconciliation-reports'") > block.indexOf("to: '/dispatches'"), 'the order closes at Reconciliation, after Dispatch');
   });
 
-  test('Stitching is stage 7, straight after Cutting', () => {
+  test('Stitching is stage 5, straight after Fabric & Cutting', () => {
     const groups = [...nav.matchAll(/label: '([^']+)',\s*\r?\n\s*stage: (\d+)/g)].map((m) => [m[1], Number(m[2])]);
     const at = groups.findIndex(([label]) => label === 'Stitching');
     assert.ok(at > 0, 'there is a Stitching group with a stage');
-    assert.deepEqual(groups[at - 1], ['Cutting', 6]);
-    assert.equal(groups[at][1], 7);
+    assert.deepEqual(groups[at - 1], ['Fabric & Cutting', 4]);
+    assert.equal(groups[at][1], 5);
   });
 
   /*

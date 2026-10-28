@@ -53,8 +53,6 @@ export const reportQuery = z
 
     // What state
     status: z.string().trim().max(30).optional(),
-    approvalStatus: z.enum(['PENDING', 'APPROVED', 'REJECTED']).optional(),
-    decision: z.enum(['ACCEPT', 'REJECT', 'REWORK']).optional(),
     inspectionStatus: z.enum(['PENDING', 'PASSED', 'FAILED']).optional(),
 
     // When

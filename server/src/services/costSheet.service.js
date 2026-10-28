@@ -159,12 +159,13 @@ function project(sheet) {
 }
 
 export async function list(query) {
-  const { skip, take, orderBy, search, styleId, orderId, status } = query;
+  const { skip, take, orderBy, search, styleId, orderId, status, dateFrom, dateTo } = query;
   const where = {
     deletedAt: null,
     ...(styleId ? { styleId } : {}),
     ...(orderId ? { orderId } : {}),
     ...(status ? { status } : {}),
+    ...(dateFrom || dateTo ? { costDate: { ...(dateFrom ? { gte: new Date(dateFrom) } : {}), ...(dateTo ? { lte: new Date(dateTo) } : {}) } } : {}),
     ...searchFilter(search, SEARCH),
   };
   const [rows, total] = await Promise.all([

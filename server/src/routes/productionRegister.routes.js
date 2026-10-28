@@ -33,13 +33,6 @@ export const internalQcRoutes = registerRouter('internalQc', {
   remove: can('INTERNAL_QUALITY_CHECK.DELETE'),
 });
 
-export const finalCheckerRoutes = registerRouter('finalChecker', {
-  view: can('FINAL_CHECKER_REPORT.VIEW'),
-  create: can('FINAL_CHECKER_REPORT.CREATE'),
-  edit: can('FINAL_CHECKER_REPORT.EDIT'),
-  remove: can('FINAL_CHECKER_REPORT.DELETE'),
-});
-
 export const finishedCheckerRoutes = registerRouter('finishedChecker', {
   view: can('FINISHED_CHECKER.VIEW'),
   create: can('FINISHED_CHECKER.CREATE'),
@@ -68,7 +61,6 @@ export const reconciliationRoutes = registerRouter('reconciliation', {
  */
 const anyRegister = can(
   'INTERNAL_QUALITY_CHECK.VIEW',
-  'FINAL_CHECKER_REPORT.VIEW',
   'FINISHED_CHECKER.VIEW',
   'SPOT_RECTIFICATION.VIEW',
   'RECONCILIATION_REPORT.VIEW',

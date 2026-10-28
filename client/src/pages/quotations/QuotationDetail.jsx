@@ -171,7 +171,7 @@ export default function QuotationDetail() {
       {/* --- Quotation details -------------------------------------------- */}
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-body">
-          <div className="form-grid">
+          <div className="form-grid detail-grid">
             <Detail label="Quotation No" value={quotation.quotationNo} mono />
             <Detail label="Date" value={fmtDate(quotation.quotationDate)} />
             <Detail label="Vendor" value={`${quotation.vendor?.vendorName} (${quotation.vendor?.vendorCode})`} />
@@ -318,7 +318,7 @@ function Detail({ label, value, mono, className = '' }) {
   return (
     <div className={`field ${className}`}>
       <label>{label}</label>
-      <div className={mono ? 'mono' : ''} style={{ paddingTop: 2 }}>
+      <div className={`detail-value${mono ? ' mono' : ''}`}>
         {value || <span className="faint">-</span>}
       </div>
     </div>

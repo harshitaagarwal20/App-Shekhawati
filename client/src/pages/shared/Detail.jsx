@@ -47,7 +47,7 @@ export function Detail({ label, value, sub, mono, className = '', showEmpty = fa
   return (
     <div className={`field ${className}`}>
       <label>{label}</label>
-      <div className={mono ? 'mono' : ''} style={{ paddingTop: 2 }}>
+      <div className={`detail-value${mono ? ' mono' : ''}`}>
         {isEmpty ? <span className="faint">-</span> : value}
       </div>
       {sub && <span className="hint">{sub}</span>}

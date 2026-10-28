@@ -9,7 +9,8 @@
  *                -> SPOT RECTIFICATION-SCRAP
  *                -> RECONCILIATION REPORT
  *
- *  Packing, Needle Checking and Dispatch follow, and are not built yet.
+ *  Needle Checking, Packing and Dispatch follow (Phase 6, see
+ *  shippingFlow.service.js); the reconciliation reads Packed Pcs from them.
  *  External Secondary Checking's 26-line grid is part of the External QC
  *  entry (externalQc.service.js), not a register here.
  *
@@ -48,6 +49,7 @@ import {
   checkInternalQualityCheck,
   checkSpotRectification,
   finishedCheckerTotals,
+  internalQcDefectTotal,
   reconciliationVariance,
   scrapPct,
   suggestedReconStatus,
@@ -222,30 +224,72 @@ export const REGISTERS = {
     title: 'Internal quality checks',
     dateField: 'recordDate',
     sortable: ['recordDate', 'unitName', 'totalPcsChecked', 'totalDefectPcs', 'qcStatus', 'createdAt'],
-    search: ['unitName', 'defectType', 'qcStatus', 'transferredBackToUnit', 'remarks', 'order.orderNo', 'style.styleNo', 'checker.empId', 'checker.empName'],
+    search: ['unitName', 'defects.some.defectType', 'qcStatus', 'transferredBackToUnit', 'remarks', 'order.orderNo', 'style.styleNo', 'checker.empId', 'checker.empName'],
     filters: ['orderId', 'styleId', 'unitName', 'checkerId', 'qcStatus'],
-    include: { ...BASE_INCLUDE, checker: { select: EMP_SELECT } },
+    include: {
+      ...BASE_INCLUDE,
+      checker: { select: EMP_SELECT },
+      defects: { orderBy: { lineNo: 'asc' }, select: { lineNo: true, defectType: true, qty: true } },
+    },
     async build(tx, v, existing) {
       const { head } = await orderAndStyle(tx, v);
       const checker = await resolveEmployee(tx, v.checkerId, 'checkerId', { required: true, label: 'the checker' });
       await assertInList(tx, 'StitchingUnit', v.unitName, 'unitName', { required: true, kept: existing?.unitName ?? null, label: 'Stitching Unit' });
-      await assertInList(tx, 'DefectType', v.defectType, 'defectType', { kept: existing?.defectType ?? null });
       await assertInList(tx, 'StatusQC', v.qcStatus, 'qcStatus', { required: true, kept: existing?.qcStatus ?? null, label: 'Status' });
       await assertInList(tx, 'StitchingUnit', v.transferredBackToUnit, 'transferredBackToUnit', {
         kept: existing?.transferredBackToUnit ?? null,
       });
-      raise(checkInternalQualityCheck(v));
+
+      // The defect lines: the ones sent, or - on an update that sends none -
+      // the ones the check already holds, so the total is still checked.
+      const stored = existing
+        ? await tx.internalQualityDefect.findMany({
+            where: { checkId: existing.id },
+            orderBy: { lineNo: 'asc' },
+            select: { defectType: true, qty: true },
+          })
+        : [];
+      const defects = v.defects ?? stored;
+      const kept = new Set(stored.map((d) => d.defectType));
+      for (const d of v.defects ?? []) {
+        await assertInList(tx, 'DefectType', d.defectType, 'defects', {
+          kept: kept.has(d.defectType) ? d.defectType : null,
+          label: 'Defect Type',
+        });
+      }
+      raise(checkInternalQualityCheck({ ...v, defects }));
+
       return {
         ...head,
         unitName: v.unitName,
         checkerId: checker.id,
         totalPcsChecked: int(v.totalPcsChecked),
-        totalDefectPcs: int(v.totalDefectPcs),
-        defectType: v.defectType ?? null,
+        totalDefectPcs: internalQcDefectTotal(defects),
         qcStatus: v.qcStatus,
         transferredBackToUnit: v.transferredBackToUnit ?? null,
         remarks: v.remarks ?? null,
       };
+    },
+    /**
+     * Sent lines replace the stored set; an update without them leaves it.
+     * One write per line, so each is on the audit trail.
+     */
+    async afterWrite(tx, checkId, v, auth) {
+      if (!v.defects) return;
+      const stored = await tx.internalQualityDefect.findMany({ where: { checkId }, select: { id: true } });
+      for (const row of stored) await tx.internalQualityDefect.delete({ where: { id: row.id } });
+      for (const [i, d] of v.defects.entries()) {
+        await tx.internalQualityDefect.create({
+          data: { checkId, lineNo: i + 1, defectType: d.defectType, qty: int(d.qty), createdById: auth.userId ?? null },
+        });
+      }
+    },
+    /** "Stain 5, Torn 2" - the lines in one column, for the list and the export. */
+    async enrich(rows) {
+      return rows.map((r) => ({
+        ...r,
+        defectSummary: r.defects?.map((d) => `${d.defectType} ${d.qty}`).join(', ') || null,
+      }));
     },
   },
 
@@ -286,8 +330,8 @@ export const REGISTERS = {
     path: 'finished-checker-records',
     module: 'FINISHED_CHECKER',
     model: 'finishedCheckerRecord',
-    label: 'Finished checker record',
-    title: 'Finished checker records',
+    label: 'External report',
+    title: 'External reports',
     dateField: 'recordDate',
     sortable: ['recordDate', 'checkedPcs', 'totalDefects', 'piecesPassed', 'defectPct', 'createdAt'],
     search: ['remarks', 'order.orderNo', 'style.styleNo', 'checker.empId', 'checker.empName'],
@@ -401,9 +445,9 @@ export const REGISTERS = {
  *   Alter Pcs               the bags sent to the Alteration Unit
  *   Scrap Pcs               Spot Rectification-Scrap, Scrap Qty
  *   Rejected Pcs            the Rejected Register
- *   Passed External QC      External QC, Approved. Packing is not built, so
- *                           this is the nearest thing to the sheet's Packed
- *                           Pcs: the pieces cleared to go on to be packed.
+ *   Passed External QC      External QC, Approved
+ *   Packed Pcs              Packing, every entry
+ *   Dispatched Pcs          Dispatch, every dispatch marked Dispatched or Delivered
  *   Variance                Cutting - Stitched - Scrap - Rejected
  */
 export async function figuresFor(db, orderId, styleId) {
@@ -415,17 +459,28 @@ async function figuresForMany(db, pairs) {
   const orderIds = [...new Set(pairs.map((p) => p.orderId))];
   const where = { orderId: { in: orderIds }, deletedAt: null };
   const by = ['orderId', 'styleId'];
-  const [cut, stitched, alter, scrap, rejected, passed] = await Promise.all([
+  const [cut, stitched, alter, scrap, rejected, passed, packed, dispatched] = await Promise.all([
     db.cuttingIssue.groupBy({
       by,
       where: { ...where, status: { not: 'CANCELLED' }, postedAt: { not: null } },
       _sum: { cuttingPcsIssued: true },
     }),
     db.stitchingRecord.groupBy({ by, where, _sum: { actualStitched: true } }),
-    db.alterationReceipt.groupBy({ by, where, _sum: { qty: true } }),
+    // AlterationReceipt is not soft-deleted; unlike the other registers it
+    // has no deletedAt field in the Prisma model.
+    db.alterationReceipt.groupBy({ by, where: { orderId: { in: orderIds } }, _sum: { qty: true } }),
     db.spotRectification.groupBy({ by, where, _sum: { scrapQty: true } }),
     db.rejectedRegisterEntry.groupBy({ by, where, _sum: { qty: true } }),
     db.externalQcEntry.groupBy({ by, where, _sum: { pcsApproved: true } }),
+    db.packingEntry.groupBy({ by, where, _sum: { pcsPacked: true } }),
+    db.dispatchLine.groupBy({
+      by,
+      where: {
+        orderId: { in: orderIds },
+        dispatch: { is: { deletedAt: null, status: { in: ['DISPATCHED', 'DELIVERED'] } } },
+      },
+      _sum: { pcs: true },
+    }),
   ]);
   const pick = (rows, p, field) => {
     const hit = rows.find((r) => r.orderId === p.orderId && r.styleId === p.styleId);
@@ -440,6 +495,8 @@ async function figuresForMany(db, pairs) {
       scrap: pick(scrap, p, 'scrapQty'),
       rejected: pick(rejected, p, 'qty'),
       passedExternalQc: pick(passed, p, 'pcsApproved'),
+      packed: pick(packed, p, 'pcsPacked'),
+      dispatched: pick(dispatched, p, 'pcs'),
     };
     f.variance = reconciliationVariance(f);
     f.suggestedStatus = suggestedReconStatus(f.variance);
@@ -504,7 +561,8 @@ export async function getById(key, id) {
 export async function create(key, input, auth = {}) {
   const reg = registerOf(key);
   const id = await prisma.$transaction(async (tx) => {
-    const data = await reg.build(tx, merged(null, input), null);
+    const v = merged(null, input);
+    const data = await reg.build(tx, v, null);
     const row = await tx[reg.model].create({
       data: {
         ...data,
@@ -515,6 +573,7 @@ export async function create(key, input, auth = {}) {
       },
       select: { id: true },
     });
+    await reg.afterWrite?.(tx, row.id, v, auth);
     return row.id;
   });
   return getById(key, id);
@@ -525,8 +584,10 @@ export async function update(key, id, input, auth = {}) {
   await prisma.$transaction(async (tx) => {
     const existing = await tx[reg.model].findFirst({ where: { id, deletedAt: null } });
     if (!existing) throw ApiError.notFound(reg.label);
-    const data = await reg.build(tx, merged(existing, input), existing);
+    const v = merged(existing, input);
+    const data = await reg.build(tx, v, existing);
     await tx[reg.model].update({ where: { id }, data: { ...data, updatedById: auth.userId ?? null } });
+    await reg.afterWrite?.(tx, id, v, auth);
   });
   return getById(key, id);
 }
@@ -563,7 +624,7 @@ export async function orderOptions() {
       sizeGroup: true,
       colorCode: true,
       status: true,
-      buyer: { select: { id: true, buyerName: true } },
+      buyer: { select: { id: true, buyerName: true, buyerCode: true } },
       style: { select: STYLE_SELECT },
     },
   });

@@ -81,6 +81,12 @@ export function StatusBadge({ status }) {
     TRANSFERRED: 'badge-info',
     // An Inline QC defect, dealt with by the person informed (OPEN above).
     RESOLVED: 'badge-approved',
+    // A buyer order, as Dispatch leaves it.
+    PARTIALLY_SHIPPED: 'badge-info',
+    SHIPPED: 'badge-approved',
+    // A dispatch (PENDING above).
+    DISPATCHED: 'badge-info',
+    DELIVERED: 'badge-approved',
   };
   const label = String(status ?? '').replace(/_/g, ' ');
   return <span className={`badge ${map[status] ?? 'badge-inactive'}`}>{label || '-'}</span>;
@@ -150,16 +156,28 @@ export function ViewTabs({ active, tabs }) {
 // --- Form primitives -------------------------------------------------------
 
 export function Field({ label, required, error, hint, htmlFor, children, className = '' }) {
+  /*
+   * In a dialog the hint is an (i) beside the label rather than a line under
+   * the control: a sentence under one field lengthens its cell and breaks the
+   * row rhythm of the whole form. Elsewhere the line stays - see .field-info
+   * and .field-hint in styles.css.
+   */
+  const info = label && hint && !error && typeof hint === 'string';
   return (
     <div className={`field ${className}`}>
       {label && (
         <label htmlFor={htmlFor}>
           {label}
           {required && <span className="req">*</span>}
+          {info && (
+            <span className="field-info" tabIndex={0} role="img" aria-label={hint} data-tip={hint}>
+              i
+            </span>
+          )}
         </label>
       )}
       {children}
-      {hint && !error && <span className="hint">{hint}</span>}
+      {hint && !error && <span className={info ? 'hint field-hint' : 'hint'}>{hint}</span>}
       {error && <span className="err">{error}</span>}
     </div>
   );
@@ -911,6 +929,20 @@ export function SortableTh({ field, label, sortBy, sortDir, onSort, className = 
       {label}
       {active && <span className="dir">{sortDir === 'asc' ? '▲' : '▼'}</span>}
     </th>
+  );
+}
+
+/**
+ * The last cell of a list's filter row: back to the unfiltered list in one
+ * click. Drawn only while a search or filter is set, so a fresh list carries
+ * no button that would do nothing.
+ */
+export function ClearFilters({ list }) {
+  if (!list.filtersActive) return null;
+  return (
+    <button type="button" className="btn btn-ghost btn-sm" onClick={list.clearFilters}>
+      Clear filters
+    </button>
   );
 }
 

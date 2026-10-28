@@ -11,10 +11,11 @@ diagram that drifts from the application can be caught by opening one file.
 was written, production has been opened after it: Stitching and Hourly
 Monitoring ([PRODUCTION-PHASE-2-NOTES.md](PRODUCTION-PHASE-2-NOTES.md)),
 **Inline QC beside stitching** ([INLINE-QC-NOTES.md](INLINE-QC-NOTES.md)),
-Ironing ([IRONING-NOTES.md](IRONING-NOTES.md)), and External QC with the
-Alteration Unit ([PHASE-4-EXTERNAL-QC-NOTES.md](PHASE-4-EXTERNAL-QC-NOTES.md)).
-They are summarised at the foot of §2. Nothing after them exists: no final QC,
-no packing, no needle checking, no dispatch, no reconciliation.
+Ironing ([IRONING-NOTES.md](IRONING-NOTES.md)), External QC with the
+Alteration Unit ([PHASE-4-EXTERNAL-QC-NOTES.md](PHASE-4-EXTERNAL-QC-NOTES.md)),
+and Phase 5: the final QC sheets, Spot Rectification & Scrap, and the
+Reconciliation Report. They are summarised at the foot of §2. Nothing after
+them exists: no packing, no needle checking, no dispatch.
 `npm run verify:scope` fails the build if any of it appears.
 
 - [1. Entry](#1-entry)
@@ -195,14 +196,40 @@ disabled account takes effect on the next call, not at token expiry.
    └──────────────────────────────┬───────────────────────────────┘
                                   ▼
           IRONING  ──►  EXTERNAL QC  ──►  ALTERATION UNIT / REJECTED
+                        26-defect inspection grid
+                        on the entry; Pcs Offered
+                        is the inspection qty
+                                  ▼
+   ┌──────────────────────────────────────────────────────────────┐
+   │  QUALITY                                          QC desk    │
+   │  Internal Quality Check   finishing and trimming, by hour    │
+   │  Finished Checker         defects by type, 17 columns        │
+   │  Spot Rectification & Scrap   fixed, sold online or scrapped │
+   │  not approvable: Status and Authorised By are recorded,      │
+   │  not routed through the approval engine                      │
+   └──────────────────────────────┬───────────────────────────────┘
+                                  ▼
+   ┌──────────────────────────────────────────────────────────────┐
+   │  RECONCILIATION REPORT                    Merchandising/GM   │
+   │  counts read LIVE from cutting, stitching, the Alteration    │
+   │  Unit, scrap, the Rejected Register and External QC          │
+   │  Passed External QC stands in for Packed Pcs until Packing   │
+   └──────────────────────────────┬───────────────────────────────┘
                                   ▼
                               ■  END OF SCOPE
+                     (Packing · Needle Checking · Dispatch)
 ```
 
 Inline QC draws on the same thing stitching does: the cutting posted to the
 tailor's unit (`inlineQc.service.js`, which reuses the stitching order list).
 It neither waits for a stitching record nor feeds ironing. The rules are in
 `domain/inlineQc.js`; the stages after it are in their phase notes.
+
+The five Phase 5 sheets share one register engine
+(`client/src/config/registers.jsx` drives one screen,
+`pages/quality/RegisterPage.jsx`). Every Formula column from the workbook is
+worked out on the server and held again by a CHECK constraint, so a total
+cannot be typed in.
 
 ---
 
@@ -363,7 +390,7 @@ moment it is.
 | Planning | Planning | `/planning` | `PLANNING.VIEW` |
 | Procurement | Vendor Quotations | `/quotations` | `VENDOR_QUOTATION.VIEW` |
 | Procurement | Purchase Orders | `/purchase-orders` | `PURCHASE_ORDER.VIEW` |
-| Procurement | Approvals (cross-module queue) | `/approvals` | `REPORT.VIEW` |
+| Procurement | Approvals (cross-module queue) | `/approvals` | `APPROVAL_QUEUE.VIEW`, or `PLAN_APPROVAL.VIEW` for the plan approvals alone |
 | Stores | Gate Pass · GRN | `/gate-passes`, `/grns` | `GATE_PASS.VIEW`, `GRN.VIEW` |
 | Stores | Inventory · Stock Ledger · Fabric Rolls | `/inventory/*` | `INVENTORY.VIEW`, `STOCK_LEDGER.VIEW`, `FABRIC_ROLL.VIEW` |
 | Stores | Fabric Issue | `/fabric-issues` | `FABRIC_ISSUE.VIEW` |
@@ -375,7 +402,9 @@ moment it is.
 | Stitching | Stitching Record · Hourly Monitoring | `/stitching`, `/stitching/hourly` | `STITCHING_RECORD.VIEW`, `HOURLY_MONITORING.VIEW` |
 | Stitching | Inline QC · QC Action Needed | `/inline-qc`, `/inline-qc/actions` | `INLINE_QC.VIEW`; recording needs `INLINE_QC.CREATE`; being named in Inform To needs `INLINE_QC.RESOLVE`, and only the person named marks a defect Resolved |
 | Finishing | Ironing · External QC · Alteration Unit · Rejected Register | `/ironing`, `/external-qc`, `/alteration`, `/rejected-register` | `IRONING.VIEW`, `EXTERNAL_QC.VIEW`, `ALTERATION.VIEW`, `REJECTED_REGISTER.VIEW` |
-| Everywhere | Reports (fourteen) | `/reports` | `REPORT.VIEW`, then each report's own permission |
+| Quality | Internal Quality Check · Finished Checker · Spot Rectification & Scrap | `/internal-quality-checks`, `/finished-checker-records`, `/spot-rectifications` | `INTERNAL_QUALITY_CHECK.VIEW`, `FINISHED_CHECKER.VIEW`, `SPOT_RECTIFICATION.VIEW` |
+| Reconciliation | Reconciliation Report | `/reconciliation-reports` | `RECONCILIATION_REPORT.VIEW`; owned by Merchandising & Planning, read by the Director |
+| Everywhere | Reports (twenty-six) · Vendor Performance | `/reports`, `/vendor-performance` | `REPORT.VIEW`, then each report's own permission |
 | Everywhere | Print | `/print/:kind/:id` | the source document's |
 | Admin | Users · Roles · Audit | `/admin/*` | `USER.VIEW`, `ROLE.VIEW`, `AUDIT.VIEW` |
 

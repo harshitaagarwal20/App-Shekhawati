@@ -60,8 +60,8 @@ function project(row) {
     pcsRejected: D(row.pcsRejected).toString(),
     rejectionPct: rules.rejectionPct(row.pcsChecked, row.pcsRejected),
     checkTypeLabel: rules.checkTypeLabel(row.checkType),
-    /** The defects as one cell - what the Excel export carries. */
-    defectsFound: defects.map((d) => d.defect).join('; '),
+    /** The defects and their counts as one cell - what the Excel export carries. */
+    defectsFound: rules.defectsLabel(defects),
     openDefects: defects.filter((d) => d.status === 'OPEN').length,
   };
 }
@@ -313,7 +313,7 @@ async function assertListValues({ operation, defects }, held = { operation: null
   if (operation && !ops.has(operation) && operation !== held.operation) {
     throw ApiError.badRequest(`"${operation}" is not on the Operation list`, { field: 'operation' });
   }
-  for (const d of defects) {
+  for (const { defect: d } of defects) {
     if (!kinds.has(d) && !held.defects.includes(d)) {
       throw ApiError.badRequest(`"${d}" is not on the Defect Type list`, { field: 'defects' });
     }
@@ -327,9 +327,9 @@ async function tellInformTo(auth, entry, defects, label) {
     await notify({
       userIds: [entry.informToUserId],
       kind: 'INLINE_QC_DEFECT',
-      title: `Inline QC: ${defects.length === 1 ? defects[0] : `${defects.length} defects`} - ${label}`,
+      title: `Inline QC: ${defects.length === 1 ? defects[0].defect : `${defects.length} defects`} - ${label}`,
       body: `${entry.unit}, tailor ${entry.tailorName}. ${D(entry.pcsRejected)} of ${D(entry.pcsChecked)} pieces rejected `
-        + `(${defects.join(', ')}). Recorded by ${auth.fullName}.`,
+        + `(${rules.defectsLabel(defects).replaceAll('; ', ', ')}). Recorded by ${auth.fullName}.`,
       link: ACTIONS_LINK,
       documentType: 'INLINE_QC',
       documentId: entry.id,
@@ -377,8 +377,8 @@ export async function create(auth, input) {
       },
     });
     // Row by row, so the audit trail has each defect line.
-    for (const defect of defects) {
-      await tx.inlineQcDefect.create({ data: { entryId: created.id, defect, createdById: auth.userId, updatedById: auth.userId } });
+    for (const { defect, qty } of defects) {
+      await tx.inlineQcDefect.create({ data: { entryId: created.id, defect, qty, createdById: auth.userId, updatedById: auth.userId } });
     }
     return {
       row: await tx.inlineQcEntry.findUnique({ where: { id: created.id }, include: INCLUDE }),
@@ -411,7 +411,7 @@ export async function update(auth, id, input) {
       operation: input.operation !== undefined ? input.operation : existing.operation,
       sizeMeasurement: input.sizeMeasurement !== undefined ? input.sizeMeasurement : existing.sizeMeasurement,
     });
-    const wanted = input.defects !== undefined ? rules.normaliseDefects(input.defects) : existing.defects.map((d) => d.defect);
+    const wanted = rules.normaliseDefects(input.defects !== undefined ? input.defects : existing.defects);
     const merged = {
       checkType,
       ...size,
@@ -419,7 +419,9 @@ export async function update(auth, id, input) {
       pcsRejected: input.pcsRejected !== undefined ? D(input.pcsRejected) : existing.pcsRejected,
       informToUserId: input.informToUserId !== undefined ? (input.informToUserId || null) : existing.informToUserId,
     };
-    assertEntry({ ...merged, defects: wanted });
+    // A defect recorded before counts were taken may stay uncounted.
+    const uncounted = existing.defects.filter((d) => d.qty == null).map((d) => d.defect);
+    assertEntry({ ...merged, defects: wanted, uncounted });
     await assertListValues(
       { operation: merged.operation, defects: wanted },
       { operation: existing.operation, defects: existing.defects.map((d) => d.defect) },
@@ -442,8 +444,11 @@ export async function update(auth, id, input) {
 
     const diff = rules.diffDefects(existing.defects, wanted);
     for (const d of diff.drop) await tx.inlineQcDefect.delete({ where: { id: d.id } });
-    for (const defect of diff.add) {
-      await tx.inlineQcDefect.create({ data: { entryId: id, defect, createdById: auth.userId, updatedById: auth.userId } });
+    for (const { line, qty } of diff.recount) {
+      await tx.inlineQcDefect.update({ where: { id: line.id }, data: { qty, updatedById: auth.userId } });
+    }
+    for (const { defect, qty } of diff.add) {
+      await tx.inlineQcDefect.create({ data: { entryId: id, defect, qty, createdById: auth.userId, updatedById: auth.userId } });
     }
 
     const row = await tx.inlineQcEntry.findUnique({ where: { id }, include: INCLUDE });
@@ -451,7 +456,7 @@ export async function update(auth, id, input) {
     // about the ones just added.
     const changedPerson = merged.informToUserId !== existing.informToUserId;
     const tell = changedPerson
-      ? row.defects.filter((d) => d.status === 'OPEN').map((d) => d.defect)
+      ? row.defects.filter((d) => d.status === 'OPEN')
       : diff.add;
     return { row, label, tell, tailorName: existing.tailor.empName };
   });
@@ -503,6 +508,7 @@ function projectAction(row, auth) {
   return {
     id: row.id,
     defect: row.defect,
+    qty: row.qty,
     status: row.status,
     resolvedAt: row.resolvedAt,
     resolvedByName: row.resolvedByName,

@@ -45,6 +45,25 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { todayInput } from '../utils/format.js';
+
+/**
+ * The date ranges a list opens on TODAY rather than on all time. A screen that
+ * declares one of these pairs blank in `initialFilters` gets today in both, so
+ * the register opens on the day's work; "All dates" is one pick away.
+ */
+const DATE_RANGES = [['dateFrom', 'dateTo'], ['orderFrom', 'orderTo']];
+
+export function withToday(filters, today = todayInput()) {
+  const out = { ...filters };
+  for (const [from, to] of DATE_RANGES) {
+    if (out[from] === '' && out[to] === '') {
+      out[from] = today;
+      out[to] = today;
+    }
+  }
+  return out;
+}
 
 /** Debounces a value so typing in the search box does not fire a request per keystroke. */
 export function useDebounced(value, delay = 350) {
@@ -98,7 +117,13 @@ export function listUrlParams(current, { prefix = '', ignore = [], values, defau
     // URL when the column is the default one.
     const isDefault = String(value) === String(fallback ?? '');
 
-    if (isEmpty || isDefault) next.delete(k);
+    // Cleared where the default is NOT blank - a date range that opens on today,
+    // set to "All dates" - is written as an explicit empty value. Dropping it
+    // would read back as the default, and a refresh would put today back.
+    const blankDefault = fallback === undefined || fallback === null || fallback === '';
+
+    if (isEmpty && !blankDefault) next.set(k, '');
+    else if (isEmpty || isDefault) next.delete(k);
     else next.set(k, String(value));
   }
 
@@ -118,13 +143,30 @@ export function useResourceList(fetcher, opts = {}) {
     defaultSort = '',
     defaultDir = 'asc',
     pageSize: initialPageSize = 25,
-    initialFilters = {},
+    initialFilters: declaredFilters = {},
+    /** false keeps a blank date range blank - see DATE_RANGES. */
+    defaultToday = true,
     syncUrl = true,
     urlPrefix = '',
     urlIgnore = [],
   } = opts;
 
   const [searchParams, setSearchParams] = useSearchParams();
+
+  /*
+   * A list opened from a link that already names a filter ("this vendor's
+   * POs") is asking about that, not about today, so it opens on all dates.
+   * Decided once, on the way in.
+   */
+  const [openOnToday] = useState(() => {
+    if (!defaultToday) return false;
+    const prefixed = (n) => (urlPrefix ? `${urlPrefix}.${n}` : n);
+    const dateKeys = DATE_RANGES.flat();
+    return !Object.keys(declaredFilters).some(
+      (k) => !dateKeys.includes(k) && (searchParams.get(prefixed(k)) ?? '') !== '',
+    );
+  });
+  const initialFilters = openOnToday ? withToday(declaredFilters) : declaredFilters;
 
   /** Callers pass `urlIgnore` as an inline array, so depend on its contents. */
   const ignoreKey = urlIgnore.join(',');
@@ -317,12 +359,31 @@ export function useResourceList(fetcher, opts = {}) {
     setFilters((f) => ({ ...f, [key]: value }));
   }, []);
 
-  // Keyed on the serialised initial filters rather than the object identity,
-  // which callers recreate on every render.
+  /*
+   * Keyed on the serialised initial filters rather than the object identity,
+   * which callers recreate on every render.
+   *
+   * A filter named in `urlIgnore` belongs to the screen - Job Work's process
+   * tabs - not to the filter row, so it neither counts as "a filter is set"
+   * nor is cleared: clearing the row must not also switch the tab.
+   */
+  const filtersActive = useMemo(() => {
+    if (search.trim()) return true;
+    const initial = JSON.parse(initialFilterKey);
+    const owned = ignoreKey ? ignoreKey.split(',') : [];
+    return Object.entries(filters).some(
+      ([k, v]) => !owned.includes(k) && String(v ?? '') !== String(initial[k] ?? ''),
+    );
+  }, [search, filters, initialFilterKey, ignoreKey]);
+
   const clearFilters = useCallback(() => {
-    setFilters(JSON.parse(initialFilterKey));
+    const owned = ignoreKey ? ignoreKey.split(',') : [];
+    setFilters((f) => ({
+      ...JSON.parse(initialFilterKey),
+      ...Object.fromEntries(owned.filter((k) => k in f).map((k) => [k, f[k]])),
+    }));
     setSearch('');
-  }, [initialFilterKey]);
+  }, [initialFilterKey, ignoreKey]);
 
   const reload = useCallback(() => setReloadKey((k) => k + 1), []);
 
@@ -346,6 +407,7 @@ export function useResourceList(fetcher, opts = {}) {
     setSearch,
     filters,
     setFilter,
+    filtersActive,
     clearFilters,
     sortBy,
     sortDir,

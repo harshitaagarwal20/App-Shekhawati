@@ -28,6 +28,7 @@ import {
   Pagination,
   Spinner,
   TextInput,
+  ClearFilters,
 } from '../../components/ui.jsx';
 import { fmtMoney, fmtNum } from '../../utils/format.js';
 import { ExportButton } from '../../components/dataTransfer.jsx';
@@ -122,10 +123,11 @@ export default function StockSummary() {
             onChange={(e) => setFilter('itemCategory', e.target.value)}
           />
         </Field>
+        <ClearFilters list={list} />
       </div>
 
-      <TableWrap>
-        <table className="data">
+      <TableWrap className="stock-summary-wrap">
+        <table className="data stock-summary-table">
           <thead>
             <tr>
               <th>Item Code</th>
@@ -176,9 +178,9 @@ export default function StockSummary() {
                   <td>{r.location}</td>
                   <td>{r.uom}</td>
                   <td className="num">
-                    <strong>{fmtNum(r.qty)}</strong>
+                    <strong>{fmtNum(r.qty, { decimals: 4 })}</strong>
                   </td>
-                  <td className="num">{fmtNum(r.inProcessQty)}</td>
+                  <td className="num">{fmtNum(r.inProcessQty, { decimals: 4 })}</td>
                   <td className="num">{fmtNum(r.avgRate, { decimals: 4 })}</td>
                   <td className="num">{fmtMoney(r.value)}</td>
                   <td className="num">

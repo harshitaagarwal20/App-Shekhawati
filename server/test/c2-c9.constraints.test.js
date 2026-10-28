@@ -405,21 +405,15 @@ describe('C5 - over-fulfilment is impossible', () => {
     );
   });
 
-  /**
-   * C5's migration rule: mandatory for new rows, silent about the ten fabric
-   * issues that predate the challan.
-   */
-  test('a fabric issue created now must quote a challan line', { skip: skipIfNoDb() }, async () => {
+  /** The cutting challan is no longer required, so neither is a challan line. */
+  test('a fabric issue need not quote a challan line', { skip: skipIfNoDb() }, async () => {
     const [{ exists }] = await prisma.$queryRaw`
       SELECT EXISTS (
         SELECT 1 FROM pg_constraint
          WHERE conname = 'fabric_issues_new_rows_need_challan'
            AND conrelid = 'fabric_issues'::regclass
       ) AS exists`;
-    assert.equal(exists, true, 'the partial CHECK must be present');
-
-    const legacy = await prisma.fabricIssue.count({ where: { cuttingChallanLineId: null } });
-    assert.ok(legacy >= 0, 'legacy issues are permitted to have none');
+    assert.equal(exists, false, 'the challan CHECK was dropped');
   });
 });
 

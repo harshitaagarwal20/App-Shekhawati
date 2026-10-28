@@ -21,21 +21,16 @@
  *  SEVERAL ROLLS AT ONCE
  *
  *  The store sends three or four rolls to the cutting floor at a time. Picked
- *  together, they share the order, purpose, challan line, job worker and
- *  issuer, and post in ONE transaction under a batch number (FIB-0001): each
- *  roll becomes its own issue, and either all of them post or none do. One
- *  roll posts exactly as it always did.
+ *  together, they share the order, purpose, job worker and issuer, and post in
+ *  ONE transaction under a batch number (FIB-0001): each roll becomes its own
+ *  issue, and either all of them post or none do. One roll posts exactly as it
+ *  always did.
  * ---------------------------------------------------------------------------
- *  OPENED FROM A CUTTING CHALLAN (old links only)
+ *  NO CUTTING CHALLAN
  *
- *  Cutting issues are now made on the challan itself - see
- *  pages/cutting/IssueFabricModal.jsx - and Cutting is not offered as a
- *  purpose below. A bookmarked link of the old form still lands here with
- *  ?order=<id>&challanLine=<id>. The order, the purpose (Cutting) and the line
- *  are filled in, and the rolls to cover what is still outstanding are picked
- *  by suggestRolls() - one colour, one shade, this order's rolls first. The
- *  screen opens on the quantities; the storeman checks the rolls against the
- *  rack and confirms. Nothing posts by itself.
+ *  Fabric for the cutting floor used to be drawn against an approved Cutting
+ *  Challan line. The office does not raise challans, so Cutting is an ordinary
+ *  purpose here again and the issue quotes nothing but the order.
  * ---------------------------------------------------------------------------
  *  REQUESTED QUANTITY ≤ AVAILABLE STOCK, CHECKED BY THE SERVER
  *
@@ -51,9 +46,8 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
-  cuttingChallans as ccApi,
   employees as employeesApi,
   fabricIssues as fiApi,
   orders as ordersApi,
@@ -68,10 +62,10 @@ import {
   QtyStepper,
   FloorStep,
 } from '../../components/mobile.jsx';
-import { CollapsibleField, Field, PageHeader, TextArea } from '../../components/ui.jsx';
-import { fmtEnum, fmtNum, todayInput } from '../../utils/format.js';
+import { CollapsibleField, Field, PageHeader, TextArea, TextInput } from '../../components/ui.jsx';
+import { fmtEnum, fmtNum, fmtVendor, todayInput } from '../../utils/format.js';
 import { loadFailed } from '../../services/loadFailures.js';
-import { suggestRolls } from '../../utils/rollSuggest.js';
+import { useDraft, useKeepDraft, useRemountKey } from '../../hooks/useDraft.js';
 
 /**
  * The purposes, as big buttons.
@@ -92,12 +86,7 @@ import { suggestRolls } from '../../utils/rollSuggest.js';
  * offered, not what the enum permits.
  */
 const PURPOSES = [
-  /*
-   * NO "CUTTING" HERE. Fabric for the cutting floor is issued on the cutting
-   * challan itself (IssueFabricModal), against the line it fulfils - the
-   * challan already knows the order, the purpose and the line. This screen is
-   * for fabric going OUT to a job worker, and for returns.
-   */
+  { value: 'CUTTING', label: 'Cutting', hint: 'to the cutting floor' },
   { value: 'DYEING', label: 'Dyeing', hint: 'out to a dyeing unit' },
   { value: 'PRINTING', label: 'Printing', hint: 'out to a printing unit' },
   { value: 'RETURN', label: 'Return', hint: 'back to the store' },
@@ -106,12 +95,17 @@ const PURPOSES = [
 /** The server's batch limit - see MAX_BATCH_ROLLS in fabricIssue.service.js. */
 const MAX_ROLLS = 30;
 
+/** Remounted blank when its draft is discarded - see useDraft. */
 export default function FabricIssueForm() {
+  const [round, remount] = useRemountKey();
+  return <FabricIssueFields key={round} onDiscardDraft={remount} />;
+}
+
+function FabricIssueFields({ onDiscardDraft }) {
   const navigate = useNavigate();
 
-  // Opened from a cutting challan line - see "OPENED FROM A CUTTING CHALLAN".
-  const [params] = useSearchParams();
-  const fromLineId = params.get('challanLine') || '';
+  const draft = useDraft('fabric-issue.new', { onDiscard: onDiscardDraft });
+  const d = draft.initial ?? {};
 
   const [rolls, setRolls] = useState([]);
   const [rollsLoading, setRollsLoading] = useState(true);
@@ -121,67 +115,37 @@ export default function FabricIssueForm() {
 
   // The rolls being issued, in the order they were picked - which is the
   // order they post in, and so the order the shade check judges them in.
-  const [rollIds, setRollIds] = useState([]);
+  const [rollIds, setRollIds] = useState(d.rollIds ?? []);
   // Quantity per roll, keyed by roll id.
-  const [qtys, setQtys] = useState({});
-  const [orderId, setOrderId] = useState(() => (fromLineId && params.get('order')) || '');
-  const [purpose, setPurpose] = useState(fromLineId ? 'CUTTING' : '');
-  const [vendorId, setVendorId] = useState('');
-  const [employeeId, setEmployeeId] = useState('');
-  const [issuedByName, setIssuedByName] = useState('');
-  const [remarks, setRemarks] = useState('');
-  const [deliveryDate, setDeliveryDate] = useState('');
-  // Only asked for when a roll's shade or dye lot differs from the one the
-  // cutting line was started on. See domain/shade.js on the server.
-  const [shadeMixReason, setShadeMixReason] = useState('');
-
-  /**
-   * C5 - THE CUTTING CHALLAN LINE THIS ISSUE FULFILS.
-   *
-   * Required for anything going to the cutting floor. NOT required for a job
-   * worker (a dyeing issue is authorised by its Job Work order) and not for a
-   * return, which fulfils no requirement.
-   *
-   * The options come from `issuableLines`, which returns only approved challans
-   * with something still outstanding - so the picker cannot offer a line the
-   * posting would refuse.
-   */
-  const [challanLines, setChallanLines] = useState([]);
-  const [challanLinesLoaded, setChallanLinesLoaded] = useState(false);
-  const [challanLineId, setChallanLineId] = useState(fromLineId);
-
-  // What was picked for the challan line, shown above the steps. Made once:
-  // a storeman who then changes the rolls must not have them put back.
-  const [suggestion, setSuggestion] = useState(null);
-  const suggested = useRef(false);
-
-  /**
-   * C5 - the cutting floor draws against a challan; a job worker does not.
-   *
-   * STITCHING is not tested for. A stitching unit never receives FABRIC - it
-   * receives cut panels, which leave on a Cutting Issue, a different document
-   * with its own challan. Fabric goes to cutting, dyeing or printing, and
-   * comes back on a return.
-   *
-   * Declared HERE, beside the state it derives from, rather than further down
-   * with the other derived values: the effect that loads the challan lines
-   * reads it, and a `const` referenced above its own declaration is a temporal
-   * dead zone error that blanks the whole screen at runtime.
-   */
-  const needsChallanLine = purpose === 'CUTTING';
+  const [qtys, setQtys] = useState(d.qtys ?? {});
+  const [orderId, setOrderId] = useState(d.orderId ?? '');
+  const [purpose, setPurpose] = useState(d.purpose ?? '');
+  const [vendorId, setVendorId] = useState(d.vendorId ?? '');
+  const [employeeId, setEmployeeId] = useState(d.employeeId ?? '');
+  const [issuedByName, setIssuedByName] = useState(d.issuedByName ?? '');
+  // Who the fabric is handed to - printed on the challan as the receiver.
+  const [issuedToId, setIssuedToId] = useState(d.issuedToId ?? '');
+  const [issuedToName, setIssuedToName] = useState(d.issuedToName ?? '');
+  const [remarks, setRemarks] = useState(d.remarks ?? '');
+  const [deliveryDate, setDeliveryDate] = useState(d.deliveryDate ?? '');
 
   /*
    * Which step is open. Derived would be wrong: after choosing a roll the flow
    * should move on by itself, but somebody reopening step 1 to change the roll
    * must stay there rather than be thrown forward again by their own answer.
    */
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(d.step ?? 1);
 
   // One preview per roll, keyed by roll id.
   const [previews, setPreviews] = useState({});
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+
+  useKeepDraft(draft, {
+    rollIds, qtys, orderId, purpose, vendorId, employeeId, issuedByName,
+    issuedToId, issuedToName, remarks, deliveryDate, step,
+  });
 
   /*
    * The rolls are fetched for the order, so each says whether it was bought
@@ -199,6 +163,16 @@ export default function FabricIssueForm() {
       live = false;
     };
   }, [orderId]);
+
+  // A restored draft can name a roll that has since been issued in full or
+  // held; once the list is in, only rolls still on it stay picked.
+  const pruned = useRef(!draft.restored);
+  useEffect(() => {
+    if (pruned.current || rollsLoading) return;
+    pruned.current = true;
+    const live = new Set(rolls.map((r) => r.id));
+    setRollIds((ids) => ids.filter((id) => live.has(id)));
+  }, [rolls, rollsLoading]);
 
   useEffect(() => {
     ordersApi.options().then(setOrders).catch(loadFailed(setOrders, 'orders'));
@@ -251,7 +225,6 @@ export default function FabricIssueForm() {
             rollId: id,
             fabricQtyIssued: qtys[id] === undefined || qtys[id] === '' ? undefined : String(qtys[id]),
             purpose: purpose || undefined,
-            cuttingChallanLineId: needsChallanLine && challanLineId ? challanLineId : undefined,
             batchRollIds: i > 0 ? rollIds.slice(0, i) : undefined,
           }),
         ),
@@ -261,52 +234,12 @@ export default function FabricIssueForm() {
       setPreviews({});
       setError(e.message);
     }
-  }, [rollIds, qtys, purpose, needsChallanLine, challanLineId]);
+  }, [rollIds, qtys, purpose]);
 
   useEffect(() => {
     const id = setTimeout(runPreview, 250);
     return () => clearTimeout(id);
   }, [runPreview]);
-
-  /**
-   * C5 - the challan lines this issue could fulfil.
-   *
-   * Reloaded whenever the order changes, and cleared when the purpose stops
-   * needing one - otherwise switching from Cutting to Dyeing would leave a
-   * stale line id attached to a job-work issue.
-   */
-  useEffect(() => {
-    if (!needsChallanLine || !orderId) {
-      setChallanLines([]);
-      setChallanLineId('');
-      return;
-    }
-    ccApi
-      .issuableLines({ orderId })
-      .then((r) => setChallanLines(r?.rows ?? []))
-      .catch(loadFailed(setChallanLines, 'challan lines'))
-      .finally(() => setChallanLinesLoaded(true));
-  }, [needsChallanLine, orderId]);
-
-  /** Opened from a challan line: pick the rolls for it, once both lists are in. */
-  useEffect(() => {
-    if (!fromLineId || suggested.current || rollsLoading || !challanLinesLoaded) return;
-    suggested.current = true;
-    const line = challanLines.find((l) => l.id === fromLineId);
-    if (!line) {
-      // Filled, closed or no longer approved since the challan was opened.
-      setChallanLineId('');
-      setSuggestion({ missing: true });
-      return;
-    }
-    const s = suggestRolls(rolls, line, MAX_ROLLS);
-    setSuggestion({ line, ...s });
-    if (s.picks.length) {
-      setRollIds(s.picks.map((p) => p.id));
-      setQtys(Object.fromEntries(s.picks.map((p) => [p.id, String(p.qty)])));
-      setStep(4);
-    }
-  }, [fromLineId, rollsLoading, challanLinesLoaded, challanLines, rolls]);
 
   const many = rollIds.length > 1;
   const picked = rollIds.map((id) => rolls.find((r) => r.id === id)).filter(Boolean);
@@ -317,6 +250,12 @@ export default function FabricIssueForm() {
   const uomLabel = uoms.length === 1 ? uoms[0] : '';
   const totalQty = rollIds.reduce((sum, id) => sum + Number(qtys[id] || 0), 0);
   const totalBalance = picked.reduce((sum, r) => sum + Number(r.balanceQty || 0), 0);
+  const issuedTo = issuedToId
+    ? employees.find((e) => e.id === issuedToId)?.empName ?? ''
+    : issuedToName.trim();
+  // A hand-over inside the factory has a person on the other end; a return
+  // or a job worker's despatch may not.
+  const needsIssuedTo = purpose === 'CUTTING' || purpose === 'STITCHING';
 
   async function post() {
     setBusy(true);
@@ -325,12 +264,10 @@ export default function FabricIssueForm() {
       issueDate: todayInput(),
       purpose,
       orderId,
-      // C5 - sent only where a challan actually governs the issue.
-      cuttingChallanLineId: needsChallanLine ? challanLineId : undefined,
       vendorId: vendorId || null,
       issuedByEmployeeId: employeeId || null,
       issuedByName: issuedByName || null,
-      shadeMixReason: shadeMix ? shadeMixReason.trim() : undefined,
+      issuedToName: issuedTo || null,
       deliveryDate: deliveryDate || null,
       remarks: remarks || null,
     };
@@ -351,6 +288,7 @@ export default function FabricIssueForm() {
         firstId = saved.id;
       }
       setConfirming(false);
+      draft.clear();
       // A batch opens on its first issue, which lists the rest and prints them all.
       navigate(`/fabric-issues/${firstId}`);
     } catch (e) {
@@ -362,22 +300,11 @@ export default function FabricIssueForm() {
 
   /*
    * Step 3 is done when the purpose AND anything the purpose drags in with it
-   * are answered - a cutting issue needs its challan line, a job work issue
-   * needs the unit it is going to. Without this the Continue button would let
-   * somebody past a half-answered step and fail at the very end instead.
+   * are answered - a job work issue needs the unit it is going to. Without
+   * this the Continue button would let somebody past a half-answered step and
+   * fail at the very end instead.
    */
-  // The shade verdicts for these rolls against the chosen cutting line.
-  const shadeMisses = needsChallanLine
-    ? rollIds.map((id) => previews[id]?.shade).filter((s) => s && !s.ok)
-    : [];
-  const shadeMix = shadeMisses.length > 0;
-  const shadeReasonOk = !shadeMix || shadeMixReason.trim().length >= 10;
-
-  const stepThreeDone =
-    shadeReasonOk &&
-    Boolean(purpose) &&
-    (!needsChallanLine || Boolean(challanLineId)) &&
-    (!needsVendor || Boolean(vendorId));
+  const stepThreeDone = Boolean(purpose) && (!needsVendor || Boolean(vendorId));
 
   const short = rollIds.filter((id) => previews[id]?.availability && !previews[id].availability.permitted);
   const allQtys = rollIds.length > 0 && rollIds.every((id) => Number(qtys[id]) > 0);
@@ -389,9 +316,8 @@ export default function FabricIssueForm() {
     allQtys &&
     allPermitted &&
     (!needsVendor || vendorId) &&
-    (!needsChallanLine || challanLineId) &&
-    shadeReasonOk &&
-    (employeeId || issuedByName.trim());
+    (employeeId || issuedByName.trim()) &&
+    (!needsIssuedTo || Boolean(issuedTo));
 
   /** Why a roll's quantity cannot be issued, in the storeman's terms. */
   const shortMessage = (availability) =>
@@ -413,41 +339,22 @@ export default function FabricIssueForm() {
       <PageHeader
         title="Issue Fabric"
         actions={
-          <button type="button" className="btn" onClick={() => navigate('/fabric-issues')}>
-            All issues
-          </button>
+          <>
+            {draft.restored && (
+              <button type="button" className="btn btn-ghost" onClick={draft.discard}>
+                Discard draft
+              </button>
+            )}
+            <button type="button" className="btn" onClick={() => navigate('/fabric-issues')}>
+              All issues
+            </button>
+          </>
         }
       />
 
       {error && (
         <FloorAlert kind="error" title="Could not issue the fabric" onDismiss={() => setError('')}>
           {error}
-        </FloorAlert>
-      )}
-
-      {suggestion?.missing && (
-        <FloorAlert kind="error" title="That challan line is no longer open" onDismiss={() => setSuggestion(null)}>
-          It has been filled, closed or taken out of approval. Choose the requirement in step 3.
-        </FloorAlert>
-      )}
-      {suggestion?.line && (
-        <FloorAlert
-          kind={suggestion.shortQty > 0 ? 'error' : 'info'}
-          title={'For ' + suggestion.line.challanNo + ' line ' + suggestion.line.lineNo}
-          onDismiss={() => setSuggestion(null)}
-        >
-          {suggestion.picks.length
-            ? suggestion.picks.length + (suggestion.picks.length > 1 ? ' rolls' : ' roll') + ' picked for ' +
-              fmtNum(suggestion.suggestedQty) + ' of the ' + fmtNum(suggestion.line.outstandingQty) + ' ' +
-              suggestion.line.uom + ' outstanding. Check them against the rack before issuing.'
-            : 'No ' + (suggestion.line.colorCode ?? '') + ' roll in ' + suggestion.line.uom +
-              ' has any balance - pick one in step 1.'}
-          {suggestion.picks.length > 0 && suggestion.shortQty > 0 && (
-            <div>
-              Short by {fmtNum(suggestion.shortQty)} {suggestion.line.uom} - add rolls in step 1, or issue what
-              there is.
-            </div>
-          )}
         </FloorAlert>
       )}
 
@@ -557,10 +464,6 @@ export default function FabricIssueForm() {
         onReopen={() => setStep(3)}
         summary={purposeLabel ?? ''}
       >
-          <p className="hint" style={{ margin: '0 0 8px' }}>
-            Fabric for cutting is issued from its{' '}
-            <Link to="/cutting-challans">cutting challan</Link>, against the line it fulfils.
-          </p>
           <div className="picker-scroll" style={{ maxHeight: 'none' }}>
             {PURPOSES.map((p) => (
               <PickerCard
@@ -581,53 +484,13 @@ export default function FabricIssueForm() {
             </FloorAlert>
           )}
 
-          {needsChallanLine && (
-            <Field
-              label="Cutting challan line"
-              required
-              hint={
-                challanLines.length
-                  ? 'The approved requirement this issue fulfils.'
-                  : 'No approved challan has anything outstanding for this order. Raise one first.'
-              }
-            >
-              <select value={challanLineId} onChange={(e) => setChallanLineId(e.target.value)}>
-                <option value="">Choose the requirement...</option>
-                {challanLines.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.label}
-                  </option>
-                ))}
-              </select>
-            </Field>
-          )}
-
-          {shadeMix && (
-            <FloorAlert kind="error" title="Different shade or dye lot">
-              {shadeMisses.map((s, i) => (
-                <div key={i}>{s.message}</div>
-              ))}
-              <Field
-                label="Reason for mixing"
-                required
-                hint={`At least 10 characters. Stored on ${shadeMisses.length > 1 ? 'each issue that mixes' : 'the issue'}.`}
-              >
-                <TextArea
-                  rows={2}
-                  value={shadeMixReason}
-                  onChange={(e) => setShadeMixReason(e.target.value)}
-                />
-              </Field>
-            </FloorAlert>
-          )}
-
           {needsVendor && (
             <Field label="Job worker" required hint="The fabric is leaving the factory.">
               <select value={vendorId} onChange={(e) => setVendorId(e.target.value)}>
                 <option value="">Choose the {purpose.toLowerCase()} unit...</option>
                 {vendors.map((v) => (
                   <option key={v.id} value={v.id}>
-                    {v.vendorName}
+                    {fmtVendor(v)}
                   </option>
                 ))}
               </select>
@@ -727,6 +590,30 @@ export default function FabricIssueForm() {
                 </option>
               ))}
             </select>
+          </Field>
+
+          <Field label="Issued to" required={needsIssuedTo} hint="The person receiving the fabric.">
+            <select
+              value={issuedToId}
+              onChange={(e) => {
+                setIssuedToId(e.target.value);
+                setIssuedToName('');
+              }}
+            >
+              <option value="">Choose who receives it...</option>
+              {employees.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.empName} ({e.empId})
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="…or type a name" hint="If they are not on the employee list.">
+            <TextInput
+              value={issuedToName}
+              disabled={Boolean(issuedToId)}
+              onChange={(e) => setIssuedToName(e.target.value)}
+            />
           </Field>
 
           <Field label="Delivery date">

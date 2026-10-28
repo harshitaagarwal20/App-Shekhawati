@@ -16,10 +16,9 @@
  */
 
 import prisma, { notDeleted } from '../config/prisma.js';
-import { D, ageDays } from '../utils/figures.js';
+import { D } from '../utils/figures.js';
 import { IRON, QC_BOXES, QC_REASONS, ironOf, pctText, shareOf } from '../domain/finishing.js';
 import { finishingSums, flowOf } from './finishingFlow.service.js';
-import { bagOrigin } from './alteration.service.js';
 
 const col = (key, label, format = 'text') => ({ key, label, format });
 const s = (v) => D(v).toString();
@@ -235,114 +234,12 @@ async function checkerReport(q) {
   };
 }
 
-const bucketOf = (days) => (days == null ? '-' : days <= 2 ? '0-2 days' : days <= 7 ? '3-7 days' : days <= 15 ? '8-15 days' : 'Over 15 days');
-
-async function alterationPending(q) {
-  const bags = await prisma.alterationReceipt.findMany({
-    where: {
-      status: 'OPEN',
-      ...(q.orderId ? { orderId: q.orderId } : {}),
-      ...between('receivedDate', q.dateFrom, q.dateTo),
-    },
-    orderBy: [{ receivedDate: 'asc' }, { createdAt: 'asc' }],
-    take: q.limit,
-    include: {
-      order: { select: { orderNo: true } },
-      style: { select: { styleNo: true } },
-      externalQcEntry: { select: { agency: { select: { vendorName: true } } } },
-    },
-  });
-  const rows = bags.map((b) => {
-    const age = ageDays(b.receivedDate);
-    return {
-      receivedDate: b.receivedDate,
-      ageDays: String(age ?? '-'),
-      aging: bucketOf(age),
-      orderNo: b.order.orderNo,
-      styleNo: b.style.styleNo,
-      origin: bagOrigin(b),
-      agencyName: b.externalQcEntry?.agency?.vendorName ?? '-',
-      reason: b.reason,
-      defectType: b.defectType ?? '-',
-      unit: b.unit ?? '-',
-      qty: s(b.qty),
-      pcsAltered: s(b.pcsAltered),
-      pcsNotRepairable: s(b.pcsNotRepairable),
-      balance: s(D(b.qty).minus(D(b.pcsAltered)).minus(D(b.pcsNotRepairable))),
-    };
-  });
-  const pending = rows.reduce((a, r) => a.plus(D(r.balance)), D(0));
-  const byBucket = {};
-  for (const r of rows) byBucket[r.aging] = D(byBucket[r.aging]).plus(D(r.balance));
-  return {
-    rows,
-    totals: {
-      bags: String(rows.length),
-      pending: s(pending),
-      ...Object.fromEntries(Object.entries(byBucket).map(([k, v]) => [k, s(v)])),
-    },
-  };
-}
-
-async function alterationSummary(q) {
-  const where = {
-    status: { not: 'CANCELLED' },
-    ...(q.orderId ? { orderId: q.orderId } : {}),
-    ...between('receivedDate', q.dateFrom, q.dateTo),
-  };
-  const [groups, open] = await Promise.all([
-    prisma.alterationReceipt.groupBy({
-      by: ['orderId', 'styleId'],
-      where,
-      _sum: { qty: true, pcsAltered: true, pcsNotRepairable: true },
-      _count: { _all: true },
-      _min: { receivedDate: true },
-      _max: { receivedDate: true },
-    }),
-    prisma.alterationReceipt.groupBy({
-      by: ['orderId', 'styleId'],
-      where: { ...where, status: 'OPEN' },
-      _min: { receivedDate: true },
-      _count: { _all: true },
-    }),
-  ]);
-  const oldest = new Map(open.map((g) => [`${g.orderId}:${g.styleId}`, g]));
-  const n = await names(groups.map((g) => g.orderId), groups.map((g) => g.styleId));
-  const rows = groups
-    .map((g) => {
-      const t = g._sum;
-      const worked = D(t.pcsAltered).plus(D(t.pcsNotRepairable));
-      const o = oldest.get(`${g.orderId}:${g.styleId}`);
-      return {
-        orderNo: n.order.get(g.orderId)?.orderNo ?? '-',
-        styleNo: n.style.get(g.styleId) ?? '-',
-        bags: String(g._count._all),
-        firstReceived: g._min.receivedDate,
-        lastReceived: g._max.receivedDate,
-        openBags: String(o?._count._all ?? 0),
-        pcsReceived: s(t.qty),
-        pcsAltered: s(t.pcsAltered),
-        pcsNotRepairable: s(t.pcsNotRepairable),
-        repairedPct: pctText(shareOf(t.pcsAltered, worked)),
-        pcsPending: s(D(t.qty).minus(worked)),
-        oldestPendingDays: o?._min.receivedDate ? String(ageDays(o._min.receivedDate)) : '-',
-      };
-    })
-    .sort((a, b) => a.orderNo.localeCompare(b.orderNo) || a.styleNo.localeCompare(b.styleNo))
-    .slice(0, q.limit);
-  const sum = (k) => s(rows.reduce((a, r) => a.plus(D(r[k])), D(0)));
-  return {
-    rows,
-    totals: { received: sum('pcsReceived'), altered: sum('pcsAltered'), notRepairable: sum('pcsNotRepairable'), pending: sum('pcsPending') },
-  };
-}
-
 /**
  * Every stage of an order and style after the stitching units, net. The
  * Difference column is (sum of the stages) - (received from the units): zero
  * on every row, because a piece sent back leaves the stage that sent it.
  */
-async function finishingPipeline(q) {
+export async function finishingPipeline(q) {
   const sums = await finishingSums(prisma, q.orderId ? { orderId: q.orderId } : {});
   const flows = [...sums.values()].map((x) => ({ ...x, f: flowOf(x) }));
   const n = await names(flows.map((x) => x.orderId), flows.map((x) => x.styleId));
@@ -445,77 +342,5 @@ export const FINISHING_REPORTS = {
       col('shareOfAllFaulty', '% of all faulty'),
     ],
     run: checkerReport,
-  },
-  'alteration-pending': {
-    title: 'Alteration Unit - pending and aging',
-    description: 'Every bag still open in the Alteration Unit, oldest first: where it came from, its reason, what is done and what is left, and how many days it has waited.',
-    permission: 'ALTERATION.VIEW',
-    excelRef: '— derived from Alteration Unit bags',
-    category: 'PRODUCTION',
-    filters: ['orderId', 'dateFrom', 'dateTo'],
-    columns: [
-      col('receivedDate', 'Received', 'date'),
-      col('ageDays', 'Days waiting'),
-      col('aging', 'Aging'),
-      col('orderNo', 'Order No'),
-      col('styleNo', 'Style'),
-      col('origin', 'From'),
-      col('agencyName', 'Agency'),
-      col('reason', 'Reason'),
-      col('defectType', 'Damage type'),
-      col('unit', 'Stitching unit'),
-      col('qty', 'Received', 'qty'),
-      col('pcsAltered', 'Altered', 'qty'),
-      col('pcsNotRepairable', 'Not repairable', 'qty'),
-      col('balance', 'Pending', 'qty'),
-    ],
-    run: alterationPending,
-  },
-  'alteration-summary': {
-    title: 'Alteration Unit - summary',
-    description: 'Per order and style: pieces received in the Alteration Unit, altered or cleaned, not repairable and still pending, and how long the oldest open bag has waited.',
-    permission: 'ALTERATION.VIEW',
-    excelRef: '— derived from Alteration Unit bags and entries',
-    category: 'PRODUCTION',
-    filters: ['orderId', 'dateFrom', 'dateTo'],
-    columns: [
-      col('orderNo', 'Order No'),
-      col('styleNo', 'Style'),
-      col('bags', 'Bags'),
-      col('firstReceived', 'First received', 'date'),
-      col('lastReceived', 'Last received', 'date'),
-      col('openBags', 'Open bags'),
-      col('pcsReceived', 'Received', 'qty'),
-      col('pcsAltered', 'Altered / cleaned', 'qty'),
-      col('pcsNotRepairable', 'Not repairable', 'qty'),
-      col('repairedPct', 'Repaired %'),
-      col('pcsPending', 'Pending', 'qty'),
-      col('oldestPendingDays', 'Oldest pending (days)'),
-    ],
-    run: alterationSummary,
-  },
-  'finishing-pipeline': {
-    title: 'Finishing pipeline - net stage balances',
-    description: 'Per order and style, every piece received at ironing from the stitching units and where it is now. Pieces sent back leave the stage that sent them, so the stages add up to what was received: Difference is always zero.',
-    permission: 'IRONING.VIEW',
-    excelRef: '— derived from Ironing, External QC, Alteration Unit and the Rejected Register',
-    category: 'PRODUCTION',
-    filters: ['orderId'],
-    columns: [
-      col('orderNo', 'Order No'),
-      col('styleNo', 'Style'),
-      col('receivedFromUnits', 'Received from units', 'qty'),
-      col('atIroning', 'At ironing', 'qty'),
-      col('damageUndecided', 'Damage undecided', 'qty'),
-      col('waitingForQc', 'Ironed, waiting for QC', 'qty'),
-      col('approved', 'Approved (to Humidity)', 'qty'),
-      col('reIronPending', 'Sent back to re-iron', 'qty'),
-      col('atAlteration', 'At Alteration Unit', 'qty'),
-      col('alteredPending', 'Altered, waiting to iron', 'qty'),
-      col('rejected', 'Rejected register', 'qty'),
-      col('accounted', 'Accounted for', 'qty'),
-      col('difference', 'Difference', 'qty'),
-    ],
-    run: finishingPipeline,
   },
 };

@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { stitching as api } from '../../services/erp.js';
 import { Field, RecordSelect } from '../../components/ui.jsx';
-import { fmtNum } from '../../utils/format.js';
+import { fmtNum, fmtOrderStyle } from '../../utils/format.js';
 
 /** Units, slots and the write right, loaded once per screen. */
 export function useStitchingContext() {
@@ -69,7 +69,7 @@ export function UnitPicker({ ctx, value, onChange, required, allowAll = false })
   );
 }
 
-export const orderLabel = (o) => `${o.orderNo} · ${o.styleNo}${o.buyerName ? ` (${o.buyerName})` : ''}`;
+export const orderLabel = fmtOrderStyle;
 
 /**
  * Printing after stitching is optional, so it is a tab beside the stitching

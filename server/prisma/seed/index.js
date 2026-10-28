@@ -43,9 +43,12 @@ import {
   fabricScrutinies,
   planApprovals,
   cuttingIssues,
+  costSheets,
   documentSequences,
   excessRules,
 } from './data/transactions.js';
+import { costSheet as computeCostSheet } from '../../src/domain/costing.js';
+import { istDate } from '../../src/utils/dates.js';
 
 dotenv.config();
 
@@ -95,11 +98,17 @@ async function wipe() {
   // table left off is still full on the second run, and its foreign keys
   // refuse the delete of whatever it points at.
   const order = [
+    // Phase 6 - each points at an order and a style; a line at its dispatch.
+    'dispatchLine',
+    'dispatch',
+    'packingEntry',
+    'needleCheckCarton',
     // Phase 5 - each points at an order, a style or an employee.
     'reconciliationReport',
     'spotRectification',
     'finishedCheckerRecord',
     'finalCheckerReport',
+    'internalQualityDefect',
     'internalQualityCheck',
     'externalQcInspectionLine',
     'rejectedRegisterEntry',
@@ -135,6 +144,9 @@ async function wipe() {
     'vendorQuotationHeader',
     'planningLine',
     'planning',
+    // Each points at a style (restrict) and maybe an order; its lines cascade.
+    'styleCostSheetLine',
+    'styleCostSheet',
     'buyerOrder',
     'inventoryItem',
     'styleBomLine',
@@ -1433,6 +1445,163 @@ async function seedApprovalHistory(ctx) {
 }
 
 // ---------------------------------------------------------------------------
+//  12a. FOB COST SHEETS
+// ---------------------------------------------------------------------------
+
+/**
+ * The rate costSheet.service.js would have suggested ON THE SHEET'S DATE: the
+ * last approved PO for the material, else the last approved quotation. Read
+ * from the seed data rather than the service, whose lookup is always "latest"
+ * and would price an August sheet off a September PO.
+ */
+function rateOn(line, onDate) {
+  const same = (d) =>
+    d.item === line.itemCategory &&
+    (d.subCategory ?? null) === (line.subCategory ?? null) &&
+    (d.accessoriesItem ?? null) === (line.accessoriesItem ?? null) &&
+    d.uom === line.uom;
+  const latest = (rows, dateOf) =>
+    rows.filter((d) => dateOf(d) <= onDate).sort((a, b) => dateOf(b).localeCompare(dateOf(a)))[0];
+
+  const po = latest(
+    purchaseOrders.filter((p) => same(p) && p.approvalStatus === 'APPROVED'),
+    (p) => p.approvedAt ?? p.poDate,
+  );
+  if (po) return { rate: po.rate, rateSource: `PO ${po.poId}, ${istDate(date(po.poDate))}` };
+
+  const quote = latest(
+    vendorQuotations.filter((q) => same(q) && q.authorisationStatus === 'APPROVED'),
+    (q) => q.quotationDate,
+  );
+  if (quote) {
+    return { rate: quote.rateQuoted, rateSource: `Quotation ${quote.quotationNo}, ${istDate(date(quote.quotationDate))}` };
+  }
+  return { rate: null, rateSource: null };
+}
+
+async function seedCostSheets(ctx) {
+  const merch = await prisma.user.findUnique({ where: { username: 'vinay' } });
+  const director = await prisma.user.findUnique({ where: { username: 'dinesh' } });
+
+  const trail = [];
+  let lineCount = 0;
+  for (const c of costSheets) {
+    const style = ctx.styleByNo.get(c.styleNo);
+    const bom = await prisma.styleBomLine.findMany({
+      where: { styleId: style.id, deletedAt: null, isActive: true },
+      orderBy: { lineNo: 'asc' },
+    });
+
+    const lines = bom.map((b, i) => {
+      const priced = c.rates[b.lineNo] ?? rateOn(b, c.costDate);
+      return {
+        lineNo: i + 1,
+        bomLineNo: b.lineNo,
+        itemCategory: b.itemCategory,
+        subCategory: b.subCategory,
+        accessoriesItem: b.accessoriesItem,
+        accessoryType: b.accessoryType,
+        colorCode: b.colorCode,
+        description: b.description,
+        uom: b.uom,
+        consumption: b.avgUtilisationPerPiece,
+        wastagePct: b.wastagePct,
+        rate: D(priced.rate),
+        rateSource: priced.rateSource,
+      };
+    });
+
+    const header = {
+      currency: c.currency,
+      exchangeRate: dec(c.exchangeRate),
+      targetPrice: D(c.targetPrice),
+      cmtCost: dec(c.cmtCost),
+      printCost: dec(c.printCost),
+      dyeWashCost: dec(c.dyeWashCost),
+      otherCost: dec(c.otherCost),
+      otherCostLabel: c.otherCostLabel,
+      overheadPct: dec(c.overheadPct),
+      rejectionPct: dec(c.rejectionPct),
+      commissionPct: dec(c.commissionPct),
+      marginPct: dec(c.marginPct),
+    };
+    const result = computeCostSheet(header, lines);
+    if (c.status !== 'DRAFT' && !result.complete) {
+      throw new Error(`${c.costSheetNo} is ${c.status} with ${result.unpricedLines} unpriced line(s)`);
+    }
+
+    const decided = ['APPROVED', 'SUPERSEDED'].includes(c.status);
+    const row = await prisma.styleCostSheet.create({
+      data: {
+        costSheetNo: c.costSheetNo,
+        styleId: style.id,
+        version: c.version,
+        orderId: c.orderNo ? ctx.orderByNo.get(c.orderNo).id : null,
+        costDate: date(c.costDate),
+        status: c.status,
+        ...header,
+        materialCost: result.materialCost,
+        conversionCost: result.conversionCost,
+        overheadAmount: result.overheadAmount,
+        rejectionAmount: result.rejectionAmount,
+        totalCost: result.totalCost,
+        commissionAmount: result.commissionAmount,
+        marginAmount: result.marginAmount,
+        fobInr: result.fobInr,
+        fobPrice: result.fobPrice,
+        marginAtTarget: result.marginAtTarget,
+        submittedAt: date(c.submittedDate),
+        approvedAt: decided ? date(c.decidedDate) : null,
+        approvedById: decided ? director.id : null,
+        approvedByName: decided ? director.fullName : null,
+        rejectionReason: c.rejectionReason ?? null,
+        remarks: c.remarks,
+        createdById: merch.id,
+        updatedById: decided || c.status === 'REJECTED' ? director.id : merch.id,
+        lines: {
+          create: lines.map((l, i) => ({
+            ...l,
+            consumption: dec(l.consumption),
+            wastagePct: dec(l.wastagePct),
+            grossConsumption: result.lines[i].grossConsumption,
+            amount: result.lines[i].amount,
+          })),
+        },
+      },
+    });
+    lineCount += lines.length;
+
+    // The trail the service writes: SUBMITTED, then APPROVED or REJECTED.
+    // Superseding a sheet is not an action anybody takes, so it has no entry.
+    const entry = (sequenceNo, action, fromStatus, toStatus, actor, actedOn, remarks) => ({
+      documentType: 'COST_SHEET',
+      documentId: row.id,
+      documentNo: row.costSheetNo,
+      sequenceNo,
+      action,
+      fromStatus,
+      toStatus,
+      actedById: actor.id,
+      actedByName: actor.fullName,
+      actedAt: date(actedOn),
+      remarks,
+    });
+    if (c.submittedDate) {
+      trail.push(entry(1, 'SUBMITTED', 'DRAFT', 'PENDING_APPROVAL', merch, c.submittedDate, null));
+    }
+    if (decided) {
+      trail.push(entry(2, 'APPROVED', 'PENDING_APPROVAL', 'APPROVED', director, c.decidedDate,
+        c.approvalRemarks ?? `FOB ${result.fobPrice.toFixed(4)} ${c.currency}`));
+    } else if (c.status === 'REJECTED') {
+      trail.push(entry(2, 'REJECTED', 'PENDING_APPROVAL', 'REJECTED', director, c.decidedDate, c.rejectionReason));
+    }
+  }
+
+  await prisma.approvalHistory.createMany({ data: trail });
+  log(`cost sheets: ${costSheets.length} / cost sheet lines: ${lineCount} / trail entries: ${trail.length}`);
+}
+
+// ---------------------------------------------------------------------------
 //  12b. EXCESS RULES  (Phase 17 - no percentage is hardcoded any more)
 // ---------------------------------------------------------------------------
 async function seedExcessRules() {
@@ -1545,6 +1714,8 @@ const COUNTED = [
   ['fabric_scrutinies', 'fabricScrutiny'],
   ['plan_approvals', 'planApproval'],
   ['cutting_issues', 'cuttingIssue'],
+  ['style_cost_sheets', 'styleCostSheet'],
+  ['style_cost_sheet_lines', 'styleCostSheetLine'],
   ['approval_history', 'approvalHistory'],
   ['document_amendments', 'documentAmendment'],
   ['audit_logs', 'auditLog'],
@@ -1620,6 +1791,7 @@ async function main() {
 
   await seedStock(ctx8);
   await seedApprovalHistory(ctx8);
+  await seedCostSheets(ctx8);
   await seedWorkflowStates();
   await seedSequences();
 

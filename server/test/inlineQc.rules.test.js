@@ -8,6 +8,7 @@ import test, { describe } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  defectsLabel,
   diffDefects,
   entryProblems,
   mayResolve,
@@ -20,8 +21,8 @@ import { masterLists } from '../prisma/seed/data/masterLists.js';
 
 const fieldsOf = (e) => entryProblems(e).map((p) => p.field);
 
-const size = { checkType: 'SIZE', operation: 'Handle Attach', sizeMeasurement: 'Free Size', pcsChecked: '200', pcsRejected: '4', defects: ['Handle Size'], informToUserId: 'u1' };
-const workmanship = { checkType: 'WORKMANSHIP', pcsChecked: '24', pcsRejected: '2', defects: ['Handle Out'], informToUserId: 'u1' };
+const size = { checkType: 'SIZE', operation: 'Handle Attach', sizeMeasurement: 'Free Size', pcsChecked: '200', pcsRejected: '4', defects: [{ defect: 'Handle Size', qty: 4 }], informToUserId: 'u1' };
+const workmanship = { checkType: 'WORKMANSHIP', pcsChecked: '24', pcsRejected: '2', defects: [{ defect: 'Handle Out', qty: 2 }], informToUserId: 'u1' };
 
 describe('Inline QC - one screen, two check types', () => {
   test('the workbook sample rows are valid', () => {
@@ -80,17 +81,52 @@ describe('Inline QC - defects and Inform To', () => {
   });
 
   test('defects are trimmed, blanks dropped, repeats kept once', () => {
-    assert.deepEqual(normaliseDefects([' Stain', 'stain', '', null, 'Torn']), ['Stain', 'Torn']);
+    assert.deepEqual(
+      normaliseDefects([{ defect: ' Stain', qty: 3 }, 'stain', '', null, { defect: 'Torn', qty: '2' }]),
+      [{ defect: 'Stain', qty: 3 }, { defect: 'Torn', qty: 2 }],
+    );
   });
 
-  test('an edit adds, keeps (with its status) and drops by name', () => {
+  test('each defect is counted - whole pieces, at least one, no more than rejected', () => {
+    const counted = (qty) => fieldsOf({ ...workmanship, defects: [{ defect: 'Handle Out', qty }] });
+    assert.deepEqual(counted(null), ['defects']);
+    assert.deepEqual(counted(0), ['defects']);
+    assert.deepEqual(counted(1.5), ['defects']);
+    assert.deepEqual(counted(3), ['defects'], '2 were rejected');
+    assert.deepEqual(counted(2), []);
+    assert.match(entryProblems({ ...workmanship, pcsRejected: '5', defects: [{ defect: 'Stain', qty: 50 }] })[0].message, /more than the 5 rejected/);
+  });
+
+  test('with nothing rejected, a count is held to the pieces checked', () => {
+    const counted = (qty) => fieldsOf({ ...workmanship, pcsRejected: '0', defects: [{ defect: 'Handle Out', qty }] });
+    assert.deepEqual(counted(25), ['defects']);
+    assert.deepEqual(counted(24), []);
+  });
+
+  test('the counts need not add up to Pcs Rejected - one piece can have two defects', () => {
+    const both = [{ defect: 'Stain', qty: 2 }, { defect: 'Torn', qty: 2 }];
+    assert.deepEqual(entryProblems({ ...workmanship, pcsRejected: '2', defects: both }), []);
+  });
+
+  test('a defect recorded before counts were taken may stay uncounted, a new one may not', () => {
+    const old = { ...workmanship, defects: [{ defect: 'Handle Out', qty: null }], uncounted: ['Handle Out'] };
+    assert.deepEqual(entryProblems(old), []);
+    assert.deepEqual(fieldsOf({ ...old, defects: [...old.defects, { defect: 'Stain', qty: null }] }), ['defects']);
+  });
+
+  test('the defects as one cell carry their counts', () => {
+    assert.equal(defectsLabel([{ defect: 'Handle Size', qty: 3 }, { defect: 'Stain', qty: null }]), 'Handle Size 3; Stain');
+  });
+
+  test('an edit adds, keeps (with its status), recounts and drops by name', () => {
     const existing = [
-      { id: 'a', defect: 'Stain', status: 'RESOLVED' },
-      { id: 'b', defect: 'Torn', status: 'OPEN' },
+      { id: 'a', defect: 'Stain', qty: 2, status: 'RESOLVED' },
+      { id: 'b', defect: 'Torn', qty: 1, status: 'OPEN' },
     ];
-    const d = diffDefects(existing, ['stain', 'Handle Out']);
-    assert.deepEqual(d.add, ['Handle Out']);
+    const d = diffDefects(existing, [{ defect: 'stain', qty: 5 }, { defect: 'Handle Out', qty: 1 }]);
+    assert.deepEqual(d.add, [{ defect: 'Handle Out', qty: 1 }]);
     assert.deepEqual(d.keep.map((x) => [x.id, x.status]), [['a', 'RESOLVED']]);
+    assert.deepEqual(d.recount.map((r) => [r.line.id, r.qty]), [['a', 5]]);
     assert.deepEqual(d.drop.map((x) => x.id), ['b']);
   });
 });

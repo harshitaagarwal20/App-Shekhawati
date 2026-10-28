@@ -206,7 +206,7 @@ export async function orderOptions() {
   const [orders, styles] = await Promise.all([
     prisma.buyerOrder.findMany({
       where: { id: { in: [...new Set(live.map((g) => g.orderId))] } },
-      select: { id: true, orderNo: true, buyer: { select: { buyerName: true } } },
+      select: { id: true, orderNo: true, buyer: { select: { buyerName: true, buyerCode: true } } },
     }),
     prisma.style.findMany({ where: { id: { in: [...new Set(live.map((g) => g.styleId))] } }, select: { id: true, styleNo: true } }),
   ]);
@@ -221,6 +221,7 @@ export async function orderOptions() {
       sourceLabel: sourceLabel(g.source),
       orderNo: order.get(g.orderId).orderNo,
       buyerName: order.get(g.orderId).buyer?.buyerName ?? null,
+      buyerCode: order.get(g.orderId).buyer?.buyerCode ?? null,
       styleNo: style.get(g.styleId)?.styleNo ?? null,
     }))
     .sort((a, b) => a.orderNo.localeCompare(b.orderNo)

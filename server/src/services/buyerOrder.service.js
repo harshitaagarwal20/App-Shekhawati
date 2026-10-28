@@ -1623,7 +1623,7 @@ export async function options() {
       sizeGroup: true,
       status: true,
       buyerDeliveryDate: true,
-      buyer: { select: { id: true, buyerName: true } },
+      buyer: { select: { id: true, buyerName: true, buyerCode: true } },
       style: { select: { id: true, styleNo: true, styleDescription: true } },
       // Every style on the order, not just the lead one - the quotation form
       // offers only the items their BOMs call for.

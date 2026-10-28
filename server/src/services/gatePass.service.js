@@ -821,10 +821,7 @@ export async function allocate(id, { linkedDocNo, qty, purpose, remarks }, actor
     );
   }
 
-  const chosenPurpose = purpose ?? gp.purpose;
-  if (!chosenPurpose) {
-    throw ApiError.badRequest('Say what the goods are here for', { field: 'purpose' });
-  }
+  const chosenPurpose = purpose ?? gp.purpose ?? null;
 
   /*
    * Claimed by naming the state it must still be in, so two people allocating

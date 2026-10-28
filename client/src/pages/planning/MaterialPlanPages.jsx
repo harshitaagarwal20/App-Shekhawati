@@ -53,13 +53,15 @@ import {
   Spinner,
   TextArea,
   TextInput,
+  ClearFilters,
 } from '../../components/ui.jsx';
 import {} from '../../components/form.jsx';
 import { StateBadge, WorkflowTrail } from '../../components/workflow.jsx';
-import { fmtDate, fmtEnum, fmtNum, fmtPctFromFraction, todayInput } from '../../utils/format.js';
+import { fmtDate, fmtEnum, fmtNum, fmtOrderStyle, fmtPctFromFraction, todayInput } from '../../utils/format.js';
 import { loadFailed } from '../../services/loadFailures.js';
 import { ExportButton } from '../../components/dataTransfer.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
+import DateRangeFilter from '../../components/DateRangeFilter.jsx';
 
 const CATEGORY_LABEL = {
   FABRIC: 'Fabric',
@@ -152,7 +154,7 @@ export function MaterialPlanList({ title = 'Material Plans' }) {
   const list = useResourceList((params) => mpApi.list(params), {
     defaultSort: 'planDate',
     defaultDir: 'desc',
-    initialFilters: { approvalStatus: '', orderId: '' },
+    initialFilters: { approvalStatus: '', orderId: '', dateFrom: '', dateTo: '' },
   });
 
   const [creating, setCreating] = useState(false);
@@ -200,6 +202,8 @@ export function MaterialPlanList({ title = 'Material Plans' }) {
             ))}
           </select>
         </Field>
+        <DateRangeFilter filters={list.filters} setFilter={list.setFilter} />
+        <ClearFilters list={list} />
       </div>
 
       {list.error && <Alert kind="error">{list.error}</Alert>}
@@ -332,7 +336,7 @@ function CreateMaterialPlanModal({ onClose, onSaved }) {
         await mpApi.create({
           orderId,
           planDate,
-          containerNo: containerNo || null,
+          containerNo: containerNo.trim(),
           remarks: remarks || null,
         }),
       );
@@ -342,7 +346,7 @@ function CreateMaterialPlanModal({ onClose, onSaved }) {
     }
   }
 
-  const ready = orderId && preview?.lines?.length > 0 && !previewing;
+  const ready = orderId && containerNo.trim() && preview?.lines?.length > 0 && !previewing;
 
   return (
     <Modal
@@ -379,15 +383,15 @@ function CreateMaterialPlanModal({ onClose, onSaved }) {
             onChange={(e) => setOrderId(e.target.value)}
             options={orderOptions}
             getValue={(o) => o.id}
-            getLabel={(o) => `${o.orderNo} — ${o.style?.styleNo ?? ''}`.trim()}
+            getLabel={fmtOrderStyle}
             placeholder="Select an order..."
           />
         </Field>
         <Field label="Plan date">
           <TextInput type="date" value={planDate} onChange={(e) => setPlanDate(e.target.value)} />
         </Field>
-        <Field label="Container no">
-          <TextInput value={containerNo} onChange={(e) => setContainerNo(e.target.value)} />
+        <Field label="Container No" required>
+          <TextInput value={containerNo} maxLength={40} onChange={(e) => setContainerNo(e.target.value)} />
         </Field>
         <CollapsibleField className="span-2">
           <Field label="Remarks">

@@ -30,6 +30,7 @@ import {
   StatusBadge,
   TextArea,
   TextInput,
+  ClearFilters,
 } from '../../components/ui.jsx';
 import { CheckList } from '../../components/mobile.jsx';
 import {
@@ -42,6 +43,7 @@ import { fmtDate, fmtDateTime, fmtNum, fmtOrder } from '../../utils/format.js';
 import { loadFailed } from '../../services/loadFailures.js';
 import { ExportButton } from '../../components/dataTransfer.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
+import DateRangeFilter from '../../components/DateRangeFilter.jsx';
 
 const STATUS_OPTIONS = [
   { value: 'PENDING', label: 'Pending' },
@@ -64,7 +66,8 @@ export function CuttingIssueList() {
     initialFilters: {
       status: '',
       orderId: '',
-      isLocked: '',
+      dateFrom: '',
+      dateTo: '',
     },
   });
 
@@ -125,6 +128,7 @@ export function CuttingIssueList() {
               onChange={(e) => list.setFilter('orderId', e.target.value)}
             />
           </Field>
+          <DateRangeFilter filters={list.filters} setFilter={list.setFilter} />
 
           <Field label="Status" htmlFor="ci-f-status">
             <EnumSelect
@@ -136,19 +140,7 @@ export function CuttingIssueList() {
             />
           </Field>
 
-          <div className="field">
-            <label htmlFor="ci-f-locked">Record</label>
-            <EnumSelect
-              id="ci-f-locked"
-              options={[
-                { value: 'false', label: 'Drafts' },
-                { value: 'true', label: 'Posted' },
-              ]}
-              placeholder="All"
-              value={list.filters.isLocked ?? ''}
-              onChange={(e) => list.setFilter('isLocked', e.target.value)}
-            />
-          </div>
+          <ClearFilters list={list} />
         </div>
 
         <TableWrap>

@@ -246,6 +246,9 @@ const INCLUDE = {
       uom: true,
       postedAt: true,
       status: true,
+      issuedByName: true,
+      /** The cutting contractor the fabric was handed to - printed on the challan. */
+      issuedToName: true,
       roll: { select: { id: true, rollNo: true, stage: true, isHeld: true, balanceQty: true } },
     },
   },
@@ -1628,6 +1631,9 @@ export async function printView(id) {
     posted: Boolean(ci.postedAt),
     postedAt: ci.postedAt,
     postedByName: ci.postedByName,
+    /** Who issued the cut pieces to the unit, and the contractor who cut them. */
+    issuedBy: ci.postedByName ?? null,
+    contractor: ci.fabricIssue?.issuedToName ?? null,
     printable: Boolean(ci.postedAt),
     printWarning: ci.postedAt
       ? null

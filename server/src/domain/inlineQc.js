@@ -14,7 +14,12 @@
  *                                             neither is kept
  *
  *  Both: Pcs Checked > 0, 0 <= Pcs Rejected <= Pcs Checked, Defects Found
- *  from the Defect Type list (several), and Inform To.
+ *  from the Defect Type list (several, each with how many pieces had it),
+ *  and Inform To.
+ *
+ *  A defect's count is its own: one piece can be stained AND torn, so the
+ *  counts are not held to add up to Pcs Rejected - only each one to no more
+ *  than was rejected (or, where nothing was rejected, than was checked).
  *
  *  THE TWO RULES THE WORKBOOK LEAVES IMPLICIT
  *
@@ -41,28 +46,40 @@ export const checkTypeLabel = (key) => CHECK_TYPES.find((t) => t.key === key)?.l
 const blank = (v) => v == null || String(v).trim() === '';
 
 /**
- * Defects as entered: trimmed, blanks dropped, a repeat kept once, the order
- * the checker ticked them in.
+ * Defects as entered, as [{ defect, qty }]: trimmed, blanks dropped, a repeat
+ * kept once, the order the checker ticked them in. A bare name (what the
+ * screen sent before counts) is a defect with no count yet.
  */
 export function normaliseDefects(list = []) {
   const out = [];
   const seen = new Set();
   for (const raw of list) {
-    const d = String(raw ?? '').trim();
+    const isLine = raw !== null && typeof raw === 'object';
+    const d = String((isLine ? raw.defect : raw) ?? '').trim();
     if (!d) continue;
     const key = d.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push(d);
+    const qty = isLine && !blank(raw.qty) ? Number(raw.qty) : null;
+    out.push({ defect: d, qty });
   }
   return out;
+}
+
+/** "Handle Size 3; Stain" - the defects and their counts as one cell. */
+export function defectsLabel(defects = []) {
+  return defects.map((d) => (d.qty == null ? d.defect : `${d.defect} ${d.qty}`)).join('; ');
 }
 
 /**
  * What is wrong with an entry, as a list of { field, message }. Empty when
  * it may be saved. The database holds the same rules as CHECK constraints.
+ *
+ * `uncounted` names the defects the entry already holds without a count
+ * (recorded before counts were taken): those may stay uncounted. Every other
+ * defect needs one.
  */
-export function entryProblems({ checkType, operation, sizeMeasurement, pcsChecked, pcsRejected, defects = [], informToUserId }) {
+export function entryProblems({ checkType, operation, sizeMeasurement, pcsChecked, pcsRejected, defects = [], informToUserId, uncounted = [] }) {
   const problems = [];
   const add = (field, message) => problems.push({ field, message });
 
@@ -83,6 +100,18 @@ export function entryProblems({ checkType, operation, sizeMeasurement, pcsChecke
   const found = normaliseDefects(defects);
   if (rejected.greaterThan(0) && found.length === 0) {
     add('defects', 'Choose the defect(s) the rejected pieces had');
+  }
+  const mayStayUncounted = new Set(uncounted.map((d) => d.toLowerCase()));
+  for (const { defect, qty } of found) {
+    if (qty == null) {
+      if (!mayStayUncounted.has(defect.toLowerCase())) add('defects', `Enter how many pieces had ${defect}`);
+    } else if (!Number.isInteger(qty) || qty < 1) {
+      add('defects', `${defect}: the count must be a whole number, at least 1`);
+    } else if (rejected.greaterThan(0) && D(qty).greaterThan(rejected)) {
+      add('defects', `${defect}: ${qty} pieces is more than the ${rejected} rejected`);
+    } else if (checked.greaterThan(0) && D(qty).greaterThan(checked)) {
+      add('defects', `${defect}: ${qty} pieces is more than the ${checked} checked`);
+    }
   }
   if (found.length > 0 && blank(informToUserId)) {
     add('informToUserId', 'Choose who to inform - the defects go to their Action needed list');
@@ -111,21 +140,26 @@ export function rejectionPct(pcsChecked, pcsRejected) {
 }
 
 /**
- * Which defect lines an edit adds, keeps and drops. Matched by name, without
- * regard to case, so "stain" and "Stain" are one defect and a kept line keeps
- * its status (a defect already resolved stays resolved).
+ * Which defect lines an edit adds, keeps, recounts and drops. Matched by
+ * name, without regard to case, so "stain" and "Stain" are one defect and a
+ * kept line keeps its status (a defect already resolved stays resolved) -
+ * only its count may change.
  *
- * @param existing [{ id, defect, status }]
- * @param wanted   defect names, as entered
+ * @param existing [{ id, defect, qty, status }]
+ * @param wanted   [{ defect, qty }], as entered
  */
 export function diffDefects(existing, wanted) {
   const want = normaliseDefects(wanted);
-  const wantKeys = new Set(want.map((d) => d.toLowerCase()));
+  const wantBy = new Map(want.map((d) => [d.defect.toLowerCase(), d]));
   const haveKeys = new Set(existing.map((e) => e.defect.toLowerCase()));
+  const keep = existing.filter((e) => wantBy.has(e.defect.toLowerCase()));
   return {
-    add: want.filter((d) => !haveKeys.has(d.toLowerCase())),
-    keep: existing.filter((e) => wantKeys.has(e.defect.toLowerCase())),
-    drop: existing.filter((e) => !wantKeys.has(e.defect.toLowerCase())),
+    add: want.filter((d) => !haveKeys.has(d.defect.toLowerCase())),
+    keep,
+    recount: keep
+      .map((e) => ({ line: e, qty: wantBy.get(e.defect.toLowerCase()).qty }))
+      .filter(({ line, qty }) => qty != null && qty !== line.qty),
+    drop: existing.filter((e) => !wantBy.has(e.defect.toLowerCase())),
   };
 }
 

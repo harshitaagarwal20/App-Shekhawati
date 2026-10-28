@@ -425,6 +425,9 @@ export const styleMaster = {
           type: 'number',
           step: '1',
         },
+        /* How the style is packed: one piece to a bag. Blank keeps 10 and 10. */
+        { name: 'bagsPerPacket', label: 'Bags / Packet', type: 'number', step: '1', placeholder: '10' },
+        { name: 'packetsPerCarton', label: 'Packets / Carton', type: 'number', step: '1', placeholder: '10' },
         /* Hourly Monitoring paints a tailor's slot red when it is under this. */
         {
           name: 'hourlyTarget',
@@ -445,6 +448,8 @@ export const styleMaster = {
     colorCode: opt(60),
     avgFabricUtilizationPerPc: zeroOrPositive('Average fabric utilisation'),
     qtyPerCarton: optCount('Qty / Ctn'),
+    bagsPerPacket: optCount('Bags / Packet'),
+    packetsPerCarton: optCount('Packets / Carton'),
     hourlyTarget: optCount('Hourly target'),
     status,
     remarks: opt(2000),

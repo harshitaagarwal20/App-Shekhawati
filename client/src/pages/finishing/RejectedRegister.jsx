@@ -2,19 +2,23 @@
  * The Rejected Register - pieces out of the order for good.
  *
  * Read-only. Every row was written by the stage that rejected the pieces -
- * today the Alteration Unit, for what it found not repairable - and keeps the
- * reason the piece first left the line (Defected, Spoiled, Ironing damage ...).
- * A wrong row is corrected on the alteration entry that made it.
+ * the Alteration Unit, for what it found not repairable, keeping the reason
+ * the piece first left the line (Defected, Spoiled, Ironing damage ...). A
+ * wrong row is corrected on the entry that made it.
+ *
+ * Packed is the order and style's packed qty, so each reject reads against
+ * what went into the boxes.
  */
 
 import { Link } from 'react-router-dom';
 import { useResourceList } from '../../hooks/useResourceList.js';
 import { rejectedRegister as api } from '../../services/erp.js';
-import { Alert, EmptyState, Field, PageHeader, Pagination, SortableTh, Spinner, TextInput, ViewTabs } from '../../components/ui.jsx';
+import { Alert, EmptyState, Field, PageHeader, Pagination, SortableTh, Spinner, TextInput, ViewTabs, ClearFilters } from '../../components/ui.jsx';
 import { fmtDate, fmtEnum, fmtNum } from '../../utils/format.js';
 import { ExportButton } from '../../components/dataTransfer.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
 import { QC_TABS } from './ExternalQcPages.jsx';
+import DateRangeFilter from '../../components/DateRangeFilter.jsx';
 
 const n0 = (v) => fmtNum(v, { decimals: 0 });
 const ORIGIN = { EXTERNAL_QC: 'External QC', IRONING: 'Ironing (internal)' };
@@ -23,7 +27,7 @@ export default function RejectedRegister() {
   const list = useResourceList((params) => api.list(params), {
     defaultSort: 'rejectDate',
     defaultDir: 'desc',
-    initialFilters: { origin: '', reason: '', dateFrom: '', dateTo: '' },
+    initialFilters: { stage: '', reason: '', dateFrom: '', dateTo: '' },
   });
   const totals = list.meta?.totals;
 
@@ -32,11 +36,10 @@ export default function RejectedRegister() {
       <PageHeader title="Rejected Register" actions={<ExportButton dataset="rejected-register" params={list.query} rowCount={list.meta.total} />} />
       <ViewTabs active="rejected" tabs={QC_TABS} />
       <div className="filter-row">
-        <Field label="Came from">
-          <select value={list.filters.origin} onChange={(e) => list.setFilter('origin', e.target.value)}>
-            <option value="">Everywhere</option>
-            <option value="EXTERNAL_QC">External QC</option>
-            <option value="IRONING">Ironing (internal)</option>
+        <Field label="Stage">
+          <select value={list.filters.stage} onChange={(e) => list.setFilter('stage', e.target.value)}>
+            <option value="">Every stage</option>
+            <option value="ALTERATION_UNIT">Alteration Unit</option>
           </select>
         </Field>
         <Field label="Reason">
@@ -45,17 +48,13 @@ export default function RejectedRegister() {
             {['Alter', 'Defected', 'Spoiled', 'Other', 'Ironing damage'].map((r) => <option key={r} value={r}>{r}</option>)}
           </select>
         </Field>
-        <Field label="From">
-          <TextInput type="date" value={list.filters.dateFrom} onChange={(e) => list.setFilter('dateFrom', e.target.value)} />
-        </Field>
-        <Field label="To">
-          <TextInput type="date" value={list.filters.dateTo} onChange={(e) => list.setFilter('dateTo', e.target.value)} />
-        </Field>
+        <DateRangeFilter filters={list.filters} setFilter={list.setFilter} fromLabel="From" toLabel="To" />
         <div className="grow">
           <Field label="Search">
             <TextInput value={list.search} onChange={(e) => list.setSearch(e.target.value)} placeholder="Order, style, reason, unit" />
           </Field>
         </div>
+        <ClearFilters list={list} />
       </div>
 
       {list.error && <Alert kind="error">{list.error.message ?? String(list.error)}</Alert>}
@@ -77,12 +76,16 @@ export default function RejectedRegister() {
                 <th>Came from</th>
                 <th>Why not repairable</th>
                 <th>Staff</th>
+                <th className="num" title="Packed pcs of this order and style">Packed</th>
               </tr>
             </thead>
             <tbody>
               {list.rows.map((r) => (
                 <tr key={r.id}>
-                  <td className="nowrap">{r.alterationEntry ? <Link to={`/alteration/entries/${r.alterationEntry.id}`}>{fmtDate(r.rejectDate)}</Link> : fmtDate(r.rejectDate)}</td>
+                  <td className="nowrap">
+                    {r.alterationEntry ? <Link to={`/alteration/entries/${r.alterationEntry.id}`}>{fmtDate(r.rejectDate)}</Link>
+                      : fmtDate(r.rejectDate)}
+                  </td>
                   <td>{fmtEnum(r.stage)}</td>
                   <td>{r.order?.orderNo}</td>
                   <td className="code">{r.style?.styleNo}</td>
@@ -95,6 +98,7 @@ export default function RejectedRegister() {
                   </td>
                   <td>{r.notRepairableReason}</td>
                   <td>{r.alterationEntry?.staff?.empName}</td>
+                  <td className="num">{n0(r.orderStylePacked)}</td>
                 </tr>
               ))}
             </tbody>
@@ -104,6 +108,7 @@ export default function RejectedRegister() {
                   <td colSpan={4}><strong>All matching rejects</strong></td>
                   <td className="num"><strong>{n0(totals.qty)}</strong></td>
                   <td colSpan={4} />
+                  <td className="num">{totals.packed != null && <strong>{n0(totals.packed)}</strong>}</td>
                 </tr>
               </tfoot>
             )}

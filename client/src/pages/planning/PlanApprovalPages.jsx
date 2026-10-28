@@ -42,6 +42,7 @@ import {
   Spinner,
   TextArea,
   TextInput,
+  ClearFilters,
 } from '../../components/ui.jsx';
 import {
   FieldGroup,
@@ -58,10 +59,11 @@ import {
   WorkflowTrail,
 } from '../../components/workflow.jsx';
 import { Detail, DetailGrid } from '../shared/Detail.jsx';
-import { fmtDate, fmtDateTime, fmtNum, todayInput, fmtOrder } from '../../utils/format.js';
+import { fmtDate, fmtDateTime, fmtNum, fmtOrder, fmtOrderStyle, todayInput } from '../../utils/format.js';
 import { loadFailed } from '../../services/loadFailures.js';
 import { ExportButton } from '../../components/dataTransfer.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
+import DateRangeFilter from '../../components/DateRangeFilter.jsx';
 
 const STATUS_OPTIONS = [
   { value: 'PENDING', label: 'Awaiting decision' },
@@ -83,7 +85,8 @@ export function PlanApprovalList() {
     initialFilters: {
       approvalStatus: '',
       orderId: '',
-      awaitingRectification: '',
+      dateFrom: '',
+      dateTo: '',
     },
   });
 
@@ -157,16 +160,8 @@ export function PlanApprovalList() {
             />
           </Field>
 
-          <div className="field">
-            <label htmlFor="pa-f-rect">Needing action</label>
-            <EnumSelect
-              id="pa-f-rect"
-              options={[{ value: 'true', label: 'Rejected, not yet rectified' }]}
-              placeholder="All"
-              value={list.filters.awaitingRectification ?? ''}
-              onChange={(e) => list.setFilter('awaitingRectification', e.target.value)}
-            />
-          </div>
+          <DateRangeFilter filters={list.filters} setFilter={list.setFilter} />
+          <ClearFilters list={list} />
         </div>
 
         <TableWrap>
@@ -262,7 +257,7 @@ export function PlanApprovalList() {
 const schema = z.object({
   submittedDate: z.string().min(1, 'Date is required'),
   orderId: z.string().uuid('Choose an order'),
-  containerNo: z.string().optional(),
+  containerNo: z.string().trim().min(1, 'Container No is required').max(40),
   preparedBy: z.string().trim().min(1, 'Who prepared the plan?').max(120),
   submittedTo: z.string().trim().min(1, 'Who is it going to?').max(120),
   planningId: z.string().optional(),
@@ -317,7 +312,7 @@ export function PlanApprovalForm({ rectifying, onSaved, onCancel }) {
     (values) => {
       const payload = {
         submittedDate: values.submittedDate,
-        containerNo: values.containerNo || null,
+        containerNo: values.containerNo,
         preparedBy: values.preparedBy,
         submittedTo: values.submittedTo,
         planningId: values.planningId || null,
@@ -371,13 +366,13 @@ export function PlanApprovalForm({ rectifying, onSaved, onCancel }) {
             label="Order"
             required
             options={orders}
-            getLabel={(o) => `${o.orderNo} — ${o.style?.styleNo ?? ''}`}
+            getLabel={fmtOrderStyle}
             placeholder="Choose the order..."
             hint={isRectification ? 'Carried over from the rejected version.' : undefined}
           />
           {/* Carried from the plan being submitted. Typed rather than chosen -
               see planning.service.js. */}
-          <RHFInput form={form} name="containerNo" label="Container No" />
+          <RHFInput form={form} name="containerNo" label="Container No" required maxLength={40} />
           <RHFRecordSelect
             form={form}
             name="planningId"

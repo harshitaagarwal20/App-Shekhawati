@@ -44,6 +44,7 @@ import {
   StatusBadge,
   TextArea,
   TextInput,
+  ClearFilters,
 } from '../../components/ui.jsx';
 import {
   FieldGroup,
@@ -208,6 +209,7 @@ function RulesTab({ can }) {
               </button>
             </div>
           )}
+          <ClearFilters list={list} />
         </div>
 
         <TableWrap>
@@ -565,6 +567,7 @@ function ApprovalsTab({ can }) {
             <label>&nbsp;</label>
             <ExportButton dataset="excess-approvals" params={list.query} rowCount={list.meta.total} />
           </div>
+          <ClearFilters list={list} />
         </div>
 
         <TableWrap>

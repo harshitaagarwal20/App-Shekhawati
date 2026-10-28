@@ -8,19 +8,25 @@
  * ---------------------------------------------------------------------------
  *  THE GROUPS FOLLOW THE PIPELINE, AND SAY SO
  *
- *  The seven middle groups ARE the process, in the order the work happens:
+ *  The seven middle groups ARE the process, in the order the work happens.
+ *  Departments that hand straight to each other share a group, so the sidebar
+ *  is seven steps rather than eleven:
  *
  *      Dashboard                 Dashboard, Reports, Approvals (queue + plans)
  *    1 Masters                   Dropdown Lists, Buyers, Vendors, Employees,
  *                                Styles, Excess Rules
- *    2 Orders                    Buyer Orders, Cost Sheets, Planning (production +
+ *    2 Orders & Planning         Buyer Orders, Cost Sheets, Planning (production +
  *                                procurement)
- *    3 Procurement               Vendor Quotations, Purchase Orders
- *    4 Stores                    Gate Pass, Goods Received, Inventory (stock +
- *                                movement + rolls), Fabric Issue
- *    5 Job Work                   Job Work (dyeing / printing), Fabric Scrutiny
- *    6 Cutting                   Cutting Challan, Cut Pieces Receipt,
- *                                Cutting Issue
+ *    3 Purchase & Stores         Vendor Quotations, Purchase Orders, Gate Pass,
+ *                                Goods Received, Inventory, Fabric Issue
+ *    4 Fabric & Cutting          Job Work (dyeing / printing), Fabric Scrutiny,
+ *                                Cut Pieces Receipt, Cutting Issue
+ *    5 Stitching                 Stitching Record, Hourly Monitoring, Inline QC,
+ *                                Internal Quality Check
+ *    6 Finishing & Quality       Ironing, External QC, Alteration Unit,
+ *                                External Report, Spot Rectification & Scrap
+ *    7 Packing & Dispatch        Needle Checking, Packing, Dispatch,
+ *                                Reconciliation Report
  *      Administration            Roles, Users, Audit
  *
  *  which is the pipeline the README states and the dashboard's own STAGES list
@@ -30,10 +36,9 @@
  *              -> GATE PASS -> GRN -> INVENTORY -> FABRIC ISSUE -> DYEING
  *              -> PRINTING -> FABRIC SCRUTINY -> PLAN APPROVAL -> CUTTING ISSUE
  *
- *  The `stage` number is carried as DATA rather than written into the label,
- *  so the sidebar can show the sequence without the number becoming part of the
- *  group's name - which is what every other screen, the breadcrumb and the
- *  navigation contract test all match on.
+ *  The `stage` number is carried as DATA rather than written into the label.
+ *  The sidebar no longer prints it - the order of the groups already says it -
+ *  but it is what the navigation contract test checks the order against.
  *
  *  Dashboard and Administration carry no stage. Neither is a step in the work:
  *  one is where you start and the other is how the system is configured, and
@@ -73,11 +78,10 @@
  *  link to a catalogue the server has already filtered by permission, so a user
  *  sees only the reports they may actually run.
  *
- *  Production Phase 2 adds Stitching as stage 7, after Cutting, and Phase 3's
- *  Inline QC sits inside it - the checks are taken on the line while the
- *  tailors stitch. Beyond Finishing there is deliberately no entry - and no
- *  "coming soon" placeholder - for final QC, packing, needle checking,
- *  dispatch or reconciliation.
+ *  Inline QC sits inside Stitching (5) - the checks are taken on the line while
+ *  the tailors stitch. Packing & Dispatch (7) takes External QC's approved
+ *  pieces through Needle Checking into the boxes and out to the buyer, and ends
+ *  on the Reconciliation Report, because the order closes there.
  * ---------------------------------------------------------------------------
  */
 
@@ -168,6 +172,14 @@ export const NAV_GROUPS = [
         permission: ['APPROVAL_QUEUE.VIEW', 'PLAN_APPROVAL.VIEW'],
         covers: ['/plan-approvals'],
       },
+      /*
+       * Ask (the assistant) is held out of the sidebar for now. Its screen is
+       * still at /assistant, guarded by ASSISTANT.VIEW. To show it, add back
+       *   { to: '/assistant', label: 'Ask', permission: 'ASSISTANT.VIEW',
+       *     hint: 'Questions answered from reports and documents' },
+       * and '/assistant' after '/approvals' for DIRECTOR in
+       * server/test/screensByRole.rules.test.js.
+       */
     ],
   },
   {
@@ -217,7 +229,7 @@ export const NAV_GROUPS = [
     ],
   },
   {
-    label: 'Orders',
+    label: 'Orders & Planning',
     stage: 2,
     items: [
       { to: '/orders', label: 'Buyer Orders', permission: 'BUYER_ORDER.VIEW', hint: "Enter the buyer's order" },
@@ -240,17 +252,12 @@ export const NAV_GROUPS = [
     ],
   },
   {
-    label: 'Procurement',
+    /* Buying and the store, one section: the PO, the goods at the gate, the receipt, the stock. */
+    label: 'Purchase & Stores',
     stage: 3,
     items: [
       { to: '/quotations', label: 'Vendor Quotations', permission: 'VENDOR_QUOTATION.VIEW', hint: 'Rates quoted by vendors' },
       { to: '/purchase-orders', label: 'Purchase Orders', permission: 'PURCHASE_ORDER.VIEW', hint: 'Order material from vendors' },
-    ],
-  },
-  {
-    label: 'Stores',
-    stage: 4,
-    items: [
       { to: '/gate-passes', label: 'Gate Pass', permission: 'GATE_PASS.VIEW', hint: 'Goods coming in or going out' },
       { to: '/grns', label: 'Goods Received', permission: 'GRN.VIEW', hint: 'Record material that arrived' },
       /*
@@ -293,8 +300,9 @@ export const NAV_GROUPS = [
     ],
   },
   {
-    label: 'Job Work',
-    stage: 5,
+    /* The fabric's road to the cutting table: out to the dyer or printer, checked, then cut. */
+    label: 'Fabric & Cutting',
+    stage: 4,
     items: [
       /**
        * One register, two doors. See the note at the top of this file and the
@@ -318,18 +326,10 @@ export const NAV_GROUPS = [
        */
       { to: '/job-works', label: 'Job Work', permission: 'DYE_ISSUE.VIEW', hint: 'Dyeing and printing by vendors' },
       { to: '/scrutinies', label: 'Fabric Scrutiny', permission: 'FABRIC_SCRUTINY.VIEW', hint: 'Quality check after job work' },
-    ],
-  },
-  {
-    label: 'Cutting',
-    stage: 6,
-    items: [
       /*
        * Plan Approval - step 13, straight before the challan - is reached from
        * Dashboard > Approvals only. See the note on that entry.
        */
-      /** C5 - the requirement comes first; the issue fulfils it. */
-      { to: '/cutting-challans', label: 'Cutting Challan', permission: 'CUTTING_CHALLAN.VIEW', hint: 'What has to be cut' },
       /** Cut pieces counted in from the cutting floor, before they are issued. */
       { to: '/cut-pieces-receipts', label: 'Cut Pieces Receipt', permission: 'CUT_PIECES_RECEIPT.VIEW', hint: 'Count pieces from cutting' },
       /** Cut pieces out to a stitching unit. Stitching draws on these. */
@@ -342,7 +342,7 @@ export const NAV_GROUPS = [
      * written for the floor: each says what it records, not what it is.
      */
     label: 'Stitching',
-    stage: 7,
+    stage: 5,
     items: [
       /*
        * Printing after stitching is a tab on this screen, not a link of its
@@ -358,15 +358,18 @@ export const NAV_GROUPS = [
        * second tab, so it has no link of its own.
        */
       { to: '/inline-qc', label: 'Inline QC', permission: 'INLINE_QC.VIEW', hint: 'Size and workmanship checks, defects to resolve' },
+      // The unit's own check of what it finished and trimmed, after Inline QC.
+      { to: '/internal-quality-checks', label: 'Internal Quality Check', permission: 'INTERNAL_QUALITY_CHECK.VIEW', hint: 'Finishing and trimming, hour by hour' },
     ],
   },
   {
     /*
      * After stitching. Ironing, then the external agency's check; faulty
-     * pieces go to the Alteration Unit and come back through ironing.
+     * pieces go to the Alteration Unit and come back through ironing. The QC
+     * desk's own sheets follow.
      */
-    label: 'Finishing',
-    stage: 8,
+    label: 'Finishing & Quality',
+    stage: 6,
     items: [
       { to: '/ironing', label: 'Ironing', permission: 'IRONING.VIEW', hint: 'Pieces ironed, damaged, waiting' },
       /*
@@ -382,28 +385,28 @@ export const NAV_GROUPS = [
         covers: ['/rejected-register'],
       },
       { to: '/alteration', label: 'Alteration Unit', permission: 'ALTERATION.VIEW', hint: 'Bags to repair or clean' },
-    ],
-  },
-  {
-    /*
-     * Phase 5. The QC desk's own sheets after the agency's check, and what was
-     * rectified, sold online or scrapped. External Secondary Checking's 26-line
-     * inspection report is on the External QC entry, not a link here.
-     */
-    label: 'Quality',
-    stage: 9,
-    items: [
-      { to: '/internal-quality-checks', label: 'Internal Quality Check', permission: 'INTERNAL_QUALITY_CHECK.VIEW', hint: 'Finishing and trimming, hour by hour' },
-      { to: '/final-checker-reports', label: 'Final Checker Report', permission: 'FINAL_CHECKER_REPORT.VIEW', hint: "Each checker's day" },
-      { to: '/finished-checker-records', label: 'Finished Checker', permission: 'FINISHED_CHECKER.VIEW', hint: 'Defects by type, 17 columns' },
+      /*
+       * Phase 5. The QC desk's own sheets after the agency's check, and what was
+       * rectified, sold online or scrapped. External Secondary Checking's 26-line
+       * inspection report is on the External QC entry, not a link here.
+       */
+      { to: '/finished-checker-records', label: 'External Report', permission: 'FINISHED_CHECKER.VIEW', hint: 'Defects by type, 17 columns' },
       { to: '/spot-rectifications', label: 'Spot Rectification & Scrap', permission: 'SPOT_RECTIFICATION.VIEW', hint: 'Fixed, sold online or scrapped' },
     ],
   },
   {
-    /* Phase 5. The order closes here: cutting read against everything after it. */
-    label: 'Reconciliation',
-    stage: 10,
+    /*
+     * Phase 6. External QC's approved pieces to the buyer, in the order the
+     * floor works them. Each draws on the one before: Packing packs only what
+     * Needle Checking passed, Dispatch takes only what is packed.
+     */
+    label: 'Packing & Dispatch',
+    stage: 7,
     items: [
+      { to: '/needle-checking', label: 'Needle Checking', permission: 'NEEDLE_DETECTION.VIEW', hint: 'Size allotment sheet' },
+      { to: '/packing', label: 'Packing', permission: 'PACKING.VIEW', hint: 'Packing details, box by box' },
+      { to: '/dispatches', label: 'Dispatch', permission: 'DISPATCH.VIEW', hint: "Order-wise, with the buyer's shipment details" },
+      /* Phase 5. The order closes here: cutting read against everything after it. */
       { to: '/reconciliation-reports', label: 'Reconciliation Report', permission: 'RECONCILIATION_REPORT.VIEW', hint: 'Cutting against stitching, scrap and rejects' },
     ],
   },

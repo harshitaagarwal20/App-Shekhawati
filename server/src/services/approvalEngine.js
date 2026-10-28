@@ -378,6 +378,8 @@ export const REGISTRY = {
    * Issue that fulfils the line.
    */
   CUTTING_CHALLAN: {
+    /** No longer used: fabric goes to cutting on a Fabric Issue alone. */
+    retired: true,
     model: 'cuttingChallan',
     lifecycle: [...APPROVAL_LIFECYCLE, 'COMPLETED'],
     numberField: 'challanNo',
@@ -459,6 +461,13 @@ export const REGISTRY = {
     },
   },
 };
+
+/**
+ * The types the approval queue and the dashboard list. A RETIRED type stays in
+ * REGISTRY so its old records still resolve, but nothing new is raised on it and
+ * it has no screen to open, so it is not offered as waiting.
+ */
+export const QUEUED_TYPES = Object.keys(REGISTRY).filter((type) => !REGISTRY[type].retired);
 
 // ===========================================================================
 //  THE RULES
@@ -833,6 +842,10 @@ export const FULFILMENT_TRANSITIONS = {
   PENDING: ['IN_PROGRESS', 'ON_HOLD', 'COMPLETED', 'CANCELLED'],
   IN_PROGRESS: ['COMPLETED', 'ON_HOLD', 'CANCELLED'],
   ON_HOLD: ['IN_PROGRESS', 'PENDING', 'CANCELLED'],
+  // A buyer order only, and only Dispatch moves an order INTO these two
+  // (dispatch.service.js). From there it can be closed or held by hand.
+  PARTIALLY_SHIPPED: ['COMPLETED', 'ON_HOLD'],
+  SHIPPED: ['COMPLETED'],
   // Both terminal. Something delivered is not un-delivered, and something
   // cancelled is re-raised as a new document rather than revived.
   COMPLETED: [],
@@ -1061,7 +1074,7 @@ const PENDING_STATES = ['SUBMITTED', 'PENDING_APPROVAL', 'RESUBMITTED'];
  * ---------------------------------------------------------------------------
  */
 export async function pendingSummary({ documentTypes } = {}) {
-  const wanted = documentTypes?.length ? documentTypes : Object.keys(REGISTRY);
+  const wanted = documentTypes?.length ? documentTypes : QUEUED_TYPES;
 
   const groups = await Promise.all(
     wanted.map(async (documentType) => {
@@ -1123,7 +1136,7 @@ export async function pendingSummary({ documentTypes } = {}) {
 }
 
 export async function pendingQueue({ documentTypes, limit = 100 } = {}) {
-  const wanted = documentTypes?.length ? documentTypes : Object.keys(REGISTRY);
+  const wanted = documentTypes?.length ? documentTypes : QUEUED_TYPES;
 
   const groups = await Promise.all(
     wanted.map(async (documentType) => {

@@ -83,6 +83,9 @@ import * as externalQcService from './externalQc.service.js';
 import * as alterationService from './alteration.service.js';
 import * as rejectedRegisterService from './rejectedRegister.service.js';
 import * as productionRegisterService from './productionRegister.service.js';
+import * as needleService from './needle.service.js';
+import * as packingService from './packing.service.js';
+import * as dispatchService from './dispatch.service.js';
 import * as excessService from './excess.service.js';
 import * as auditService from './audit.service.js';
 import { importColumns } from './import.service.js';
@@ -630,6 +633,44 @@ const DATASETS = [
     defaultDir: 'desc',
     fetch: (q) => productionRegisterService.list(key, q),
   })),
+
+  // =========================================================================
+  //  PHASE 6 - External QC's Approved to the buyer
+  // =========================================================================
+  {
+    key: 'needle-checking',
+    title: 'Needle Checking - size assortment cartons',
+    group: 'Packing & Dispatch',
+    module: 'NEEDLE_DETECTION',
+    filters: ['orderId', 'styleId', 'dateFrom', 'dateTo'],
+    sortable: needleService.SORTABLE,
+    defaultSort: 'checkDate',
+    defaultDir: 'desc',
+    fetch: (q) => needleService.list(q),
+  },
+  {
+    key: 'packing',
+    title: 'Packing',
+    group: 'Packing & Dispatch',
+    module: 'PACKING',
+    filters: ['orderId', 'styleId', 'dateFrom', 'dateTo'],
+    sortable: packingService.SORTABLE,
+    defaultSort: 'packDate',
+    defaultDir: 'desc',
+    fetch: (q) => packingService.list(q),
+  },
+  {
+    key: 'dispatches',
+    title: 'Dispatch',
+    group: 'Packing & Dispatch',
+    module: 'DISPATCH',
+    filters: ['orderId', 'status', 'dateFrom', 'dateTo'],
+    sortable: dispatchService.SORTABLE,
+    defaultSort: 'dispatchDate',
+    defaultDir: 'desc',
+    fetch: (q) => dispatchService.list(q),
+    hide: ['lines'],
+  },
 
   // =========================================================================
   //  THE EXCESS ENGINE

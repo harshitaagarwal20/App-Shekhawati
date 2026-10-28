@@ -32,6 +32,7 @@ import bcrypt from 'bcryptjs';
 import { createApp } from '../src/app.js';
 import prisma from '../src/config/prisma.js';
 import { istIsoDate } from '../src/utils/dates.js';
+import { finishingPipeline } from '../src/services/reports.finishing.js';
 
 const USER_PASSWORD = process.env.SEED_DEFAULT_USER_PASSWORD || 'Shekhawati@123';
 
@@ -94,7 +95,8 @@ let ironingRejectEntry;
 
 const OS = () => ({ orderId: opt.orderId, styleId: opt.styleId });
 const flowNow = async () => (await call('GET', `/api/external-qc/position?orderId=${opt.orderId}&styleId=${opt.styleId}`, { as: 'extqc' })).body.data.flow;
-const pipelineRow = async () => (await call('GET', `/api/reports/finishing-pipeline?orderId=${opt.orderId}`, { as: 'admin' })).body.data.rows.find((r) => r.styleNo === opt.styleNo);
+// The finishing pipeline is no longer a report, but it is still the check that every piece is somewhere.
+const pipelineRow = async () => (await finishingPipeline({ orderId: opt.orderId })).rows.find((r) => r.styleNo === opt.styleNo);
 const ironingPost = async (body) => {
   const res = await call('POST', '/api/ironing', { as: 'finishing', body: { ...OS(), ...body } });
   if (res.status === 201) ironingIds.push(res.body.data.id);
@@ -452,20 +454,6 @@ describe('External QC and the Alteration Unit', { skip }, () => {
     assert.equal(Number(mine.pcsExternalFaulty), 25);
     assert.equal(mine.checkerName, checker.empName);
     assert.equal(Number(res.body.data.rows.find((r) => r.checkerCode === 'X-9').pcsExternalFaulty), 10);
-  });
-
-  test('Alteration reports: pending with aging, and the summary', async () => {
-    const pending = await call('GET', `/api/reports/alteration-pending?orderId=${opt.orderId}`, { as: 'alteration' });
-    assert.equal(pending.status, 200);
-    assert.equal(pending.body.data.rows.reduce((a, r) => a + Number(r.balance), 0), 40);
-    assert.ok(pending.body.data.rows.every((r) => r.aging === '0-2 days'));
-
-    const summary = await call('GET', `/api/reports/alteration-summary?orderId=${opt.orderId}`, { as: 'alteration' });
-    const s = summary.body.data.rows.find((r) => r.styleNo === opt.styleNo);
-    assert.equal(Number(s.pcsReceived), 97);
-    assert.equal(Number(s.pcsAltered), 45);
-    assert.equal(Number(s.pcsNotRepairable), 12);
-    assert.equal(Number(s.pcsPending), 40);
   });
 
   test('the inspection report: a PDF or a photo, nothing else', async () => {

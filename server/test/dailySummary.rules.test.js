@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 
 import { D } from '../src/utils/figures.js';
 import { composeSummary, isDue, istClock, SUMMARY_PERMISSION } from '../src/services/dailySummary.service.js';
+import { briefingFacts, withBriefing, writeBriefing, HEADING, NOTHING } from '../src/services/summaryBriefing.service.js';
 import { buildPermissions } from '../prisma/seed/data/rbac.js';
 
 const FIGURES = {
@@ -91,5 +92,100 @@ describe('Daily summary - when it goes', () => {
     // A permission the code checks but the seeder never creates is a lockout:
     // no role could ever be granted it.
     assert.ok(buildPermissions().some((p) => p.code === SUMMARY_PERMISSION));
+  });
+});
+
+// The week before 2026-10-21, as buildTrend() returns it.
+const TREND = {
+  day: '2026-10-21',
+  stitching: [
+    { key: 'Unit 1', date: '2026-10-19', pcs: 600 },
+    { key: 'Unit 1', date: '2026-10-20', pcs: 700 },
+    { key: 'Unit 1', date: '2026-10-21', pcs: 390 },
+    { key: 'Unit 2', date: '2026-10-20', pcs: 500 },
+  ],
+  externalQc: [
+    { key: 'ST-101', date: '2026-10-20', offered: 400, alteration: 8, rejected: 4 },
+    { key: 'ST-101', date: '2026-10-21', offered: 500, alteration: 10, rejected: 25 },
+    { key: 'ST-102', date: '2026-10-20', offered: 300, alteration: 3, rejected: 3 },
+  ],
+  inlineQc: [{ key: 'Unit 1', date: '2026-10-21', checked: 300, rejected: 6 }],
+  cut: [
+    { date: '2026-10-20', pcs: 1000 },
+    { date: '2026-10-21', pcs: 1200 },
+  ],
+};
+
+describe('Daily summary - the AI briefing is shown only what the reader may see', () => {
+  test("a stitching supervisor's briefing is written from stitching alone", () => {
+    const facts = briefingFacts(FIGURES, TREND, holder('STITCHING_RECORD.VIEW'));
+    assert.deepEqual(Object.keys(facts), ['day', 'stitching']);
+  });
+
+  test('somebody who may see none of it costs no call', () => {
+    assert.equal(briefingFacts(FIGURES, TREND, () => false), null);
+  });
+
+  test('approvals: only the types the reader may view, and whether each is theirs to decide', () => {
+    const facts = briefingFacts(FIGURES, TREND, holder('FABRIC_SCRUTINY.VIEW', 'FABRIC_SCRUTINY.APPROVE'));
+    assert.deepEqual(facts.approvalsWaiting, [
+      { document: 'Fabric Scrutiny', waiting: 2, readerMayApprove: true, oldest: { documentNo: 'FS-0003', daysWaiting: 1 } },
+    ]);
+  });
+
+  test('usual output is averaged over the days a unit worked; a unit idle today shows as -100%', () => {
+    const { byUnit } = briefingFacts(FIGURES, TREND, holder('STITCHING_RECORD.VIEW')).stitching;
+    assert.deepEqual(byUnit, [
+      { unit: 'Unit 1', todayPcs: 390, usualPcsPerWorkingDay: 650, changePct: -40 },
+      { unit: 'Unit 2', todayPcs: 0, usualPcsPerWorkingDay: 500, changePct: -100 },
+    ]);
+  });
+
+  test('External QC rates by style are worked out here, not left to the model', () => {
+    const { byStyle } = briefingFacts(FIGURES, TREND, holder('EXTERNAL_QC.VIEW')).externalQc;
+    assert.deepEqual(byStyle, [
+      {
+        style: 'ST-101',
+        todayOffered: 500,
+        todayRejectedPct: 5,
+        todayAlterationPct: 2,
+        last7DaysRejectedPct: 1,
+        last7DaysAlterationPct: 2,
+      },
+    ], 'ST-102 was not offered today, so it has nothing new to say');
+  });
+
+  test('cutting compared with its usual day', () => {
+    const { cut } = briefingFacts(FIGURES, TREND, holder('CUT_PIECES_RECEIPT.VIEW'));
+    assert.deepEqual(cut, { todayPcs: 1200, usualPcsPerWorkingDay: 1000, changePct: 20 });
+  });
+});
+
+describe('Daily summary - the AI briefing on top of the message', () => {
+  const message = composeSummary(FIGURES, holder('STITCHING_RECORD.VIEW'));
+
+  test('the points go above the figures, which stay as they were', () => {
+    const m = withBriefing(message, ['Unit 1 stitched 390 pcs, 40% below its usual 650.']);
+    assert.equal(m.body, `${HEADING}
+• Unit 1 stitched 390 pcs, 40% below its usual 650.
+
+Stitched: 950 pcs`);
+    assert.deepEqual(m.lines, message.lines);
+  });
+
+  test('nothing standing out is said, not skipped', () => {
+    assert.equal(withBriefing(message, []).body, `${HEADING}
+${NOTHING}
+
+Stitched: 950 pcs`);
+  });
+
+  test('no briefing leaves the summary exactly as before', () => {
+    assert.equal(withBriefing(message, null), message);
+    assert.equal(withBriefing(null, ['x']), null);
+  });
+
+  test('without an API key nothing is called', async () => {
+    assert.equal(await writeBriefing({ day: '2026-10-21' }), null);
   });
 });

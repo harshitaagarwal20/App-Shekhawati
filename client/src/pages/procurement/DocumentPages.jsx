@@ -46,7 +46,7 @@ import {
   VarietySelect,
 } from '../../components/ui.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
-import { fmtDate, fmtDateTime, todayInput, fmtOrder } from '../../utils/format.js';
+import { fmtDate, fmtDateTime, fmtOrder, fmtOrderStyle, fmtVendor, todayInput } from '../../utils/format.js';
 import { loadFailed } from '../../services/loadFailures.js';
 
 // Kolkata's calendar date, not UTC's - before 05:30 IST those differ by a day.
@@ -251,13 +251,13 @@ export function PoDocumentForm() {
           <div className="form-grid">
             <Field label="Vendor" required>
               <RecordSelect options={vendors ?? []} loading={vendors === null} getValue={(v) => v.id}
-                getLabel={(v) => `${v.vendorName}${v.vendorCode ? ` (${v.vendorCode})` : ''}`}
+                getLabel={fmtVendor}
                 placeholder="Select vendor..." value={head.vendorId} onChange={setH('vendorId')} />
             </Field>
             <Field label="PO date"><TextInput type="date" value={head.poDate} onChange={setH('poDate')} /></Field>
             <Field label="For buyer order" hint="Default for every line; a line may name another.">
               <RecordSelect options={orders} getValue={(o) => o.id}
-                getLabel={(o) => (o.style?.styleNo ? `${o.orderNo} — ${o.style.styleNo}` : o.orderNo)}
+                getLabel={fmtOrderStyle}
                 placeholder="None (bulk)" value={head.orderId} onChange={setH('orderId')} />
             </Field>
             <Field label="Container No" hint="Default for every line; a line may name another.">
@@ -309,7 +309,7 @@ export function PoDocumentForm() {
                         question being answered here and an order number on its
                         own does not answer it. */}
                     <RecordSelect options={orders} getValue={(o) => o.id} aria-label="Order"
-                      getLabel={(o) => (o.style?.styleNo ? `${o.orderNo} — ${o.style.styleNo}` : o.orderNo)}
+                      getLabel={fmtOrderStyle}
                       placeholder={head.orderId ? 'as document' : 'none'} value={l.orderId}
                       onChange={(e) => setLine(l.key, { orderId: e.target.value })} />
                   </td>
@@ -469,7 +469,7 @@ export function PoDocumentDetail() {
           <span className="faint" style={{ fontWeight: 400, fontSize: 12 }}>{doc.lineCount} line(s) · total ₹ {money(doc.totalAmount)}</span>
         </div>
         <div className="card-body">
-          <div className="form-grid">
+          <div className="form-grid detail-grid">
             <Info label="PO date" value={fmtDate(doc.poDate)} />
             <Info label="Deliver by" value={fmtDate(doc.deliveryDate)} />
             <Info label="Payment terms" value={doc.paymentTerms} />
@@ -591,7 +591,7 @@ function Info({ label, value, className = '' }) {
   return (
     <div className={`field ${className}`}>
       <label>{label}</label>
-      <div style={{ paddingTop: 2 }}>{value || <span className="faint">-</span>}</div>
+      <div className="detail-value">{value || <span className="faint">-</span>}</div>
     </div>
   );
 }
@@ -693,7 +693,7 @@ export function QuotationDocumentForm() {
         <div className="card-body">
           <div className="form-grid">
             <Field label="Vendor" required>
-              <RecordSelect options={vendors ?? []} loading={vendors === null} getValue={(v) => v.id} getLabel={(v) => v.vendorName}
+              <RecordSelect options={vendors ?? []} loading={vendors === null} getValue={(v) => v.id} getLabel={fmtVendor}
                 placeholder="Select vendor..." value={head.vendorId} onChange={setH('vendorId')} />
             </Field>
             <Field label="Date"><TextInput type="date" value={head.quotationDate} onChange={setH('quotationDate')} /></Field>
@@ -798,7 +798,7 @@ export function QuotationDocumentDetail() {
           <span className="faint" style={{ fontWeight: 400, fontSize: 12 }}>{doc.lineCount} item(s) · ₹ {money(doc.totalAmount)}</span>
         </div>
         <div className="card-body">
-          <div className="form-grid">
+          <div className="form-grid detail-grid">
             <Info label="Date" value={fmtDate(doc.quotationDate)} />
             <Info label="Vendor's ref" value={doc.vendorRefNo} />
             <Info label="Valid until" value={fmtDate(doc.validUntil)} />
@@ -845,14 +845,6 @@ export function QuotationDocumentDetail() {
 //  GRN - one delivery, one bill, several PO lines
 // ===========================================================================
 
-const GRN_PURPOSES = [
-  { value: 'RAW_MATERIAL', label: 'Raw material' },
-  { value: 'ACCESSORIES', label: 'Accessories' },
-  { value: 'DYEING', label: 'Dyeing' },
-  { value: 'PRINTING', label: 'Printing' },
-  { value: 'JOB_WORK_RETURN', label: 'Job work return' },
-];
-
 const blankGrnLine = () => ({ key: key(), purchaseOrderId: '', receivingQty: '', inventoryRate: '', rolls: [] });
 const blankRoll = () => ({ key: key(), rollNo: '', qty: '', shade: '', dyeLot: '' });
 
@@ -863,7 +855,7 @@ export function GrnDocumentForm() {
   const [pos, setPos] = useState([]);
   // GRN date starts blank: the store keys the day the goods actually came in,
   // which is often not the day the receipt is entered.
-  const [head, setHead] = useState({ vendorId: '', billNo: '', billDate: '', grnDate: '', purpose: 'RAW_MATERIAL', gstRatePct: '', location: '', headerRemarks: '' });
+  const [head, setHead] = useState({ vendorId: '', billNo: '', billDate: '', grnDate: '', gstRatePct: '', location: '', headerRemarks: '' });
   const [lines, setLines] = useState([blankGrnLine()]);
   const [acknowledge, setAcknowledge] = useState(false);
   const [needsAck, setNeedsAck] = useState(false);
@@ -900,7 +892,6 @@ export function GrnDocumentForm() {
         billNo: head.billNo,
         billDate: head.billDate || null,
         grnDate: head.grnDate,
-        purpose: head.purpose,
         gstRatePct: head.gstRatePct || undefined,
         location: head.location || undefined,
         headerRemarks: head.headerRemarks || undefined,
@@ -950,16 +941,13 @@ export function GrnDocumentForm() {
         <div className="card-body">
           <div className="form-grid">
             <Field label="Vendor" required>
-              <RecordSelect options={vendors ?? []} loading={vendors === null} getValue={(v) => v.id} getLabel={(v) => v.vendorName}
+              <RecordSelect options={vendors ?? []} loading={vendors === null} getValue={(v) => v.id} getLabel={fmtVendor}
                 placeholder="Select vendor..." value={head.vendorId}
                 onChange={(e) => { setHead((h) => ({ ...h, vendorId: e.target.value })); setLines([blankGrnLine()]); }} />
             </Field>
             <Field label="Bill / challan no" required><TextInput value={head.billNo} maxLength={60} onChange={setH('billNo')} /></Field>
             <Field label="Bill date"><TextInput type="date" value={head.billDate} onChange={setH('billDate')} /></Field>
             <Field label="GRN date" required><TextInput type="date" value={head.grnDate} max={today()} onChange={setH('grnDate')} /></Field>
-            <Field label="Purpose">
-              <EnumSelect options={GRN_PURPOSES} includeBlank={false} value={head.purpose} onChange={setH('purpose')} />
-            </Field>
             <Field label="GST rate" hint="As charged on the bill.">
               <EnumSelect options={gstRates.map((r) => ({ value: r.value, label: r.label }))} placeholder="No GST / unregistered"
                 value={head.gstRatePct} onChange={setH('gstRatePct')} />
@@ -1065,7 +1053,7 @@ export function GrnDocumentDetail() {
           </span>
         </div>
         <div className="card-body">
-          <div className="form-grid">
+          <div className="form-grid detail-grid">
             <Info label="GRN date" value={fmtDate(doc.grnDate)} />
             <Info label="Bill date" value={fmtDate(doc.billDate)} />
             <Info label="Location" value={doc.location} />

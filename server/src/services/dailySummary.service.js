@@ -13,6 +13,10 @@
  *    Rejected                  the Rejected register - pieces not repairable
  *    Waiting for approval      everything pending, and how much is yours
  *
+ *  With ANTHROPIC_API_KEY set, up to five "Needs attention" lines written by
+ *  Claude go on top - see summaryBriefing.service.js. Without it, or if that
+ *  fails, the summary is exactly the lines above.
+ *
  *  Each line is shown only to a person who may view the register it comes
  *  from - the same `<MODULE>.VIEW` that guards that screen - so the summary
  *  never tells anybody something the application would not. A day with
@@ -40,6 +44,7 @@ import { D } from '../utils/figures.js';
 import { istDate, istIsoDate } from '../utils/dates.js';
 import { pendingSummary } from './approvalEngine.js';
 import { notify } from './notification.service.js';
+import { briefingEnabled, briefingFacts, buildTrend, withBriefing, writeBriefing } from './summaryBriefing.service.js';
 
 export const SUMMARY_PERMISSION = 'REPORT.SUMMARY';
 
@@ -227,10 +232,11 @@ export async function sendDailySummary(day = istIsoDate()) {
   const people = await recipients();
   if (!people.length) return { day, recipients: 0, created: 0 };
   const figures = await buildFigures(day);
+  const briefFor = await briefer(figures, day);
 
   let created = 0;
   for (const p of people) {
-    const message = composeSummary(figures, p.has);
+    const message = withBriefing(composeSummary(figures, p.has), await briefFor(p.has));
     if (!message) continue;
     const r = await notify({
       userIds: [p.id],
@@ -247,8 +253,36 @@ export async function sendDailySummary(day = istIsoDate()) {
 
 /** The caller's own summary for a day, without sending it - the settings preview. */
 export async function previewFor(has, day = istIsoDate()) {
-  const message = composeSummary(await buildFigures(day), has);
+  const figures = await buildFigures(day);
+  const briefFor = await briefer(figures, day);
+  const message = withBriefing(composeSummary(figures, has), await briefFor(has));
   return { day, receives: has(SUMMARY_PERMISSION), time: env.DAILY_SUMMARY_TIME, message };
+}
+
+/**
+ * The "Needs attention" lines for each reader (summaryBriefing.service.js).
+ * Readers who may see the same registers are shown the same facts, so they
+ * share one call. Resolves to null for everyone when the briefing is off.
+ */
+async function briefer(figures, day) {
+  const none = async () => null;
+  if (!briefingEnabled()) return none;
+  let trend;
+  try {
+    trend = await buildTrend(day);
+  } catch (err) {
+    // The summary goes without its briefing rather than not at all.
+    process.stderr.write(`[daily-summary] briefing skipped: ${err?.message ?? err}\n`);
+    return none;
+  }
+  const written = new Map();
+  return (has) => {
+    const facts = briefingFacts(figures, trend, has);
+    if (!facts) return null;
+    const key = JSON.stringify(facts);
+    if (!written.has(key)) written.set(key, writeBriefing(facts));
+    return written.get(key);
+  };
 }
 
 // ===========================================================================

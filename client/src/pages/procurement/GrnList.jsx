@@ -29,7 +29,6 @@ import {
   ColumnMenu,
   Alert,
   EmptyState,
-  EnumSelect,
   Field,
   Modal,
   PageHeader,
@@ -39,20 +38,15 @@ import {
   Spinner,
   StatusBadge,
   TextInput,
+  ClearFilters,
 } from '../../components/ui.jsx';
-import { fmtDate, fmtMoney, fmtNum } from '../../utils/format.js';
+import { fmtDate, fmtMoney, fmtNum, fmtVendor } from '../../utils/format.js';
 import GrnForm from './GrnForm.jsx';
 import { loadFailed } from '../../services/loadFailures.js';
 import { ExportButton } from '../../components/dataTransfer.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
+import DateRangeFilter from '../../components/DateRangeFilter.jsx';
 
-const PURPOSE_OPTIONS = [
-  { value: 'RAW_MATERIAL', label: 'Raw material' },
-  { value: 'ACCESSORIES', label: 'Accessories' },
-  { value: 'DYEING', label: 'Dyeing' },
-  { value: 'PRINTING', label: 'Printing' },
-  { value: 'JOB_WORK_RETURN', label: 'Job work return' },
-];
 
 /**
  * What this register can show, and what it shows unasked.
@@ -97,10 +91,10 @@ export default function GrnList() {
     defaultSort: 'poDate',
     defaultDir: 'desc',
     initialFilters: {
-      purpose: '',
       vendorId: '',
       status: '',
-      breachesOnly: '',
+      dateFrom: '',
+      dateTo: '',
     },
   });
 
@@ -181,33 +175,16 @@ export default function GrnList() {
             <RecordSelect
               id="grn-f-vendor"
               options={vendorOptions}
-              getLabel={(v) => v.vendorName}
+              getLabel={fmtVendor}
               placeholder="All vendors"
               value={list.filters.vendorId ?? ''}
               onChange={(e) => list.setFilter('vendorId', e.target.value)}
             />
           </Field>
 
-          <Field label="Purpose" htmlFor="grn-f-purpose">
-            <EnumSelect
-              id="grn-f-purpose"
-              options={PURPOSE_OPTIONS}
-              placeholder="All"
-              value={list.filters.purpose ?? ''}
-              onChange={(e) => list.setFilter('purpose', e.target.value)}
-            />
-          </Field>
 
-          <div className="field">
-            <label htmlFor="grn-f-breach">Receipts</label>
-            <EnumSelect
-              id="grn-f-breach"
-              options={[{ value: 'true', label: 'Over tolerance' }]}
-              placeholder="All"
-              value={list.filters.breachesOnly ?? ''}
-              onChange={(e) => list.setFilter('breachesOnly', e.target.value)}
-            />
-          </div>
+          <DateRangeFilter filters={list.filters} setFilter={list.setFilter} />
+          <ClearFilters list={list} />
         </div>
 
         <TableWrap>

@@ -15,7 +15,6 @@ import {
   Alert,
   CollapsibleField,
   ConfirmDialog,
-  EnumSelect,
   Field,
   Modal,
   PageHeader,
@@ -26,7 +25,6 @@ import {
 } from '../../components/ui.jsx';
 
 import { Detail, DetailGrid, TraceChain } from '../shared/Detail.jsx';
-import { PURPOSE_OPTIONS } from './GatePassList.jsx';
 import { QtyStepper } from '../../components/mobile.jsx';
 import { fmtDate, fmtDateTime, fmtEnum, fmtMoney, fmtNum } from '../../utils/format.js';
 import TableWrap from '../../components/TableWrap.jsx';
@@ -44,7 +42,6 @@ export default function GatePassDetail() {
   const [allocDoc, setAllocDoc] = useState('');
   const [allocPos, setAllocPos] = useState(null);
   const [allocAllVendors, setAllocAllVendors] = useState(false);
-  const [allocPurpose, setAllocPurpose] = useState('');
   const [allocBusy, setAllocBusy] = useState(false);
   const [allocError, setAllocError] = useState('');
   const [reopening, setReopening] = useState(false);
@@ -346,12 +343,6 @@ export default function GatePassDetail() {
         <Modal title={`Allocate ${gp.gatePassNo}`} size="narrow" onClose={() => setAllocating(false)}>
           <div className="modal-body">
             {allocError && <Alert kind="error">{allocError}</Alert>}
-            <p className="muted" style={{ marginTop: 0 }}>
-              {gp.partyName} delivered
-              {gp.movementTime && ` at ${fmtDateTime(gp.movementTime)}`}. Choose the purchase
-              order this load is for - or, for fabric coming back from a dyer or printer, its job
-              work order. The item, quantity and UOM are taken from it.
-            </p>
             <Field
               label="PO or job work"
               required
@@ -389,18 +380,6 @@ export default function GatePassDetail() {
                 before goods can be allocated to it.
               </Alert>
             )}
-            <Field label="Purpose" required htmlFor="alloc-purpose">
-              {/* An enum, not a Master List. This asked for a list called
-                  "Purpose", which is not one of the twenty-five that exist, so
-                  the control rendered "List unavailable" on a required field
-                  and the dialog could not be completed as intended. */}
-              <EnumSelect
-                id="alloc-purpose"
-                options={PURPOSE_OPTIONS}
-                value={allocPurpose}
-                onChange={(e) => setAllocPurpose(e.target.value)}
-              />
-            </Field>
             <p className="faint" style={{ fontSize: 11.5, marginBottom: 0 }}>
               A pass is allocated once. If it goes to the wrong PO, cancel it and raise the right
               one - that leaves both facts on the record.
@@ -416,10 +395,7 @@ export default function GatePassDetail() {
                 setAllocBusy(true);
                 setAllocError('');
                 try {
-                  await gpApi.allocate(gp.id, {
-                    linkedDocNo: allocDoc.trim(),
-                    purpose: allocPurpose || undefined,
-                  });
+                  await gpApi.allocate(gp.id, { linkedDocNo: allocDoc.trim() });
                   setAllocating(false);
                   setBanner({ kind: 'success', text: `${gp.gatePassNo} allocated to ${allocDoc.trim()}.` });
                   await load();

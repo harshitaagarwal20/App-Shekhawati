@@ -60,8 +60,6 @@ const ROUTE_FOR = {
   PLAN_APPROVAL: (id) => `/plan-approvals/${id}`,
   /** C12 - the raw material plan waiting on a signature. */
   MATERIAL_PLAN: (id) => `/material-plans/${id}`,
-  /** C5 - the cutting requirement, raised before any fabric is issued. */
-  CUTTING_CHALLAN: (id) => `/cutting-challans/${id}`,
   CUTTING_ISSUE: (id) => `/cutting-issues/${id}`,
 };
 

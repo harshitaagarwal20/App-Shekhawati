@@ -209,6 +209,15 @@ export async function assertFinishingFlow(tx, { orderId, styleId }, label) {
       details,
     );
   }
+  // Phase 6 - the approved pieces already needle-checked have moved on.
+  const checked = await tx.needleCheckCarton.aggregate({ where: { orderId, styleId, deletedAt: null }, _sum: { totalPcs: true } });
+  if (D(checked._sum.totalPcs).greaterThan(f.approved)) {
+    throw ApiError.conflict(
+      `${D(checked._sum.totalPcs)} approved pieces of ${label} are already in needle-checked cartons, but External QC `
+        + `would approve only ${f.approved}. Correct the cartons at Needle Checking first.`,
+      details,
+    );
+  }
   // Every piece sent to alteration is in a bag. Not a user's mistake if it
   // fails - a bag the services forgot to keep - so it is not a 409.
   if (!f.unbagged.isZero()) {

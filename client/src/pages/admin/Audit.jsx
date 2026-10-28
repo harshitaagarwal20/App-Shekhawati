@@ -36,6 +36,7 @@ import {
   SortableTh,
   Spinner,
   TextInput,
+  ClearFilters,
 } from '../../components/ui.jsx';
 import { fmtDateTime } from '../../utils/format.js';
 import EntryDetail from './audit/EntryDetail.jsx';
@@ -44,6 +45,7 @@ import { humanField } from './audit/ChangeTable.jsx';
 import { loadFailed } from '../../services/loadFailures.js';
 import { ExportButton } from '../../components/dataTransfer.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
+import DateRangeFilter from '../../components/DateRangeFilter.jsx';
 
 const ACTIONS = [
   { value: 'CREATE', label: 'Created' },
@@ -82,6 +84,8 @@ export default function Audit() {
       recordId: searchParams.get('recordId') ?? '',
       userId: '',
       action: '',
+      dateFrom: '',
+      dateTo: '',
     },
   });
 
@@ -189,6 +193,8 @@ export default function Audit() {
               placeholder="Any"
             />
           </Field>
+          <DateRangeFilter filters={list.filters} setFilter={list.setFilter} />
+          <ClearFilters list={list} />
         </div>
 
         {list.error && <Alert kind="error">{list.error.message}</Alert>}

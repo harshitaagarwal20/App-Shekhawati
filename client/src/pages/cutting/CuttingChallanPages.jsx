@@ -47,12 +47,14 @@ import {
   Spinner,
   TextArea,
   TextInput,
+  ClearFilters,
 } from '../../components/ui.jsx';
 import { StateBadge } from '../../components/workflow.jsx';
 import { fmtDate, fmtEnum, fmtNum, todayInput, fmtOrder } from '../../utils/format.js';
 import { loadFailed } from '../../services/loadFailures.js';
 import { ExportButton } from '../../components/dataTransfer.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
+import DateRangeFilter from '../../components/DateRangeFilter.jsx';
 import IssueFabricModal from './IssueFabricModal.jsx';
 
 /** A stable key per row: keying on the array index makes React re-use the
@@ -94,7 +96,7 @@ export function CuttingChallanList() {
   const list = useResourceList((params) => ccApi.list(params), {
     defaultSort: 'challanDate',
     defaultDir: 'desc',
-    initialFilters: { status: '', orderId: '', openOnly: '' },
+    initialFilters: { status: '', orderId: '', openOnly: '', dateFrom: '', dateTo: '' },
   });
 
   const [creating, setCreating] = useState(false);
@@ -151,6 +153,8 @@ export function CuttingChallanList() {
             <option value="true">Still outstanding</option>
           </select>
         </Field>
+        <DateRangeFilter filters={list.filters} setFilter={list.setFilter} />
+        <ClearFilters list={list} />
       </div>
 
       {list.error && <Alert kind="error">{list.error}</Alert>}

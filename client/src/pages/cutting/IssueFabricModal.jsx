@@ -41,6 +41,9 @@ export default function IssueFabricModal({ challan, line, onClose, onIssued }) {
   const [previews, setPreviews] = useState({});
   const [employeeId, setEmployeeId] = useState('');
   const [issuedByName, setIssuedByName] = useState('');
+  // Who the fabric is handed to - the cutting contractor.
+  const [issuedToId, setIssuedToId] = useState('');
+  const [issuedToName, setIssuedToName] = useState('');
   const [shadeMixReason, setShadeMixReason] = useState('');
   const [remarks, setRemarks] = useState('');
   const [showAll, setShowAll] = useState(false);
@@ -124,11 +127,15 @@ export default function IssueFabricModal({ challan, line, onClose, onIssued }) {
   const shadeMisses = order.map((id) => previews[id]?.shade).filter((s) => s && !s.ok);
   const shadeMix = shadeMisses.length > 0;
   const total = order.reduce((sum, id) => sum + Number(qtys[id] || 0), 0);
+  const issuedTo = issuedToId
+    ? employees.find((e) => e.id === issuedToId)?.empName ?? ''
+    : issuedToName.trim();
   const ready =
     order.length > 0 &&
     order.every((id) => Number(qtys[id]) > 0 && previews[id]?.availability?.permitted) &&
     (!shadeMix || shadeMixReason.trim().length >= 10) &&
-    Boolean(employeeId || issuedByName.trim());
+    Boolean(employeeId || issuedByName.trim()) &&
+    Boolean(issuedTo);
 
   async function post() {
     setBusy(true);
@@ -140,6 +147,7 @@ export default function IssueFabricModal({ challan, line, onClose, onIssued }) {
       cuttingChallanLineId: line.id,
       issuedByEmployeeId: employeeId || null,
       issuedByName: issuedByName.trim() || null,
+      issuedToName: issuedTo,
       shadeMixReason: shadeMix ? shadeMixReason.trim() : undefined,
       remarks: remarks.trim() || null,
     };
@@ -297,6 +305,29 @@ export default function IssueFabricModal({ challan, line, onClose, onIssued }) {
                 value={issuedByName}
                 disabled={Boolean(employeeId)}
                 onChange={(e) => setIssuedByName(e.target.value)}
+              />
+            </Field>
+            <Field label="Issued to" required hint="The cutting contractor receiving the fabric.">
+              <select
+                value={issuedToId}
+                onChange={(e) => {
+                  setIssuedToId(e.target.value);
+                  setIssuedToName('');
+                }}
+              >
+                <option value="">Choose who receives it...</option>
+                {employees.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.empName} ({e.empId})
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="…or type a name" hint="If they are not on the employee list.">
+              <TextInput
+                value={issuedToName}
+                disabled={Boolean(issuedToId)}
+                onChange={(e) => setIssuedToName(e.target.value)}
               />
             </Field>
           </div>

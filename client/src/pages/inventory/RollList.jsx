@@ -13,7 +13,6 @@ import { useResourceList } from '../../hooks/useResourceList.js';
 import { useOptionalColumns } from '../../hooks/useOptionalColumns.js';
 import { inventory as invApi, vendors as vendorsApi } from '../../services/erp.js';
 import { loadFailed } from '../../services/loadFailures.js';
-import { loadFabricItems } from '../reports/Reports.jsx';
 import {
   Alert,
   CollapsibleField,
@@ -31,8 +30,9 @@ import {
   StatusBadge,
   TextArea,
   TextInput,
+  ClearFilters,
 } from '../../components/ui.jsx';
-import { fmtEnum, fmtNum } from '../../utils/format.js';
+import { fmtEnum, fmtNum, fmtVendor } from '../../utils/format.js';
 import { ExportButton } from '../../components/dataTransfer.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
 
@@ -110,11 +110,9 @@ export default function RollList() {
   const [inspecting, setInspecting] = useState(false);
   const [banner, setBanner] = useState(null);
   const [vendorOptions, setVendorOptions] = useState([]);
-  const [itemOptions, setItemOptions] = useState([]);
 
   useEffect(() => {
     vendorsApi.options().then(setVendorOptions).catch(loadFailed(setVendorOptions, 'vendors'));
-    loadFabricItems().then(setItemOptions);
   }, []);
 
   /*
@@ -129,7 +127,6 @@ export default function RollList() {
       location: '',
       inStockOnly: '',
       vendorId: '',
-      itemId: '',
       inspectionStatus: '',
     },
   });
@@ -239,23 +236,13 @@ export default function RollList() {
             <RecordSelect
               id="roll-f-vendor"
               options={vendorOptions}
-              getLabel={(v) => v.vendorName}
+              getLabel={fmtVendor}
               placeholder="All suppliers"
               value={list.filters.vendorId ?? ''}
               onChange={(e) => list.setFilter('vendorId', e.target.value)}
             />
           </Field>
 
-          <Field label="Item" htmlFor="roll-f-item">
-            <RecordSelect
-              id="roll-f-item"
-              options={itemOptions}
-              getLabel={(o) => `${o.description} (${o.itemCode})`}
-              placeholder="All items"
-              value={list.filters.itemId ?? ''}
-              onChange={(e) => list.setFilter('itemId', e.target.value)}
-            />
-          </Field>
 
           <Field label="Inspection" htmlFor="roll-f-insp">
             <EnumSelect
@@ -277,6 +264,7 @@ export default function RollList() {
               onChange={(e) => list.setFilter('inStockOnly', e.target.value)}
             />
           </div>
+          <ClearFilters list={list} />
         </div>
 
         <TableWrap>

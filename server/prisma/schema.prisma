@@ -53,6 +53,10 @@ enum StatusGeneral {
   COMPLETED
   ON_HOLD
   CANCELLED
+  /// Phase 6 - a buyer order only, set by Dispatch: some of the order has
+  /// left in a container, or all of it has. Never chosen on a screen.
+  PARTIALLY_SHIPPED
+  SHIPPED
 }
 
 /// Master Lists!StatusApproval - Pending / Approved / Rejected
@@ -399,6 +403,8 @@ enum DocumentType {
   GRN_REVERSAL
   /// The FOB cost sheet of a style - CS-0001. See model StyleCostSheet.
   COST_SHEET
+  /// Phase 6 - one container leaving. DSP-0001.
+  DISPATCH
 }
 
 // ===========================================================================
@@ -1258,6 +1264,12 @@ model Style {
   /// Nullable: most styles arrive without it, and 0 cartons of a bag is not a
   /// specification anybody means, so the column is > 0 or absent.
   qtyPerCarton              Int?         @map("qty_per_carton")
+  /// Phase 6 - how the style is packed: bags (one piece each) to a packet,
+  /// and packets to a carton. 10 and 10 unless the style says otherwise, so a
+  /// carton is 100 pieces. Packing fills its pcs per box from them, and Needle
+  /// Checking and Packing show each carton as packets and bags.
+  bagsPerPacket             Int          @default(10) @map("bags_per_packet")
+  packetsPerCarton          Int          @default(10) @map("packets_per_carton")
   /// Phase 2 - pieces ONE tailor is expected to stitch in one hour on this
   /// style. Hourly Monitoring paints a slot red when it comes in under this.
   /// Optional: a style with no target is simply never highlighted.
@@ -1341,6 +1353,10 @@ model Style {
   finishedCheckerRecords  FinishedCheckerRecord[]
   spotRectifications      SpotRectification[]
   reconciliationReports   ReconciliationReport[]
+  /// Phase 6 - needle checking, packing and dispatch.
+  needleCheckCartons      NeedleCheckCarton[]
+  packingEntries          PackingEntry[]
+  dispatchLines           DispatchLine[]
 
   createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
   createdById       String?            @map("created_by_id") @db.Uuid
@@ -1718,6 +1734,11 @@ model BuyerOrder {
   finishedCheckerRecords  FinishedCheckerRecord[]
   spotRectifications      SpotRectification[]
   reconciliationReports   ReconciliationReport[]
+  /// Phase 6 - needle checking, packing and dispatch.
+  needleCheckCartons      NeedleCheckCarton[]
+  packingEntries          PackingEntry[]
+  dispatches              Dispatch[]
+  dispatchLines           DispatchLine[]
   /// C12 - the raw material plans raised against this order.
   materialPlans           MaterialPlan[]
   /// C9 - the buyer's measurement sheets, held rather than referred to.
@@ -3323,6 +3344,10 @@ model FabricIssue {
   issuedByEmployee   Employee?     @relation(fields: [issuedByEmployeeId], references: [id], onDelete: SetNull)
   /// Name as printed on the slip.
   issuedByName       String        @map("issued_by_name") @db.VarChar(120)
+  /// Who the fabric is handed to - the cutting contractor, for a cutting
+  /// issue. Picked from Employees or typed; only the name is kept. Null on
+  /// issues raised before it was asked.
+  issuedToName       String?       @map("issued_to_name") @db.VarChar(120)
   /// Excel: "Fabric Qty  Issued" (Manual)
   fabricQtyIssued    Decimal       @map("fabric_qty_issued") @db.Decimal(18, 4)
   /// Excel: "Fabric name" (Dropdown) - note on sheet: "eg- 10 oz"
@@ -5155,7 +5180,7 @@ model PendingReject {
 //  offered lands in exactly one of three boxes, and every piece in the two
 //  faulty boxes carries exactly one reason:
 //
-//      Approved      -> waits for Humidity Checking (Phase 5)
+//      Approved      -> waits for Needle Checking (Phase 6)
 //      reason Iron   -> back to Ironing, source Re-iron
 //      any other     -> the Alteration Unit, as a bag  (never a stitching unit)
 //
@@ -5575,6 +5600,10 @@ model InlineQcDefect {
   entry   InlineQcEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
   /// A value of the Defect Type list.
   defect  String        @db.VarChar(120)
+  /// Pieces found with this defect - at least one, never more than checked.
+  /// Null only on a defect recorded before counts were taken, when the check
+  /// named several defects and its rejected pieces cannot be shared out.
+  qty     Int?
 
   status         InlineQcDefectStatus @default(OPEN)
   resolvedAt     DateTime?            @map("resolved_at") @db.Timestamptz(3)
@@ -5633,11 +5662,14 @@ model InternalQualityCheck {
 
   /// "Total Pcs Checked" (Manual)
   totalPcsChecked Int @map("total_pcs_checked")
-  /// "Total Defect Pcs" (Manual) - never more than checked.
+  /// "Total Defect Pcs" = SUM(defects.qty). SERVER-CALCULATED - never more
+  /// than checked.
   totalDefectPcs  Int @map("total_defect_pcs")
 
-  /// "Defect Type" (Dropdown -> L_DefectType)
-  defectType            String? @map("defect_type") @db.VarChar(120)
+  /// "Defect Type" (Dropdown -> L_DefectType) - one line per type found,
+  /// each with its own count. A check rarely finds only one kind of fault.
+  defects InternalQualityDefect[]
+
   /// "Status" (Dropdown -> L_StatusQC: Approved / Rejected / Alteration)
   qcStatus              String  @map("qc_status") @db.VarChar(40)
   /// "Transferred Back To Unit" (Dropdown, required if Rejected)
@@ -5660,6 +5692,29 @@ model InternalQualityCheck {
   @@index([recordDate])
   @@index([deletedAt])
   @@map("internal_quality_checks")
+}
+
+/// One defect type found on an Internal Quality Check, and how many pieces
+/// had it. The lines are replaced as a set whenever the check is saved.
+model InternalQualityDefect {
+  id String @id @default(uuid()) @db.Uuid
+
+  checkId String               @map("check_id") @db.Uuid
+  check   InternalQualityCheck @relation(fields: [checkId], references: [id], onDelete: Cascade)
+
+  lineNo     Int    @map("line_no")
+  /// A value of L_DefectType.
+  defectType String @map("defect_type") @db.VarChar(120)
+  /// Pieces with this defect - at least one.
+  qty        Int
+
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdById String?  @map("created_by_id") @db.Uuid
+
+  @@unique([checkId, lineNo])
+  @@unique([checkId, defectType])
+  @@index([defectType])
+  @@map("internal_quality_defects")
 }
 
 /// EXCEL SHEET: "Final Checker Report" - Internal Record
@@ -5885,6 +5940,251 @@ model ReconciliationReport {
   @@index([orderId, styleId])
   @@index([deletedAt])
   @@map("reconciliation_reports")
+}
+
+// ===========================================================================
+//  PHASE 6 - NEEDLE CHECKING, PACKING, DISPATCH
+//
+//  The pieces External QC approved, to the buyer:
+//
+//      External QC approved -> Needle Checking (size assortment cartons)
+//                           -> Packing (the packing details, box by box)
+//                           -> Dispatch (order-wise)
+//
+//      needle-checked      never more than External QC approved  (order, style)
+//      packed              never more than needle-checked        (order, style, colour)
+//      on a dispatch       never more than packed                (order, style)
+//
+//  All arithmetic is in src/domain/shipping.js; the lock and the checks in
+//  shippingFlow.service.js.
+// ===========================================================================
+
+/// EXCEL SHEET: Needle Checking - "Size Assortment Carton".
+///
+/// One row of the sheet: a number of cartons of one colour packed to one
+/// size assortment, checked through the needle detector. The Order No and
+/// Style are chosen once at the top of the sheet. "Carton" (Auto) is the
+/// range of carton numbers the row covers - 1-10, 11-15 - given when the row
+/// is made, on from the highest number of the order and style, and stored:
+/// the cartons are labelled with it, so deleting a row leaves a gap rather
+/// than renumbering the rows after it.
+model NeedleCheckCarton {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// The day the cartons were checked (Auto).
+  checkDate DateTime   @map("check_date") @db.Date
+  /// "Order No" / "Style" - at the top of the sheet.
+  orderId   String     @map("order_id") @db.Uuid
+  order     BuyerOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  styleId   String     @map("style_id") @db.Uuid
+  style     Style      @relation(fields: [styleId], references: [id], onDelete: Restrict)
+  /// The row's place on the sheet: 1, 2, 3 ... within the order and style.
+  seq       Int
+
+  /// "Carton Qty" (Manual) - cartons packed to this assortment.
+  cartonQty    Int      @map("carton_qty")
+  /// "Carton" (Auto) - the first and last carton numbers of the row.
+  cartonFrom   Int?     @map("carton_from")
+  cartonTo     Int?     @map("carton_to")
+  /// "Color" (Dropdown) - the order's colours for the style.
+  colorCode    String?  @map("color_code") @db.VarChar(60)
+  /// "Size 1" .. "Size 10" (Manual) - pieces of each size in ONE carton.
+  size1        Int      @default(0) @map("size_1")
+  size2        Int      @default(0) @map("size_2")
+  size3        Int      @default(0) @map("size_3")
+  size4        Int      @default(0) @map("size_4")
+  size5        Int      @default(0) @map("size_5")
+  size6        Int      @default(0) @map("size_6")
+  size7        Int      @default(0) @map("size_7")
+  size8        Int      @default(0) @map("size_8")
+  size9        Int      @default(0) @map("size_9")
+  size10       Int      @default(0) @map("size_10")
+  /// "Weight" (Manual) - kg, one carton.
+  weightKg     Decimal? @map("weight_kg") @db.Decimal(10, 3)
+  /// "Pcs/Carton" (Formula) - Size 1 + ... + Size 10.
+  pcsPerCarton Int      @map("pcs_per_carton")
+  /// Pcs/Carton x Carton Qty - the pieces the row passes on to packing.
+  totalPcs     Decimal  @map("total_pcs") @db.Decimal(18, 4)
+  /// "Sign." (Manual) - who checked and signed for the cartons.
+  signedBy     String   @map("signed_by") @db.VarChar(120)
+
+  recordedById   String? @map("recorded_by_id") @db.Uuid
+  recordedByName String? @map("recorded_by_name") @db.VarChar(120)
+
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdById String?   @map("created_by_id") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  updatedById String?   @map("updated_by_id") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
+  deletedById String?   @map("deleted_by_id") @db.Uuid
+
+  @@index([orderId, styleId])
+  @@index([checkDate])
+  @@index([deletedAt])
+  @@map("needle_check_cartons")
+}
+
+/// EXCEL SHEET: Packing - "Packing Details".
+///
+/// One line of the packing list: a run of boxes of one colour, each holding
+/// the same pieces. Qty = Packing x Boxes; N.W, G.W and CBM are worked out
+/// from the per-box figures when read (src/domain/shipping.js), never stored.
+/// Total packed of a colour never exceeds what Needle Checking passed of it.
+model PackingEntry {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// The day it was packed (Auto).
+  packDate    DateTime   @map("pack_date") @db.Date
+  /// "Box No" (Manual) - e.g. 1-20.
+  boxNo       String     @map("box_no") @db.VarChar(40)
+  /// "OrderNo" (Dropdown), "Style No." (Dropdown)
+  orderId     String     @map("order_id") @db.Uuid
+  order       BuyerOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  styleId     String     @map("style_id") @db.Uuid
+  style       Style      @relation(fields: [styleId], references: [id], onDelete: Restrict)
+  /// "Color" (Dropdown) - the colours Needle Checking passed.
+  colorCode   String?    @map("color_code") @db.VarChar(60)
+  /// The dispatch these boxes go on - set when a dispatch takes them, cleared
+  /// when it is deleted. A line goes on one dispatch, whole.
+  dispatchId  String?    @map("dispatch_id") @db.Uuid
+  dispatch    Dispatch?  @relation(fields: [dispatchId], references: [id], onDelete: SetNull)
+  /// "Packing" (Manual) - pieces in each box.
+  pcsPerBox   Int        @map("pcs_per_box")
+  /// "Boxes" (Manual)
+  boxesPacked Int        @map("boxes_packed")
+  /// "Qty (In pcs)" (Formula) - Packing x Boxes.
+  pcsPacked   Decimal    @map("pcs_packed") @db.Decimal(18, 4)
+  /// "N.W per Box" / "G.W per Box" (Manual) - kg.
+  nwPerBoxKg  Decimal?   @map("nw_per_box_kg") @db.Decimal(10, 3)
+  gwPerBoxKg  Decimal?   @map("gw_per_box_kg") @db.Decimal(10, 3)
+  /// "Dim (in cms)" L / W / H (Manual) - one box.
+  lengthCm    Decimal?   @map("length_cm") @db.Decimal(8, 2)
+  widthCm     Decimal?   @map("width_cm") @db.Decimal(8, 2)
+  heightCm    Decimal?   @map("height_cm") @db.Decimal(8, 2)
+  /// "Remarks" (Text)
+  remarks     String?    @db.Text
+
+  recordedById   String? @map("recorded_by_id") @db.Uuid
+  recordedByName String? @map("recorded_by_name") @db.VarChar(120)
+
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdById String?   @map("created_by_id") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  updatedById String?   @map("updated_by_id") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
+  deletedById String?   @map("deleted_by_id") @db.Uuid
+
+  @@index([orderId, styleId])
+  @@index([packDate])
+  @@index([dispatchId])
+  @@index([deletedAt])
+  @@map("packing_entries")
+}
+
+/// A dispatch's state, chosen on the screen.
+enum DispatchStatus {
+  /// Made ready, not yet left. Its totals follow the packing until it goes.
+  PENDING
+  /// Left the factory. The order counts these pieces as shipped.
+  DISPATCHED
+  /// The buyer has it.
+  DELIVERED
+}
+
+/// EXCEL SHEET: Dispatch.
+///
+/// One order going out. The buyer, the container and the shipment details
+/// come from the order (and its buyer and approved plan) and are kept as
+/// printed; Total Boxes and Total Qty come from the packing - everything of
+/// the order packed and on no other dispatch, one line per style.
+model Dispatch {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// Dispatch No (Auto) - DSP-0001
+  dispatchNo   String         @unique @map("dispatch_no") @db.VarChar(40)
+  /// "Date" (Auto) - today; may be moved back, never forward.
+  dispatchDate DateTime       @map("dispatch_date") @db.Date
+  /// "Order No" (Dropdown)
+  orderId      String         @map("order_id") @db.Uuid
+  order        BuyerOrder     @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  /// "Buyer" (Formula - from the order)
+  buyerName    String?        @map("buyer_name") @db.VarChar(150)
+  /// "Container No" (Formula - from the order's approved plan, else the order)
+  containerNo  String?        @map("container_no") @db.VarChar(40)
+  /// "Invoice No" (Manual)
+  invoiceNo    String?        @map("invoice_no") @db.VarChar(60)
+  /// "Total Boxes" / "Total Qty" (Auto - from packing): the lines' sums.
+  totalBoxes   Int            @map("total_boxes")
+  totalPcs     Decimal        @map("total_pcs") @db.Decimal(18, 4)
+  /// "Ship Mode" (Dropdown -> L_ShipMode) - the order's, unless changed.
+  shipMode     String?        @map("ship_mode") @db.VarChar(40)
+  /// "Carrier / AWB-BL No" (Manual)
+  carrierRef   String?        @map("carrier_ref") @db.VarChar(120)
+  /// "ETA" (Manual)
+  eta          DateTime?      @db.Date
+  /// "Status" (Dropdown) - Pending / Dispatched / Delivered
+  status       DispatchStatus @default(PENDING)
+  /// "Remarks" (Text)
+  remarks      String?        @db.Text
+
+  /// The buyer's shipment details and address, from the buyer and the order,
+  /// as they stood when the dispatch was made.
+  buyerPoNo          String? @map("buyer_po_no") @db.VarChar(60)
+  buyerAddress       String? @map("buyer_address") @db.Text
+  shipTo             String? @map("ship_to") @db.Text
+  consigneeName      String? @map("consignee_name") @db.VarChar(200)
+  consigneeAddress   String? @map("consignee_address") @db.Text
+  notifyPartyName    String? @map("notify_party_name") @db.VarChar(200)
+  notifyPartyAddress String? @map("notify_party_address") @db.Text
+  portOfDischarge    String? @map("port_of_discharge") @db.VarChar(120)
+  finalDestination   String? @map("final_destination") @db.VarChar(120)
+  priceTerms         String? @map("price_terms") @db.VarChar(150)
+  freightTerms       String? @map("freight_terms") @db.VarChar(40)
+
+  lines          DispatchLine[]
+  /// The packing lines it took - what its packing list prints.
+  packingEntries PackingEntry[]
+
+  recordedById   String? @map("recorded_by_id") @db.Uuid
+  recordedByName String? @map("recorded_by_name") @db.VarChar(120)
+
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdById String?   @map("created_by_id") @db.Uuid
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  updatedById String?   @map("updated_by_id") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
+  deletedById String?   @map("deleted_by_id") @db.Uuid
+
+  @@index([orderId])
+  @@index([containerNo])
+  @@index([dispatchDate])
+  @@index([status])
+  @@index([deletedAt])
+  @@map("dispatches")
+}
+
+/// One style of the dispatch's order: the packed pieces and boxes it carries.
+model DispatchLine {
+  id String @id @default(uuid()) @db.Uuid
+
+  dispatchId String     @map("dispatch_id") @db.Uuid
+  dispatch   Dispatch   @relation(fields: [dispatchId], references: [id], onDelete: Cascade)
+  orderId    String     @map("order_id") @db.Uuid
+  order      BuyerOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  styleId    String     @map("style_id") @db.Uuid
+  style      Style      @relation(fields: [styleId], references: [id], onDelete: Restrict)
+
+  pcs   Decimal @db.Decimal(18, 4)
+  boxes Int
+
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdById String?  @map("created_by_id") @db.Uuid
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  updatedById String?  @map("updated_by_id") @db.Uuid
+
+  @@unique([dispatchId, orderId, styleId])
+  @@index([orderId, styleId])
+  @@map("dispatch_lines")
 }
 
 // ===========================================================================
@@ -6274,4 +6574,64 @@ model GrnHeader {
   @@index([grnDate])
   @@index([deletedAt])
   @@map("grn_headers")
+}
+
+// ===========================================================================
+//  THE ASSISTANT'S DOCUMENTS
+// ===========================================================================
+
+/// A reference document uploaded for the assistant to read - a buyer tech
+/// pack, a spec sheet, an SOP, a QC manual. Its text is cut into chunks
+/// (AssistantChunk) and each chunk is searched by meaning, not by keyword.
+/// See services/assistantDocuments.service.js.
+///
+/// The original file is kept so a source under an answer can be opened.
+/// Not audited, for the same reason as the attachments: the trail would store
+/// every file a second time.
+model AssistantDocument {
+  id String @id @default(uuid()) @db.Uuid
+
+  fileName  String @map("file_name") @db.VarChar(255)
+  mimeType  String @map("mime_type") @db.VarChar(120)
+  sizeBytes Int    @map("size_bytes")
+  data      Bytes
+  /// Pages in a PDF; null for a text file.
+  pageCount Int?   @map("page_count")
+
+  /// Who may be shown this document's text, as a permission code. Null: every
+  /// holder of ASSISTANT.VIEW. A costing workbook marked COST_SHEET.VIEW is
+  /// never retrieved for - and so never sent to Claude for - anybody who could
+  /// not open a cost sheet on screen.
+  requiredPermission String? @map("required_permission") @db.VarChar(80)
+
+  chunks AssistantChunk[]
+
+  uploadedById   String? @map("uploaded_by_id") @db.Uuid
+  uploadedByName String? @map("uploaded_by_name") @db.VarChar(120)
+
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
+  deletedById String?   @map("deleted_by_id") @db.Uuid
+
+  @@index([deletedAt])
+  @@map("assistant_documents")
+}
+
+/// One overlapping piece of a document's text, and where it sits in it.
+model AssistantChunk {
+  id String @id @default(uuid()) @db.Uuid
+
+  documentId String            @map("document_id") @db.Uuid
+  document   AssistantDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  /// Order within the document, from 0.
+  seq        Int
+  /// The PDF page the chunk starts on, from 1; null for a text file.
+  page       Int?
+  text       String            @db.Text
+  /// all-MiniLM-L6-v2's sentence vector for `text`: 384 float32 values,
+  /// little-endian, normalised to length 1 so a dot product is the cosine.
+  embedding  Bytes
+
+  @@unique([documentId, seq])
+  @@map("assistant_chunks")
 }

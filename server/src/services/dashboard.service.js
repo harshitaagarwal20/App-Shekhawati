@@ -45,7 +45,7 @@
  */
 
 import prisma, { notDeleted } from '../config/prisma.js';
-import { REGISTRY, pendingSummary } from './approvalEngine.js';
+import { QUEUED_TYPES, pendingSummary } from './approvalEngine.js';
 import { isBelowReorder } from './inventory.service.js';
 import { D, ageDays } from '../utils/figures.js';
 
@@ -359,7 +359,8 @@ export const STAGES = [
     permission: 'BUYER_ORDER.VIEW',
     to: '/orders',
     model: 'buyerOrder',
-    open: { status: { in: ['PENDING', 'IN_PROGRESS'] } },
+    // Part of a Partially Shipped order has still to go.
+    open: { status: { in: ['PENDING', 'IN_PROGRESS', 'PARTIALLY_SHIPPED'] } },
     dateField: 'orderDate',
   },
   {
@@ -721,9 +722,9 @@ export function sectionsFor(has) {
   return {
     attention: ATTENTION_PROBES.filter((p) => has(p.permission)).map((p) => p.key),
     /** Document types this caller may SEE waiting. */
-    approvals: Object.keys(REGISTRY).filter((type) => has(`${type}.VIEW`)),
+    approvals: QUEUED_TYPES.filter((type) => has(`${type}.VIEW`)),
     /** Of those, the ones they may actually DECIDE. Always a subset in practice. */
-    decidable: Object.keys(REGISTRY).filter((type) => has(`${type}.APPROVE`)),
+    decidable: QUEUED_TYPES.filter((type) => has(`${type}.APPROVE`)),
     /**
      * Whether the shared approval queue screen is reachable at all.
      *

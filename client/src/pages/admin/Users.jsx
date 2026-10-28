@@ -27,6 +27,7 @@ import {
   Spinner,
   StatusBadge,
   TextInput,
+  ClearFilters,
 } from '../../components/ui.jsx';
 import { loadFailed } from '../../services/loadFailures.js';
 import { ExportButton } from '../../components/dataTransfer.jsx';
@@ -279,6 +280,7 @@ export default function Users() {
               onChange={(e) => list.setFilter('status', e.target.value)}
             />
           </Field>
+          <ClearFilters list={list} />
         </div>
 
         <TableWrap>

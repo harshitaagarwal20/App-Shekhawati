@@ -60,14 +60,14 @@ export const createMaterialPlanSchema = z.object({
    */
   orderLineId: uuid.optional(),
   planDate: isoDate.optional(),
-  containerNo: optionalText(40),
+  containerNo: requiredText(40, 'Container No'),
   remarks: optionalText(2000),
 });
 
 /** Header only. The lines are the BOM's answer and are not editable here. */
 export const updateMaterialPlanSchema = z.object({
   planDate: isoDate.optional(),
-  containerNo: optionalText(40).nullable(),
+  containerNo: requiredText(40, 'Container No').optional(),
   remarks: optionalText(2000).nullable(),
 });
 
@@ -99,4 +99,6 @@ export const materialPlanListQuery = listQuery.extend({
   orderId: uuid.optional(),
   styleId: uuid.optional(),
   containerNo: optionalText(40),
+  dateFrom: isoDate.optional(),
+  dateTo: isoDate.optional(),
 });

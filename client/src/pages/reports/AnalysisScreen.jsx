@@ -194,7 +194,7 @@ export default function AnalysisScreen({ title, views: VIEWS, category, emptyMes
           </div>
 
           {current?.totals && (
-            <div className="stat-grid" style={{ marginBottom: 16 }}>
+            <div className="stat-grid analysis-tiles" style={{ marginBottom: 16 }}>
               {active.tiles(current.totals).map((t) => (
                 <div key={t.label} className="stat">
                   <div className="label">{t.label}</div>

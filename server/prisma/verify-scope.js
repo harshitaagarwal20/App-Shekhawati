@@ -1,15 +1,13 @@
 /**
  * Scope guard.
  *
- * The application ends at the Reconciliation Report (Phase 5), after the
- * final QC sheets and Spot Rectification-Scrap; before them come External QC
- * and the Alteration Unit (Phase 4), with the Rejected Register they write,
- * and Inline QC (Phase 3) beside stitching, which carries the workbook's QC
- * Size and QC Defects sheets. Only Packing, Needle Checking and Dispatch are
- * still out. This script fails the build if any
- * model, table, enum or field in schema.prisma refers to a module that is
- * still out of scope, so a later phase cannot quietly grow past the agreed
- * boundary.
+ * The application now runs to the buyer: Needle Checking, Packing and
+ * Dispatch (Phase 6) follow External QC, beside the
+ * final QC sheets and the Reconciliation Report (Phase 5). Every module the
+ * master prompt listed is delivered, so FORBIDDEN is empty - the guard's job
+ * is now the other half: every delivered module's model must still be there.
+ * A new out-of-scope module is added to FORBIDDEN, and this script fails the
+ * build if any model, table, enum or field in schema.prisma refers to it.
  *
  * Opening the next phase is a deliberate edit to this file: move its module
  * off FORBIDDEN and onto DELIVERED, in the same commit as its tables.
@@ -48,6 +46,9 @@ const DELIVERED = [
   { module: 'External Secondary Checking (inspection report)', phase: 'Phase 5', model: 'ExternalQcInspectionLine' },
   { module: 'Spot Rectification-Scrap', phase: 'Phase 5', model: 'SpotRectification' },
   { module: 'Reconciliation Report', phase: 'Phase 5', model: 'ReconciliationReport' },
+  { module: 'Needle Checking', phase: 'Phase 6', model: 'NeedleCheckCarton' },
+  { module: 'Packing', phase: 'Phase 6', model: 'PackingEntry' },
+  { module: 'Dispatch', phase: 'Phase 6', model: 'Dispatch' },
 ];
 
 /**
@@ -56,11 +57,7 @@ const DELIVERED = [
  * names - not against prose in comments, which is allowed to explain why
  * something is absent.
  */
-const FORBIDDEN = [
-  { module: 'Packing', patterns: [/model\s+Packing\b/, /@@map\("packings?"\)/] },
-  { module: 'Needle Checking', patterns: [/needle_?check/i, /NeedleCheck/] },
-  { module: 'Dispatch', patterns: [/model\s+Dispatch\b/, /@@map\("dispatch(es)?"\)/, /dispatch_/i] },
-];
+const FORBIDDEN = [];
 
 /**
  * C7 - THE ALLOWLIST, AND WHY IT HAS TO EXIST.

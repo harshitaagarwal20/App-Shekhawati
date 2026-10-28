@@ -249,7 +249,7 @@ export async function orderOptions() {
   const [orders, styles] = await Promise.all([
     prisma.buyerOrder.findMany({
       where: { id: { in: [...new Set(open.map((g) => g.orderId))] } },
-      select: { id: true, orderNo: true, buyer: { select: { buyerName: true } } },
+      select: { id: true, orderNo: true, buyer: { select: { buyerName: true, buyerCode: true } } },
     }),
     prisma.style.findMany({ where: { id: { in: [...new Set(open.map((g) => g.styleId))] } }, select: { id: true, styleNo: true } }),
   ]);
@@ -262,6 +262,7 @@ export async function orderOptions() {
       orderId: g.orderId,
       orderNo: order.get(g.orderId).orderNo,
       buyerName: order.get(g.orderId).buyer?.buyerName ?? null,
+      buyerCode: order.get(g.orderId).buyer?.buyerCode ?? null,
       styleId: g.styleId,
       styleNo: style.get(g.styleId)?.styleNo ?? null,
       bags: g._count._all,

@@ -134,6 +134,39 @@ const FALLBACK_MESSAGE = {
   504: 'The server took too long to answer. Check whether the change was saved before trying again.',
 };
 
+/*
+ * A REFUSED FORM SAYS WHAT IS WRONG WITH IT.
+ *
+ * The server's request validation answers "Invalid request body" and puts the
+ * reason for each field in `details.fields` ("Packing must be a whole
+ * number"). A screen that shows `e.message` - most of them - used to show only
+ * the first sentence, which names nothing. The field's own messages are the
+ * message; one Zod wrote for itself ("Required", "Invalid input") gets the
+ * field's name in front so it still says where.
+ */
+const NAMELESS = /^(required|invalid input|invalid|expected .*)$/i;
+const MAX_FIELD_MESSAGES = 3;
+
+function fieldName(path) {
+  const last = path.split('.').filter((p) => !/^\d+$/.test(p)).pop() ?? path;
+  return last.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/_/g, ' ').toLowerCase();
+}
+
+function messageOf(message, details) {
+  const fields = details?.fields;
+  if (!fields || typeof fields !== 'object') return message;
+  const said = [
+    ...new Set(
+      Object.entries(fields).flatMap(([path, messages]) =>
+        [].concat(messages).map((m) => (NAMELESS.test(String(m).trim()) && path !== '_' ? `${fieldName(path)}: ${m}` : String(m)))),
+    ),
+  ];
+  if (!said.length) return message;
+  const shown = said.slice(0, MAX_FIELD_MESSAGES).join('. ');
+  const more = said.length - MAX_FIELD_MESSAGES;
+  return more > 0 ? `${shown}. (and ${more} more)` : shown;
+}
+
 /** Only an expired/invalid token is worth retrying - a revoked session is not. */
 const RETRYABLE = new Set(['TOKEN_EXPIRED', 'TOKEN_INVALID', 'UNAUTHENTICATED']);
 
@@ -198,7 +231,9 @@ api.interceptors.response.use(
 
     return Promise.reject(
       new ApiClientError(
-        response.data?.error?.message ?? FALLBACK_MESSAGE[response.status] ?? 'Something went wrong',
+        messageOf(response.data?.error?.message, response.data?.error?.details)
+          ?? FALLBACK_MESSAGE[response.status]
+          ?? 'Something went wrong',
         response.status,
         code,
         response.data?.error?.details,

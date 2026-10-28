@@ -36,6 +36,7 @@ import {
   TextArea,
   TextInput,
   ViewTabs,
+  ClearFilters,
 } from '../../components/ui.jsx';
 import { Detail, DetailGrid } from '../shared/Detail.jsx';
 import { fmtDate, fmtDateTime, fmtNum } from '../../utils/format.js';
@@ -50,6 +51,7 @@ import {
   useStitchingContext,
   useUnitOrders,
 } from './stitchingShared.jsx';
+import DateRangeFilter from '../../components/DateRangeFilter.jsx';
 
 const n0 = (v) => fmtNum(v, { decimals: 0 });
 
@@ -107,12 +109,8 @@ export function StitchingList() {
             ))}
           </select>
         </Field>
-        <Field label="From">
-          <TextInput type="date" value={list.filters.dateFrom} onChange={(e) => list.setFilter('dateFrom', e.target.value)} />
-        </Field>
-        <Field label="To">
-          <TextInput type="date" value={list.filters.dateTo} onChange={(e) => list.setFilter('dateTo', e.target.value)} />
-        </Field>
+        <DateRangeFilter filters={list.filters} setFilter={list.setFilter} fromLabel="From" toLabel="To" />
+        <ClearFilters list={list} />
       </div>
 
       {unit && <UnitPositionCard unit={unit} orders={orders} loading={ordersLoading} />}

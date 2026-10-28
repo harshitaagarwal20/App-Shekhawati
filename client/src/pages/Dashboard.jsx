@@ -88,8 +88,6 @@ const QUEUE_ROUTE = {
   DYE_ISSUE: '/job-works',
   FABRIC_SCRUTINY: '/scrutinies',
   PLAN_APPROVAL: '/plan-approvals',
-  /** C5 - the cutting requirement, raised before any fabric is issued. */
-  CUTTING_CHALLAN: '/cutting-challans',
   CUTTING_ISSUE: '/cutting-issues',
 };
 

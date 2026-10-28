@@ -89,7 +89,7 @@ const post = async (body, as = 'sunita') => {
 };
 const sizeCheck = (extra = {}) => ({
   checkType: 'SIZE', operation: 'Handle Attach', sizeMeasurement: 'Free Size',
-  pcsChecked: '200', pcsRejected: '4', defects: ['Handle Size', 'Untrimmed Thread'], informToUserId: users.mahipal.id, ...extra,
+  pcsChecked: '200', pcsRejected: '4', defects: [{ defect: 'Handle Size', qty: 3 }, { defect: 'Untrimmed Thread', qty: 2 }], informToUserId: users.mahipal.id, ...extra,
 });
 const mine = async (as, q = '') => (await call('GET', `/api/inline-qc/actions?pageSize=100${q}`, { as })).body;
 
@@ -157,8 +157,8 @@ describe('Inline QC', { skip }, () => {
     assert.equal(e.rejectionPct, '2.0%');
     assert.equal(e.informToName, 'Mahipal Yadav');
     assert.equal(e.recordedByName, 'Sunita Devi');
-    assert.deepEqual(e.defects.map((d) => [d.defect, d.status]), [['Handle Size', 'OPEN'], ['Untrimmed Thread', 'OPEN']]);
-    assert.equal(e.defectsFound, 'Handle Size; Untrimmed Thread');
+    assert.deepEqual(e.defects.map((d) => [d.defect, d.qty, d.status]), [['Handle Size', 3, 'OPEN'], ['Untrimmed Thread', 2, 'OPEN']]);
+    assert.equal(e.defectsFound, 'Handle Size 3; Untrimmed Thread 2');
   });
 
   test('the Inform To person is told in-app', async () => {
@@ -171,7 +171,7 @@ describe('Inline QC', { skip }, () => {
   test('a Workmanship check keeps no operation or size, whatever was sent', async () => {
     const res = await post({
       checkType: 'WORKMANSHIP', operation: 'Hemming', sizeMeasurement: 'Large',
-      pcsChecked: '24', pcsRejected: '2', defects: ['Handle Out'], informToUserId: users.mahipal.id,
+      pcsChecked: '24', pcsRejected: '2', defects: [{ defect: 'Handle Out', qty: 2 }], informToUserId: users.mahipal.id,
     });
     assert.equal(res.status, 201, JSON.stringify(res.body));
     assert.equal(res.body.data.operation, null);
@@ -260,7 +260,7 @@ describe('Inline QC', { skip }, () => {
 
   test('an edit keeps a resolved defect resolved, drops one taken off, adds one put on', async () => {
     const res = await call('PATCH', `/api/inline-qc/${entryIds[0]}`, {
-      as: 'sunita', body: { defects: ['Handle Size', 'Slanted Label'], pcsRejected: '5' },
+      as: 'sunita', body: { defects: [{ defect: 'Handle Size', qty: 3 }, { defect: 'Slanted Label', qty: 2 }], pcsRejected: '5' },
     });
     assert.equal(res.status, 200, JSON.stringify(res.body));
     assert.deepEqual(

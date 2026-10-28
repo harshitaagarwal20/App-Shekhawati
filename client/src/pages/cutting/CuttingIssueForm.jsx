@@ -392,8 +392,7 @@ export default function CuttingIssueForm() {
               <p className="hint">Looking for fabric issued to cutting…</p>
             ) : issues.length === 0 ? (
               <FloorAlert kind="warning" title="No fabric issued for cutting on this order">
-                Cutting has to come from fabric drawn from the store against a cutting challan. Issue it
-                from the order&apos;s <Link to="/cutting-challans">cutting challan</Link> first.
+                Issue the fabric to cutting on a <Link to="/fabric-issues/new">Fabric Issue</Link> first.
               </FloorAlert>
             ) : (
               <>

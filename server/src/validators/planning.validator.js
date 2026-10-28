@@ -10,7 +10,7 @@
  */
 
 import { z } from 'zod';
-import { decimal, isoDate, listQuery, optionalText, uuid } from './common.validator.js';
+import { decimal, isoDate, listQuery, optionalText, requiredText, uuid } from './common.validator.js';
 
 const statusGeneral = z.enum(['PENDING', 'IN_PROGRESS', 'COMPLETED', 'ON_HOLD', 'CANCELLED']);
 const planDepartment = z.enum(['CUTTING', 'STITCHING', 'SHIPPING', 'PACKING', 'IRON']);
@@ -77,7 +77,7 @@ const planHeader = z.object({
   /// Excel: "Planning Department" (Dropdown -> L_PlanDept)
   planDepartment,
   /// Excel: "Container No" (Manual / Dropdown -> L_ContainerNo)
-  containerNo: optionalText(40),
+  containerNo: requiredText(40, 'Container No'),
   /// Excel: "Date" on the flat Planning sheet (Auto) - defaults to today.
   planDate: isoDate.optional(),
   /// Excel: "Remarks" (Text)

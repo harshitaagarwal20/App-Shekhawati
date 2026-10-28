@@ -739,6 +739,50 @@ export const rejectedRegister = {
   get: (id) => request({ method: 'GET', url: `/rejected-register/${id}` }),
 };
 
+// --- Phase 6: needle checking, packing, dispatch ----------------------------
+
+export const needleChecking = {
+  context: () => request({ method: 'GET', url: '/needle-checking/context' }),
+  /** Orders and styles External QC has approved, with what is still to be checked. */
+  orders: () => request({ method: 'GET', url: '/needle-checking/orders' }),
+  /** One order and style's sheet: its figures, its colours and every carton row. */
+  position: (params) => request({ method: 'GET', url: '/needle-checking/position', params }),
+  list: (params) => requestList({ method: 'GET', url: '/needle-checking', params }),
+  get: (id) => request({ method: 'GET', url: `/needle-checking/${id}` }),
+  /** { orderId, styleId, cartonQty, colorCode, size1..size10, weightKg, signedBy } */
+  create: (body) => request({ method: 'POST', url: '/needle-checking', data: body }),
+  update: (id, body) => request({ method: 'PATCH', url: `/needle-checking/${id}`, data: body }),
+  remove: (id) => request({ method: 'DELETE', url: `/needle-checking/${id}` }),
+};
+
+export const packing = {
+  context: () => request({ method: 'GET', url: '/packing/context' }),
+  /** Orders and styles with needle-checked pieces, and what is still to pack. */
+  orders: () => request({ method: 'GET', url: '/packing/orders' }),
+  /** Order qty, the style's name, and the colours Needle Checking passed. */
+  position: (params) => request({ method: 'GET', url: '/packing/position', params }),
+  list: (params) => requestList({ method: 'GET', url: '/packing', params }),
+  get: (id) => request({ method: 'GET', url: `/packing/${id}` }),
+  create: (body) => request({ method: 'POST', url: '/packing', data: body }),
+  update: (id, body) => request({ method: 'PATCH', url: `/packing/${id}`, data: body }),
+  remove: (id) => request({ method: 'DELETE', url: `/packing/${id}` }),
+};
+
+export const dispatches = {
+  context: () => request({ method: 'GET', url: '/dispatches/context' }),
+  /** The Order No dropdown: orders with packed pieces, and what is ready to go. */
+  orders: () => request({ method: 'GET', url: '/dispatches/orders' }),
+  /** { orderId, excluding } - the buyer, container, shipment details and totals a dispatch takes. */
+  preview: (params) => request({ method: 'GET', url: '/dispatches/preview', params }),
+  list: (params) => requestList({ method: 'GET', url: '/dispatches', params }),
+  get: (id) => request({ method: 'GET', url: `/dispatches/${id}` }),
+  create: (body) => request({ method: 'POST', url: '/dispatches', data: body }),
+  update: (id, body) => request({ method: 'PATCH', url: `/dispatches/${id}`, data: body }),
+  remove: (id) => request({ method: 'DELETE', url: `/dispatches/${id}` }),
+  /** dispatch-note, packing-list */
+  print: (id, kind) => request({ method: 'GET', url: `/dispatches/${id}/print/${kind}` }),
+};
+
 // --- Phase 5: final QC, spot rectification, reconciliation -----------------
 
 /**
@@ -1084,4 +1128,36 @@ export const costSheets = {
   approve: (id, body) => request({ method: 'POST', url: `/cost-sheets/${id}/approve`, data: body ?? {} }),
   reject: (id, body) => request({ method: 'POST', url: `/cost-sheets/${id}/reject`, data: body }),
   revise: (id) => request({ method: 'POST', url: `/cost-sheets/${id}/revise` }),
+};
+
+// --- The assistant ---------------------------------------------------------
+
+/**
+ * Questions answered by Claude from the reports and the uploaded documents.
+ * The server decides what each user's questions may look up.
+ */
+export const assistant = {
+  status: () => request({ method: 'GET', url: '/assistant' }),
+  /**
+   * One question. A few lookups and an answer take seconds, sometimes most of a
+   * minute, so this waits longer than the default 30.
+   */
+  ask: (question, history) =>
+    request({ method: 'POST', url: '/assistant/ask', data: { question, history }, timeout: 180_000 }),
+  documents: {
+    list: () => request({ method: 'GET', url: '/assistant/documents' }),
+    /**
+     * Reading and indexing a long PDF takes a while - and the first upload after
+     * a server start also loads the search model. See orders.attachments for why
+     * no Content-Type is set.
+     */
+    upload: (file, requiredPermission) => {
+      const body = new FormData();
+      body.append('file', file);
+      if (requiredPermission) body.append('requiredPermission', requiredPermission);
+      return request({ method: 'POST', url: '/assistant/documents', data: body, timeout: 300_000 });
+    },
+    remove: (id) => request({ method: 'DELETE', url: `/assistant/documents/${id}` }),
+    open: (id, fileName) => openBlob(`/assistant/documents/${id}/file`, fileName),
+  },
 };

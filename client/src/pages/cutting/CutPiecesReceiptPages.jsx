@@ -4,7 +4,7 @@
  * ---------------------------------------------------------------------------
  *  WHERE IT SITS
  *
- *      Cutting Challan  ->  cut on the floor  ->  CUT PIECES RECEIPT  ->  Cutting Issue
+ *      Fabric Issue  ->  cut on the floor  ->  CUT PIECES RECEIPT  ->  Cutting Issue
  *
  *  The cutting master hands over good pieces, rejected pieces and handles;
  *  the store counts them in here. The figure the store keeper wants is
@@ -20,7 +20,6 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import { useResourceList } from '../../hooks/useResourceList.js';
 import {
   cutPiecesReceipts as cprApi,
-  cuttingChallans as ccApi,
   employees as employeesApi,
   fabricIssues as fiApi,
   orders as ordersApi,
@@ -41,12 +40,14 @@ import {
   Spinner,
   TextArea,
   TextInput,
+  ClearFilters,
 } from '../../components/ui.jsx';
 import { Detail, DetailGrid } from '../shared/Detail.jsx';
-import { fmtDate, fmtDateTime, fmtNum, toDateInput, todayInput, fmtOrder } from '../../utils/format.js';
+import { fmtDate, fmtDateTime, fmtNum, fmtOrder, toDateInput, todayInput } from '../../utils/format.js';
 import { loadFailed } from '../../services/loadFailures.js';
 import { ExportButton } from '../../components/dataTransfer.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
+import DateRangeFilter from '../../components/DateRangeFilter.jsx';
 
 const rowsOf = (r) => (Array.isArray(r) ? r : (r?.rows ?? []));
 
@@ -73,7 +74,7 @@ export function CutPiecesReceiptList() {
   const list = useResourceList((params) => cprApi.list(params), {
     defaultSort: 'receiptDate',
     defaultDir: 'desc',
-    initialFilters: { orderId: '' },
+    initialFilters: { orderId: '', dateFrom: '', dateTo: '' },
   });
 
   const [orderOptions, setOrderOptions] = useState([]);
@@ -119,6 +120,8 @@ export function CutPiecesReceiptList() {
             placeholder="All orders"
           />
         </Field>
+        <DateRangeFilter filters={list.filters} setFilter={list.setFilter} />
+        <ClearFilters list={list} />
       </div>
 
       {list.error && <Alert kind="error">{list.error.message ?? String(list.error)}</Alert>}
@@ -138,7 +141,6 @@ export function CutPiecesReceiptList() {
                 <SortableTh field="receiptDate" label="Date" sortBy={list.sortBy} sortDir={list.sortDir} onSort={list.toggleSort} />
                 <th>Order</th>
                 <th>Style</th>
-                <th>Challan</th>
                 <th>Cutting master</th>
                 <th>Color</th>
                 <SortableTh field="pcsReceived" label="Good pcs" className="num" sortBy={list.sortBy} sortDir={list.sortDir} onSort={list.toggleSort} />
@@ -154,7 +156,6 @@ export function CutPiecesReceiptList() {
                   <td className="nowrap">{fmtDate(r.receiptDate)}</td>
                   <td>{r.order?.orderNo ?? '-'}</td>
                   <td>{r.style?.styleNo ?? '-'}</td>
-                  <td>{r.cuttingChallan?.challanNo ?? '-'}</td>
                   <td>{r.cuttingMasterName}</td>
                   <td>{r.colorCode ?? '-'}</td>
                   <td className="num"><strong>{fmtNum(r.pcsReceived)}</strong></td>
@@ -286,14 +287,6 @@ export function CutPiecesReceiptDetail() {
               sub={row.order?.buyer?.buyerName}
             />
             <Detail label="Style" value={row.style?.styleNo} mono />
-            <Detail
-              label="Cutting challan"
-              value={
-                row.cuttingChallan
-                  ? <Link to={`/cutting-challans/${row.cuttingChallan.id}`}>{row.cuttingChallan.challanNo}</Link>
-                  : '-'
-              }
-            />
             <Detail label="Cutting master" value={row.cuttingMasterName} sub={row.cuttingMaster?.empId} />
             <Detail label="Color" value={row.colorCode} />
             <Detail label="Lot No" value={row.lotNo} />
@@ -773,14 +766,12 @@ function ReceiptModal({ existing, onClose, onSaved }) {
   const editing = Boolean(existing);
 
   const [orderOptions, setOrderOptions] = useState([]);
-  const [challanOptions, setChallanOptions] = useState([]);
   const [employeeOptions, setEmployeeOptions] = useState([]);
   const [nextNo, setNextNo] = useState('');
 
   const [form, setForm] = useState(() => ({
     receiptDate: existing ? toDateInput(existing.receiptDate) : todayInput(),
     orderId: existing?.orderId ?? '',
-    cuttingChallanId: existing?.cuttingChallanId ?? '',
     cuttingMasterId: existing?.cuttingMasterId ?? '',
     cuttingMasterName: existing?.cuttingMasterId ? '' : (existing?.cuttingMasterName ?? ''),
     colorCode: existing?.colorCode ?? '',
@@ -807,14 +798,12 @@ function ReceiptModal({ existing, onClose, onSaved }) {
   const [error, setError] = useState('');
 
   /*
-   * The style the pieces belong to - the challan's if one is chosen, else the
-   * order's - and its panel list. Where it has one, the handle count is worked
-   * out from the good pieces and is not typed.
+   * The style the pieces belong to - the order's - and its panel list. Where
+   * it has one, the handle count is worked out from the good pieces and is
+   * not typed.
    */
-  const chosenChallan = challanOptions.find((c) => c.id === form.cuttingChallanId);
   const chosenOrder = orderOptions.find((o) => o.id === form.orderId);
-  const styleId = chosenChallan?.styleId ?? chosenChallan?.style?.id ?? chosenOrder?.styleId
-    ?? chosenOrder?.style?.id ?? existing?.styleId ?? null;
+  const styleId = chosenOrder?.styleId ?? chosenOrder?.style?.id ?? existing?.styleId ?? null;
   const [perBag, setPerBag] = useState(null);
   useEffect(() => {
     if (!styleId) {
@@ -843,17 +832,12 @@ function ReceiptModal({ existing, onClose, onSaved }) {
     if (!editing) cprApi.nextNumber().then((r) => setNextNo(r?.receiptNo ?? '')).catch(() => {});
   }, [editing, existing]);
 
-  // The challans of the chosen order, and its pieces-in-hand so far.
+  // The chosen order's pieces-in-hand so far.
   useEffect(() => {
     if (!form.orderId) {
-      setChallanOptions([]);
       setSummary(null);
       return;
     }
-    ccApi
-      .list({ orderId: form.orderId, pageSize: 100 })
-      .then((r) => setChallanOptions(rowsOf(r).filter((c) => c.status !== 'CANCELLED')))
-      .catch(loadFailed(setChallanOptions, 'cutting challans'));
     cprApi
       .summary({ orderId: form.orderId })
       .then(setSummary)
@@ -899,7 +883,6 @@ function ReceiptModal({ existing, onClose, onSaved }) {
     const body = {
       receiptDate: form.receiptDate,
       orderId: form.orderId,
-      cuttingChallanId: form.cuttingChallanId || null,
       cuttingMasterId: form.cuttingMasterId || null,
       cuttingMasterName: form.cuttingMasterId ? undefined : form.cuttingMasterName.trim(),
       colorCode: form.colorCode || null,
@@ -952,35 +935,12 @@ function ReceiptModal({ existing, onClose, onSaved }) {
               const o = orderOptions.find((x) => x.id === e.target.value);
               set({
                 orderId: e.target.value,
-                cuttingChallanId: '',
                 colorCode: form.colorCode || o?.colorCode || '',
               });
             }}
             options={orderOptions}
             getValue={(o) => o.id}
-            getLabel={(o) => `${o.orderNo}${o.buyer?.buyerName ? ` - ${o.buyer.buyerName}` : ''}`}
-          />
-        </Field>
-
-        <Field
-          label="Cutting challan"
-          hint={
-            !form.orderId
-              ? 'Choose an order first.'
-              : challanOptions.length === 0
-                ? 'This order has no cutting challan - you can still save the receipt.'
-                : 'The challan these pieces were cut against.'
-          }
-        >
-          <RecordSelect
-            value={form.cuttingChallanId}
-            onChange={(e) => set({ cuttingChallanId: e.target.value })}
-            options={challanOptions}
-            disabled={!form.orderId}
-            placeholder={form.orderId ? 'Select a challan (optional)' : 'Choose an order first'}
-            emptyLabel={form.orderId ? 'No challan for this order' : 'Choose an order first'}
-            getValue={(c) => c.id}
-            getLabel={(c) => `${c.challanNo} - ${fmtDate(c.challanDate)}`}
+            getLabel={fmtOrder}
           />
         </Field>
 

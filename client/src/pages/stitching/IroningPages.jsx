@@ -42,15 +42,17 @@ import {
   StatusBadge,
   TextArea,
   TextInput,
+  ClearFilters,
 } from '../../components/ui.jsx';
 import { Detail, DetailGrid } from '../shared/Detail.jsx';
-import { fmtDate, fmtDateTime, fmtNum } from '../../utils/format.js';
+import { fmtDate, fmtDateTime, fmtNum, fmtOrder, fmtOrderStyle } from '../../utils/format.js';
 import { ExportButton } from '../../components/dataTransfer.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
+import DateRangeFilter from '../../components/DateRangeFilter.jsx';
 
 const n0 = (v) => fmtNum(v, { decimals: 0 });
 const num = (v) => Number(v || 0);
-const optionLabel = (o) => `${o.orderNo} · ${o.styleNo} · ${o.unit ?? o.sourceLabel}`;
+const optionLabel = (o) => `${fmtOrderStyle(o)} · ${o.unit ?? o.sourceLabel}`;
 
 const SOURCE_LABEL = {
   STITCHING_UNIT: 'Stitching unit',
@@ -85,7 +87,7 @@ export function IroningList() {
   const list = useResourceList((params) => api.list(params), {
     defaultSort: 'entryDate',
     defaultDir: 'desc',
-    initialFilters: { source: '', fromUnit: '', orderId: '', ironerId: '', undecidedOnly: '', dateFrom: '', dateTo: '' },
+    initialFilters: { source: '', orderId: '', undecidedOnly: '', dateFrom: '', dateTo: '' },
   });
 
   const loadOptions = useCallback(() => {
@@ -156,22 +158,10 @@ export function IroningList() {
                 {Object.entries(SOURCE_LABEL).map(([v, label]) => <option key={v} value={v}>{label}</option>)}
               </select>
             </Field>
-            <Field label="From unit">
-              <select value={list.filters.fromUnit} onChange={(e) => list.setFilter('fromUnit', e.target.value)}>
-                <option value="">All units</option>
-                {(ctx?.units ?? []).map((u) => <option key={u} value={u}>{u}</option>)}
-              </select>
-            </Field>
             <Field label="Order">
               <select value={list.filters.orderId} onChange={(e) => list.setFilter('orderId', e.target.value)}>
                 <option value="">All orders</option>
-                {orders.map((o) => <option key={o.orderId} value={o.orderId}>{o.orderNo}</option>)}
-              </select>
-            </Field>
-            <Field label="Ironer">
-              <select value={list.filters.ironerId} onChange={(e) => list.setFilter('ironerId', e.target.value)}>
-                <option value="">All ironers</option>
-                {(ctx?.ironers ?? []).map((i) => <option key={i.id} value={i.id}>{i.empName}</option>)}
+                {orders.map((o) => <option key={o.orderId} value={o.orderId}>{fmtOrder(o)}</option>)}
               </select>
             </Field>
             <Field label="Show">
@@ -180,12 +170,8 @@ export function IroningList() {
                 <option value="true">Damage still to decide</option>
               </select>
             </Field>
-            <Field label="From">
-              <TextInput type="date" value={list.filters.dateFrom} onChange={(e) => list.setFilter('dateFrom', e.target.value)} />
-            </Field>
-            <Field label="To">
-              <TextInput type="date" value={list.filters.dateTo} onChange={(e) => list.setFilter('dateTo', e.target.value)} />
-            </Field>
+            <DateRangeFilter filters={list.filters} setFilter={list.setFilter} fromLabel="From" toLabel="To" />
+            <ClearFilters list={list} />
           </div>
 
           {list.error && <Alert kind="error">{list.error.message ?? String(list.error)}</Alert>}

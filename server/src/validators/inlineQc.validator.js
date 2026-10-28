@@ -21,7 +21,21 @@ const fields = {
   sizeMeasurement: optionalText(60),
   pcsChecked: decimal('Pcs checked', { allowZero: false }),
   pcsRejected: decimal('Pcs rejected').optional(),
-  defects: z.array(z.string().trim().max(120)).max(30).optional(),
+  /**
+   * Each defect found and how many pieces had it. A bare name is still read,
+   * as a defect not yet counted; the rules then ask for its count. The count
+   * is checked there (whole, at least 1, no more than checked).
+   */
+  defects: z
+    .array(z.union([
+      z.string().trim().max(120),
+      z.object({
+        defect: z.string().trim().max(120),
+        qty: z.union([z.number(), z.string().trim()]).nullable().optional(),
+      }),
+    ]))
+    .max(30)
+    .optional(),
   informToUserId: z.union([uuid, z.literal(''), z.null()]).optional(),
   remarks: optionalText(2000),
 };

@@ -696,6 +696,8 @@ az webapp config appsettings set \
 | `SCM_DO_BUILD_DURING_DEPLOYMENT` | `false` | Step 10 ships a built, installed artifact. Rebuilding on the worker is slower and can produce a Prisma client for the wrong platform. |
 | `WEBSITE_RUN_FROM_PACKAGE` | `1` | Mounts the zip read-only: faster cold start, atomic deploys, and no "fixing" production by editing a file over SSH. |
 | `APPLICATIONINSIGHTS_CONNECTION_STRING` | set in Step 14 | — |
+| `ANTHROPIC_API_KEY` | *Key Vault reference* (optional) | Turns on the "Needs attention" lines Claude writes on top of the daily summary. Store it as secret `ANTHROPIC-API-KEY`, like `JWT-SECRET`. Leave it unset and the summary goes out as before. `DAILY_SUMMARY_AI=false` switches it off without removing the key. The same key turns on **Ask** - see `docs/AI-ASSISTANT.md`. |
+| `ASSISTANT_MODEL_CACHE` | `/home/assistant-model` (with the key) | Where Ask's search model is downloaded on first use. Must be writable, and the package is mounted read-only. |
 
 Deliberately **not** set here: `PORT` (App Service supplies it) and
 `SEED_ADMIN_PASSWORD` / `SEED_DEFAULT_USER_PASSWORD` — those belong to Step 12,

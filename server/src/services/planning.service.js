@@ -637,7 +637,7 @@ export async function list(query) {
   const {
     page, pageSize, skip, take, orderBy, search, includeDeleted,
     status, approvalStatus, state, orderId, planDepartment, containerNo,
-    planFrom, planTo,
+    planFrom, planTo, dateFrom, dateTo,
   } = query;
 
   const where = {
@@ -652,11 +652,11 @@ export async function list(query) {
     ...(state === 'SUBMITTED' ? { approvalStatus: 'PENDING', submittedAt: { not: null } } : {}),
     ...(state === 'APPROVED' ? { approvalStatus: 'APPROVED' } : {}),
     ...(state === 'REJECTED' ? { approvalStatus: 'REJECTED' } : {}),
-    ...(planFrom || planTo
+    ...(planFrom || planTo || dateFrom || dateTo
       ? {
           planDate: {
-            ...(planFrom ? { gte: new Date(planFrom) } : {}),
-            ...(planTo ? { lte: new Date(planTo) } : {}),
+            ...((planFrom || dateFrom) ? { gte: new Date(planFrom || dateFrom) } : {}),
+            ...((planTo || dateTo) ? { lte: new Date(planTo || dateTo) } : {}),
           },
         }
       : {}),

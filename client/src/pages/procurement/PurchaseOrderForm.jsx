@@ -45,7 +45,7 @@ import {
   Spinner,
   StationerySelect,
 } from '../../components/ui.jsx';
-import { fmtNum, todayInput, toDateInput } from '../../utils/format.js';
+import { fmtNum, fmtOrderStyle, fmtVendor, toDateInput, todayInput } from '../../utils/format.js';
 import { loadFailed } from '../../services/loadFailures.js';
 
 /**
@@ -398,7 +398,7 @@ export default function PurchaseOrderForm({ purchaseOrder, onSaved, onCancel }) 
             required
             options={vendorOptions}
             loading={vendorOptions === null}
-            getLabel={(v) => `${v.vendorName} (${v.vendorCode})`}
+            getLabel={fmtVendor}
             placeholder="Select vendor..."
           />
 
@@ -409,7 +409,7 @@ export default function PurchaseOrderForm({ purchaseOrder, onSaved, onCancel }) 
             hint="The buyer order this PO procures for."
             options={orderOptions}
             loading={orderOptions === null}
-            getLabel={(o) => `${o.orderNo} — ${o.style?.styleNo ?? ''}`}
+            getLabel={fmtOrderStyle}
             placeholder="No order reference"
           />
 

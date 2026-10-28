@@ -55,6 +55,7 @@ in the backend zip.
 |---|---|---|
 | `DATABASE_URL` | `DATABASE-URL` | Postgres connection string including the `siadmin` password |
 | `JWT_SECRET` | `JWT-SECRET` | Signing key for login tokens |
+| `ANTHROPIC_API_KEY` | `ANTHROPIC-API-KEY` | Optional. Claude API key for the daily summary's "Needs attention" lines |
 
 The App Setting value becomes a reference, for example
 `@Microsoft.KeyVault(VaultName=shekhawati-kv-u4dfh;SecretName=DATABASE-URL)`.

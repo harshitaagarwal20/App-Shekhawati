@@ -1,6 +1,6 @@
 # Post-Cutting scope — what building the production flow would take
 
-**Status: assessment only. Nothing in this document has been built.**
+**Status: the original assessment, now partly built — see the note below.**
 
 > **Status since this was written.** Several stages assessed here have been
 > built: Stitching Record and Hourly Monitoring, **Inline QC** (QC Size and QC

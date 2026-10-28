@@ -30,11 +30,13 @@ import {
   Spinner,
   TextArea,
   TextInput,
+  ClearFilters,
 } from '../../components/ui.jsx';
 import { ExportButton, ImportButton } from '../../components/dataTransfer.jsx';
 import { reportLoadFailure } from '../../services/loadFailures.js';
 import { focusFirstError } from '../../components/form.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
+import { fmtBuyer } from '../../utils/format.js';
 
 const STATUS_OPTIONS = [
   { value: 'ACTIVE', label: 'Active' },
@@ -222,7 +224,7 @@ export default function MasterPage({ descriptor, renderExtraForm, buildSubmitPay
             options={recordOptions[f.resource] ?? []}
             loading={!recordOptions[f.resource]}
             getValue={(o) => o.id}
-            getLabel={(o) => `${o.buyerName}${o.buyerCode ? ` (${o.buyerCode})` : ''}`}
+            getLabel={fmtBuyer}
             placeholder="Select buyer..."
             {...common}
           />
@@ -235,7 +237,7 @@ export default function MasterPage({ descriptor, renderExtraForm, buildSubmitPay
         control = <EnumSelect options={f.options} includeBlank={f.includeBlank ?? false} {...common} />;
         break;
       case 'number':
-        control = <TextInput type="number" step={f.step ?? 'any'} min={f.min} {...common} />;
+        control = <TextInput type="number" step={f.step ?? 'any'} min={f.min} placeholder={f.placeholder} {...common} />;
         break;
       case 'email':
         control = <TextInput type="email" autoComplete="off" {...common} />;
@@ -330,6 +332,7 @@ export default function MasterPage({ descriptor, renderExtraForm, buildSubmitPay
               onChange={(e) => list.setFilter('status', e.target.value)}
             />
           </Field>
+          <ClearFilters list={list} />
         </div>
 
         <TableWrap>

@@ -108,6 +108,11 @@ export const MODULES = [
   'FINAL_CHECKER_REPORT',
   'FINISHED_CHECKER',
   'SPOT_RECTIFICATION',
+  // Phase 6. External QC's Approved to the buyer: needle checking (the size
+  // assortment cartons), packing and the order-wise dispatch.
+  'NEEDLE_DETECTION',
+  'PACKING',
+  'DISPATCH',
   'RECONCILIATION_REPORT',
   // The cross-module queue of everything awaiting a decision (Dashboard >
   // Approvals). It sat on REPORT.VIEW, which put it in front of every floor
@@ -117,9 +122,21 @@ export const MODULES = [
   // Not a document - the trail of who changed what. Read-only by
   // construction: see services/audit.service.js.
   'AUDIT',
+  // Questions answered by Claude from the reports and the uploaded reference
+  // documents. VIEW asks, CREATE uploads a document, DELETE removes one - see
+  // services/assistant.service.js.
+  'ASSISTANT',
 ];
 
 export const ACTIONS = ['VIEW', 'CREATE', 'EDIT', 'DELETE', 'APPROVE', 'EXPORT'];
+
+/**
+ * Modules that take only some of the standard actions. A document is uploaded
+ * and removed, never edited, and there is nothing of the assistant's to export.
+ */
+const ONLY_ACTIONS = {
+  ASSISTANT: ['VIEW', 'CREATE', 'DELETE'],
+};
 
 /**
  * Actions particular to one module, beyond the standard set.
@@ -217,6 +234,7 @@ export function buildPermissions() {
     for (const action of ACTIONS) {
       if (action === 'APPROVE' && !APPROVABLE.has(module)) continue;
       if (READ_ONLY.has(module) && !['VIEW', 'EXPORT'].includes(action)) continue;
+      if (ONLY_ACTIONS[module] && !ONLY_ACTIONS[module].includes(action)) continue;
       out.push(permission(module, action));
     }
     for (const action of EXTRA_ACTIONS[module] ?? []) out.push(permission(module, action));
@@ -328,6 +346,14 @@ export const roles = [
       'FINISHED_CHECKER.EXPORT',
       'SPOT_RECTIFICATION.VIEW',
       'SPOT_RECTIFICATION.EXPORT',
+      // Phase 6 - the shipping plan is this desk's, so the dispatch that
+      // leaves against it is too. Needle checking and packing are read: they
+      // are what decides how much is ready to go.
+      ...owns('DISPATCH'),
+      'NEEDLE_DETECTION.VIEW',
+      'NEEDLE_DETECTION.EXPORT',
+      'PACKING.VIEW',
+      'PACKING.EXPORT',
       'VENDOR.VIEW',
       'CUTTING_CHALLAN.VIEW',
       'CUT_PIECES_RECEIPT.VIEW',
@@ -558,7 +584,8 @@ export const roles = [
     name: 'QC',
     description:
       'Records the Fabric Scrutiny Report (the decision itself rests with the Director), the '
-      + 'Inline QC checks taken on the stitching line, the final QC sheets and spot rectification.',
+      + 'Inline QC checks taken on the stitching line, the final QC sheets and spot rectification, '
+      + 'needle checking and packing.',
     isSystem: true,
     permissions: [
       ...owns('FABRIC_SCRUTINY'),
@@ -571,6 +598,9 @@ export const roles = [
       ...owns('FINAL_CHECKER_REPORT'),
       ...owns('FINISHED_CHECKER'),
       ...owns('SPOT_RECTIFICATION'),
+      // Phase 6 - "QC / Packing Dept": needle checking and packing.
+      ...owns('NEEDLE_DETECTION'),
+      ...owns('PACKING'),
       'FABRIC_ROLL.VIEW',
       // Grading a roll's shade and dye lot is an inspection judgement, made
       // at the light box by the same desk that writes the scrutiny report.
@@ -588,6 +618,8 @@ export const roles = [
     description:
       'Dinesh Sir. Final authority: order excess, quotation authorisation, PO approval, gate pass authorisation, fabric scrutiny decision and plan approval. Sees everything, edits nothing.',
     isSystem: true,
-    permissions: ['*.VIEW', '*.EXPORT', '*.APPROVE', 'REPORT.*'],
+    // ASSISTANT.CREATE: uploading a tech pack or an SOP for the assistant to
+    // read is not editing a document of the business, which stays the rule.
+    permissions: ['*.VIEW', '*.EXPORT', '*.APPROVE', 'REPORT.*', 'ASSISTANT.CREATE'],
   },
 ];

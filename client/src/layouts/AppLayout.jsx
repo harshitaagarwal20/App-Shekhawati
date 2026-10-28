@@ -60,7 +60,7 @@ const ICONS = {
       <line x1="4" y1="18" x2="14" y2="18" />
     </>
   ),
-  Orders: (
+  'Orders & Planning': (
     <>
       <rect x="5" y="3" width="14" height="18" rx="2" />
       <line x1="9" y1="8" x2="15" y2="8" />
@@ -68,27 +68,11 @@ const ICONS = {
       <line x1="9" y1="16" x2="13" y2="16" />
     </>
   ),
-  Procurement: (
+  'Purchase & Stores': (
     <>
       <circle cx="9" cy="20" r="1.5" />
       <circle cx="18" cy="20" r="1.5" />
       <polyline points="2 3 5 3 8 15 19 15 21 7 6 7" />
-    </>
-  ),
-  Stores: (
-    <>
-      <polyline points="3 8 12 3 21 8 21 17 12 22 3 17 3 8" />
-      <line x1="3" y1="8" x2="12" y2="12.5" />
-      <line x1="21" y1="8" x2="12" y2="12.5" />
-    </>
-  ),
-  'Job Work': (
-    <>
-      <circle cx="12" cy="12" r="6.5" />
-      <line x1="12" y1="5.5" x2="12" y2="2.5" />
-      <line x1="12" y1="21.5" x2="12" y2="18.5" />
-      <line x1="5.5" y1="12" x2="2.5" y2="12" />
-      <line x1="21.5" y1="12" x2="18.5" y2="12" />
     </>
   ),
   'Plan Approval': (
@@ -97,7 +81,7 @@ const ICONS = {
       <polyline points="8 12.5 11 15.5 16 9" />
     </>
   ),
-  Cutting: (
+  'Fabric & Cutting': (
     <>
       <circle cx="6.5" cy="18" r="2.3" />
       <circle cx="17.5" cy="18" r="2.3" />
@@ -114,30 +98,22 @@ const ICONS = {
     </>
   ),
   // An iron - pressing is where finishing starts.
-  Finishing: (
+  'Finishing & Quality': (
     <>
       <path d="M3 18h18v-4a5 5 0 0 0-5-5H9z" />
       <path d="M10.5 9V6h7v3" />
     </>
   ),
   // A magnifier over a tick - something looked at and passed.
-  Quality: (
+  // A carton, taped across the top - packed and ready to go.
+  'Packing & Dispatch': (
     <>
-      <circle cx="10.5" cy="10.5" r="6.5" />
-      <line x1="15.3" y1="15.3" x2="21" y2="21" />
-      <polyline points="7.5 10.5 9.8 12.8 13.5 8.5" />
+      <path d="M3 8l9-4 9 4v9l-9 4-9-4z" />
+      <polyline points="3 8 12 12 21 8" />
+      <line x1="12" y1="12" x2="12" y2="21" />
     </>
   ),
   // A balance - two sides that have to agree.
-  Reconciliation: (
-    <>
-      <line x1="12" y1="3" x2="12" y2="21" />
-      <line x1="4" y1="7" x2="20" y2="7" />
-      <path d="M4 7l-2.5 6h5z" />
-      <path d="M20 7l-2.5 6h5z" />
-      <line x1="8" y1="21" x2="16" y2="21" />
-    </>
-  ),
   Administration: (
     <>
       <circle cx="12" cy="8" r="3.6" />
@@ -336,19 +312,10 @@ export default function AppLayout() {
                   className={`nav-group-toggle ${group.label === activeGroup ? 'has-active' : ''}`}
                   onClick={() => toggleGroup(group.label)}
                   aria-expanded={isOpen}
-                  title={group.stage ? `Step ${group.stage} - ${group.label}` : group.label}
+                  title={group.label}
                 >
-                  {/* The pipeline position, at the START of the row where a
-                      sequence reads - a numbered list, not a badge. It was on
-                      the right beside the item count, and two numerals in two
-                      pills said nothing about which was which: "Procurement 3
-                      2" could as easily have been two items at stage 3. */}
-                  <span className="nav-group-stage" aria-hidden="true">
-                    {group.stage ?? ''}
-                  </span>
                   <NavIcon label={group.label} />
                   <span className="nav-group-label">{group.label}</span>
-                  <span className="nav-group-count">{group.items.length}</span>
                   <svg className="nav-chevron" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <polyline points="9 6 15 12 9 18" />
                   </svg>

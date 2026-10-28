@@ -18,7 +18,6 @@ import {
   EmptyState,
   EnumSelect,
   Field,
-  MasterSelect,
   Modal,
   PageHeader,
   Pagination,
@@ -27,6 +26,7 @@ import {
   Spinner,
   StatusBadge,
   TextInput,
+  ClearFilters,
 } from '../../components/ui.jsx';
 import OrderForm from './OrderForm.jsx';
 
@@ -61,10 +61,11 @@ const COLUMNS = [
   { key: 'delivery', label: 'Delivery' },
   { key: 'status', label: 'Status' },
 ];
-import { fmtDate } from '../../utils/format.js';
+import { fmtBuyer, fmtDate } from '../../utils/format.js';
 import { loadFailed } from '../../services/loadFailures.js';
 import { ExportButton } from '../../components/dataTransfer.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
+import DateRangeFilter from '../../components/DateRangeFilter.jsx';
 
 
 const fmtQty = (v) => (v === null || v === undefined ? '-' : Number(v).toLocaleString());
@@ -75,14 +76,11 @@ const STATUS_OPTIONS = [
   { value: 'COMPLETED', label: 'Completed' },
   { value: 'ON_HOLD', label: 'On Hold' },
   { value: 'CANCELLED', label: 'Cancelled' },
+  // Set by Dispatch, never chosen: the filter can still ask for them.
+  { value: 'PARTIALLY_SHIPPED', label: 'Partially Shipped' },
+  { value: 'SHIPPED', label: 'Shipped' },
 ];
 
-const EXCESS_OPTIONS = [
-  { value: 'NOT_REQUIRED', label: 'No excess' },
-  { value: 'PENDING', label: 'Awaiting Director' },
-  { value: 'APPROVED', label: 'Approved' },
-  { value: 'REJECTED', label: 'Rejected' },
-];
 
 const EXCESS_BADGE = {
   NOT_REQUIRED: 'badge-inactive',
@@ -101,9 +99,9 @@ export default function OrderList() {
     defaultDir: 'desc',
     initialFilters: {
       status: '',
-      excessApprovalStatus: '',
       buyerId: '',
-      currency: '',
+      orderFrom: '',
+      orderTo: '',
     },
   });
 
@@ -170,7 +168,7 @@ export default function OrderList() {
               id="o-buyer"
               options={buyerOptions}
               getValue={(b) => b.id}
-              getLabel={(b) => b.buyerName}
+              getLabel={fmtBuyer}
               placeholder="All buyers"
               value={list.filters.buyerId ?? ''}
               onChange={(e) => list.setFilter('buyerId', e.target.value)}
@@ -187,25 +185,9 @@ export default function OrderList() {
             />
           </Field>
 
-          <Field label="Excess" htmlFor="o-excess">
-            <EnumSelect
-              id="o-excess"
-              options={EXCESS_OPTIONS}
-              placeholder="All"
-              value={list.filters.excessApprovalStatus ?? ''}
-              onChange={(e) => list.setFilter('excessApprovalStatus', e.target.value)}
-            />
-          </Field>
 
-          <Field label="Currency" htmlFor="o-currency">
-            <MasterSelect
-              id="o-currency"
-              listCode="Currency"
-              placeholder="All"
-              value={list.filters.currency ?? ''}
-              onChange={(e) => list.setFilter('currency', e.target.value)}
-            />
-          </Field>
+          <DateRangeFilter filters={list.filters} setFilter={list.setFilter} fromKey="orderFrom" toKey="orderTo" label="Order date" fromLabel="Order date from" toLabel="Order date to" />
+          <ClearFilters list={list} />
         </div>
 
         <TableWrap>

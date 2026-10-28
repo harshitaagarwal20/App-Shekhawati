@@ -76,6 +76,7 @@ import { Prisma } from '@prisma/client';
 import prisma from '../config/prisma.js';
 import { ApiError } from '../utils/ApiError.js';
 import { duplicateMaterial, lineNumber } from '../domain/documentLines.js';
+import { tryCategoryOf } from '../domain/itemCategory.js';
 import { searchFilter } from '../utils/http.js';
 import { assertValueInList } from './masterList.service.js';
 import { nextNumber, peekNumber } from './documentNumber.service.js';
@@ -92,6 +93,13 @@ import {
   recomputeBalance,
   resolveOrCreateItem,
 } from './inventory.service.js';
+
+/**
+ * A receipt no longer asks what the goods are for - that is decided when they
+ * are issued from the store. The column is still filled, from the PO.
+ */
+const purposeOf = (po) =>
+  po.accessoriesItem || tryCategoryOf(po.item) === 'ACCESSORIES' ? 'ACCESSORIES' : 'RAW_MATERIAL';
 
 export const SORTABLE = [
   'grnNo',
@@ -1150,7 +1158,7 @@ async function writeLine(tx, ctx, { header, lineNo }, actor) {
         billNo: input.billNo.trim(),
         rollNo: rollsIn.length === 1 ? (rollsIn[0].rollNo ?? null) : null,
         grnDate: input.grnDate ? new Date(input.grnDate) : new Date(),
-        purpose: input.purpose,
+        purpose: input.purpose ?? purposeOf(po),
         item: po.item,
         hsnCode: input.hsnCode ?? po.hsnCode ?? null,
         vendorId: po.vendorId,

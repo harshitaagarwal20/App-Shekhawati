@@ -28,24 +28,27 @@ import {
   Spinner,
   StatusBadge,
   TextInput,
+  ClearFilters,
 } from '../../components/ui.jsx';
 import PlanningForm from './PlanningForm.jsx';
 import { STATE_BADGE, STATE_LABEL, fmtDate, fmtEnum, fmtQty } from './planningShared.jsx';
 import { loadFailed } from '../../services/loadFailures.js';
 import { ExportButton } from '../../components/dataTransfer.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
+import DateRangeFilter from '../../components/DateRangeFilter.jsx';
 import { fmtOrder } from '../../utils/format.js';
 
 const DEPARTMENT_OPTIONS = [
   { value: 'CUTTING', label: 'Cutting' },
   { value: 'STITCHING', label: 'Stitching' },
   { value: 'IRON', label: 'Iron' },
-  { value: 'SHIPPING', label: 'Shipping' },
   /**
    * C14 - a packing PLAN. This system records no packing work and has no table
    * that could; the department names who owns the plan, not who does the job.
    */
   { value: 'PACKING', label: 'Packing' },
+  // The stored value stays SHIPPING; the office calls it Dispatch, as the form does.
+  { value: 'SHIPPING', label: 'Dispatch' },
 ];
 
 const STATE_OPTIONS = [
@@ -55,13 +58,6 @@ const STATE_OPTIONS = [
   { value: 'REJECTED', label: 'Rejected' },
 ];
 
-const STATUS_OPTIONS = [
-  { value: 'PENDING', label: 'Pending' },
-  { value: 'IN_PROGRESS', label: 'In Progress' },
-  { value: 'COMPLETED', label: 'Completed' },
-  { value: 'ON_HOLD', label: 'On Hold' },
-  { value: 'CANCELLED', label: 'Cancelled' },
-];
 
 /**
  * What this register can show, and what it shows unasked.
@@ -102,9 +98,10 @@ export default function PlanningList({ title = 'Planning' }) {
     defaultDir: 'desc',
     initialFilters: {
       state: '',
-      status: '',
       planDepartment: '',
       orderId: '',
+      dateFrom: '',
+      dateTo: '',
     },
   });
 
@@ -187,6 +184,7 @@ export default function PlanningList({ title = 'Planning' }) {
               onChange={(e) => list.setFilter('planDepartment', e.target.value)}
             />
           </Field>
+          <DateRangeFilter filters={list.filters} setFilter={list.setFilter} />
 
           <Field label="Approval" htmlFor="p-state">
             <EnumSelect
@@ -198,15 +196,7 @@ export default function PlanningList({ title = 'Planning' }) {
             />
           </Field>
 
-          <Field label="Status" htmlFor="p-status">
-            <EnumSelect
-              id="p-status"
-              options={STATUS_OPTIONS}
-              placeholder="All"
-              value={list.filters.status ?? ''}
-              onChange={(e) => list.setFilter('status', e.target.value)}
-            />
-          </Field>
+          <ClearFilters list={list} />
         </div>
 
         <TableWrap>

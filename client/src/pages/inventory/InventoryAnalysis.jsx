@@ -31,8 +31,6 @@ const VIEWS = [
       { label: 'On hand', value: fmtNum(t.onHandQty) },
       { label: 'Stock value', value: fmtMoney(t.value) },
       { label: 'With job workers', value: fmtNum(t.withJobWorkerQty) },
-      { label: 'Held / rejected', value: fmtNum(t.heldQty), bad: Number(t.heldQty) > 0 },
-      { label: 'Older than 90 days', value: fmtNum(t.agedQty), bad: Number(t.agedQty) > 0 },
       { label: 'Rolls awaiting inspection', value: fmtNum(t.inspectionPending), bad: t.inspectionPending > 0 },
     ],
   },

@@ -177,7 +177,7 @@ export default function OrderDetail() {
       {/* --- Order details ------------------------------------------------- */}
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-body">
-          <div className="form-grid">
+          <div className="form-grid detail-grid">
             <Detail label="Order No" value={order.orderNo} mono />
             <Detail label="Order Date" value={fmtDate(order.orderDate)} />
             <Detail label="Buyer Delivery Date" value={fmtDate(order.buyerDeliveryDate)} />
@@ -218,16 +218,12 @@ export default function OrderDetail() {
           )}
         </div>
         <div className="card-body">
-          <div className="form-grid">
+          <div className="form-grid detail-grid">
             <Detail label="Buyer PO No" value={order.buyerPoNo} mono />
             <Detail label="Buyer PO Date" value={fmtDate(order.buyerPoDate)} />
             <Detail label="Ex-Factory Date" value={fmtDate(order.exFactoryDate)} />
             <Detail label="Price Terms" value={order.priceTerms} />
             <Detail label="Payment Terms" value={order.paymentTerms} />
-            <Detail
-              label="Exchange Rate"
-              value={order.exchangeRate ? `${Number(order.exchangeRate)} INR / ${order.currency ?? 'unit'}` : null}
-            />
             <Detail
               label="Order Value"
               value={
@@ -508,7 +504,7 @@ function Detail({ label, value, mono, className = '' }) {
   return (
     <div className={`field ${className}`}>
       <label>{label}</label>
-      <div className={mono ? 'mono' : ''} style={{ paddingTop: 2 }}>
+      <div className={`detail-value${mono ? ' mono' : ''}`}>
         {value || <span className="faint">-</span>}
       </div>
     </div>
@@ -531,12 +527,10 @@ function PricingDialog({ order, onCancel, onDone }) {
     exFactoryDate: asInput(order.exFactoryDate),
     priceTerms: order.priceTerms ?? '',
     paymentTerms: order.paymentTerms ?? '',
-    exchangeRate: order.exchangeRate != null ? String(Number(order.exchangeRate)) : '',
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const set = (k) => (e) => setTerms((t) => ({ ...t, [k]: e.target.value }));
-  const isInr = String(order.currency ?? '').toUpperCase() === 'INR';
 
   const total = (order.lines ?? []).reduce(
     (acc, l) => (acc === null || prices[l.id] === '' ? null : acc + Number(l.orderQty) * Number(prices[l.id])),
@@ -553,7 +547,6 @@ function PricingDialog({ order, onCancel, onDone }) {
         exFactoryDate: terms.exFactoryDate || null,
         priceTerms: terms.priceTerms,
         paymentTerms: terms.paymentTerms,
-        exchangeRate: isInr || !terms.exchangeRate ? null : terms.exchangeRate,
         lines: (order.lines ?? []).map((l) => ({ id: l.id, unitPrice: prices[l.id] === '' ? null : prices[l.id] })),
       });
       onDone();
@@ -590,9 +583,6 @@ function PricingDialog({ order, onCancel, onDone }) {
           </Field>
           <Field label="Ex-Factory Date" hint="On or before the buyer delivery date.">
             <TextInput type="date" value={terms.exFactoryDate} onChange={set('exFactoryDate')} />
-          </Field>
-          <Field label="Exchange Rate" hint={isInr ? 'Not needed for an INR order.' : `Rupees per 1 ${order.currency ?? 'unit'}.`}>
-            <TextInput type="number" min="0" step="0.0001" disabled={isInr} value={terms.exchangeRate} onChange={set('exchangeRate')} />
           </Field>
           <Field label="Price Terms">
             <TextInput value={terms.priceTerms} onChange={set('priceTerms')} />

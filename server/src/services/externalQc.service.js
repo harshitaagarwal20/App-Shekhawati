@@ -200,7 +200,7 @@ export async function orderOptions() {
   const [orders, styles] = await Promise.all([
     prisma.buyerOrder.findMany({
       where: { id: { in: [...new Set(flows.map((f) => f.orderId))] }, deletedAt: null },
-      select: { id: true, orderNo: true, buyer: { select: { buyerName: true } } },
+      select: { id: true, orderNo: true, buyer: { select: { buyerName: true, buyerCode: true } } },
     }),
     prisma.style.findMany({ where: { id: { in: [...new Set(flows.map((f) => f.styleId))] } }, select: { id: true, styleNo: true } }),
   ]);
@@ -213,6 +213,7 @@ export async function orderOptions() {
       orderId: f.orderId,
       orderNo: order.get(f.orderId).orderNo,
       buyerName: order.get(f.orderId).buyer?.buyerName ?? null,
+      buyerCode: order.get(f.orderId).buyer?.buyerCode ?? null,
       styleId: f.styleId,
       styleNo: style.get(f.styleId)?.styleNo ?? null,
       pcsIroned: f.flow.ironed.toString(),

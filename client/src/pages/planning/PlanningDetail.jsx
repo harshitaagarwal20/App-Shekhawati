@@ -250,7 +250,7 @@ export default function PlanningDetail() {
           </span>
         </div>
         <div className="card-body">
-          <div className="form-grid">
+          <div className="form-grid detail-grid">
             <Detail label="Plan No" value={plan.planNo} mono />
             <Detail label="Planning Department" value={fmtEnum(plan.planDepartment)} />
             <Detail label="Container No" value={plan.containerNo} />
@@ -536,7 +536,7 @@ function Detail({ label, value, mono, className = '' }) {
   return (
     <div className={`field ${className}`}>
       <label>{label}</label>
-      <div className={mono ? 'mono' : ''} style={{ paddingTop: 2 }}>
+      <div className={`detail-value${mono ? ' mono' : ''}`}>
         {value || <span className="faint">-</span>}
       </div>
     </div>

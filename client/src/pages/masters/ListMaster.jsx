@@ -26,6 +26,7 @@ import {
   SortableTh,
   Spinner,
   TextInput,
+  ClearFilters,
 } from '../../components/ui.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
 
@@ -196,6 +197,7 @@ export default function ListMaster() {
               />
             </Field>
           </div>
+          <ClearFilters list={lists} />
         </div>
 
         <TableWrap>

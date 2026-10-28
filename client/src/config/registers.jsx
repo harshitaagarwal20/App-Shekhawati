@@ -18,6 +18,8 @@
  *   order                          the order picker; loads the order's context
  *   style                          one of the order's styles (Auto)
  *   employee                       the Employee Master
+ *   defects                        lines of a defect type (`listCode`) and
+ *                                  how many pieces had it
  *   preview                        read-only, `compute(form, ctx)`
  *   figures                        the reconciliation counts for the style
  *
@@ -60,6 +62,9 @@ export const FINISHED_CHECKER_DEFECTS = [
 ];
 
 const finishedTotal = (f) => FINISHED_CHECKER_DEFECTS.reduce((s, d) => s + num(f[d.key]), 0);
+
+/** A `defects` field's lines: each one's count, added up. */
+const defectLinesTotal = (lines = []) => lines.reduce((s, l) => s + num(l.qty), 0);
 
 /** The chosen style's entry in the order context, if any. */
 const styleCtx = (form, ctx) => ctx?.styles?.find((s) => s.id === form.styleId) ?? ctx?.styles?.[0] ?? null;
@@ -116,7 +121,7 @@ export const internalQualityCheck = {
     col.empCode('checker'),
     col.num('totalPcsChecked', 'Total Pcs Checked'),
     col.num('totalDefectPcs', 'Total Defect Pcs', { strong: true }),
-    col.text('defectType', 'Defect Type'),
+    col.text('defectSummary', 'Defect Type'),
     col.text('qcStatus', 'Status', { sort: 'qcStatus' }),
     col.text('transferredBackToUnit', 'Transferred Back To Unit', { optional: true }),
     col.text('remarks', 'Remarks', { optional: true }),
@@ -128,8 +133,14 @@ export const internalQualityCheck = {
     { ...UNIT, label: 'Stitching Unit' },
     { name: 'checkerId', label: 'Checker Code', type: 'employee', required: true },
     { name: 'totalPcsChecked', label: 'Total Pcs Checked', type: 'int', required: true },
-    { name: 'totalDefectPcs', label: 'Total Defect Pcs', type: 'int', required: true },
-    { name: 'defectType', label: 'Defect Type', type: 'master', listCode: 'DefectType' },
+    {
+      name: '_totalDefectPcs',
+      label: 'Total Defect Pcs',
+      type: 'preview',
+      compute: (f) => fmtNum(defectLinesTotal(f.defects)),
+      hint: 'Sum of the defects below',
+    },
+    { name: 'defects', label: 'Defect Type', type: 'defects', listCode: 'DefectType', span: 2 },
     { name: 'qcStatus', label: 'Status', type: 'master', listCode: 'StatusQC', required: true },
     {
       name: 'transferredBackToUnit',
@@ -143,41 +154,12 @@ export const internalQualityCheck = {
   ],
 };
 
-export const finalCheckerReport = {
-  key: 'finalChecker',
-  path: 'final-checker-reports',
-  module: 'FINAL_CHECKER_REPORT',
-  title: 'Final Checker Report',
-  singular: 'final checker report',
-  orderOptional: true,
-  columns: [
-    col.date(),
-    col.empCode('checker'),
-    col.emp('checker'),
-    col.style,
-    col.num('totalPcsChecked', 'Total Pcs Checked'),
-    col.num('totalDefect', 'Total Defect', { strong: true }),
-    col.text('defectType', 'Defect Type', { optional: true }),
-    { ...col.order, optional: true },
-  ],
-  fields: [
-    DATE,
-    { name: 'checkerId', label: 'Name', type: 'employee', required: true, hint: 'The checker code fills from the name.' },
-    { ...ORDER, required: false, hint: 'Optional - fills the style.' },
-    { ...STYLE, required: true, hint: 'From the order, or chosen.' },
-    { name: 'totalPcsChecked', label: 'Total Pcs Checked', type: 'int', required: true },
-    { name: 'totalDefect', label: 'Total Defect', type: 'int', required: true },
-    { name: 'defectType', label: 'Defect Type', type: 'master', listCode: 'DefectType' },
-    REMARKS,
-  ],
-};
-
 export const finishedChecker = {
   key: 'finishedChecker',
   path: 'finished-checker-records',
   module: 'FINISHED_CHECKER',
-  title: 'Finished Checker',
-  singular: 'finished checker record',
+  title: 'External Report',
+  singular: 'external report',
   columns: [
     col.order,
     col.empCode('checker'),
@@ -266,6 +248,8 @@ export const reconciliationReport = {
     fig('scrap', 'Scrap Pcs'),
     fig('rejected', 'Rejected Pcs'),
     fig('passedExternalQc', 'Passed External QC'),
+    fig('packed', 'Packed Pcs'),
+    fig('dispatched', 'Dispatched Pcs'),
     fig('variance', 'Variance', { strong: true }),
     col.text('reconStatus', 'Status', { sort: 'reconStatus' }),
     col.text('remarks', 'Remarks', { optional: true }),
@@ -285,7 +269,6 @@ export const reconciliationReport = {
 
 export const REGISTERS = {
   internalQc: internalQualityCheck,
-  finalChecker: finalCheckerReport,
   finishedChecker,
   spotRectification,
   reconciliation: reconciliationReport,

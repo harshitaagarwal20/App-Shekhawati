@@ -24,7 +24,8 @@ import {
 import { CeilingNote, FabricCoverNote, FabricStockPanel, UnitAllocationTable, fmtQty } from './planningShared.jsx';
 import { loadFailed, reportLoadFailure } from '../../services/loadFailures.js';
 import TableWrap from '../../components/TableWrap.jsx';
-import { todayInput } from '../../utils/format.js';
+import { fmtOrderStyle, todayInput } from '../../utils/format.js';
+import { useDraft, useKeepDraft, useRemountKey } from '../../hooks/useDraft.js';
 
 /**
  * What the one allotment column is called, per department.
@@ -46,15 +47,15 @@ const DEPARTMENT_OPTIONS = [
   { value: 'CUTTING', label: 'Cutting' },
   { value: 'STITCHING', label: 'Stitching' },
   { value: 'IRON', label: 'Iron' },
-  /* Called DISPATCH by the office. The stored value stays SHIPPING - it is
-     what every existing plan holds, and renaming stored data to change a word
-     on screen is how one thing ends up with two names. */
-  { value: 'SHIPPING', label: 'Dispatch' },
   /**
    * C14 - a packing PLAN. This system records no packing work and has no table
    * that could; the department names who owns the plan, not who does the job.
    */
   { value: 'PACKING', label: 'Packing' },
+  /* Called DISPATCH by the office. The stored value stays SHIPPING - it is
+     what every existing plan holds, and renaming stored data to change a word
+     on screen is how one thing ends up with two names. */
+  { value: 'SHIPPING', label: 'Dispatch' },
 ];
 
 const LINE_STATUS_OPTIONS = [
@@ -116,11 +117,18 @@ function toPayloadLine(l, planDepartment) {
   };
 }
 
-export default function PlanningForm({ plan, onSaved, onCancel }) {
+/** Remounted blank when its draft is discarded - see useDraft. */
+export default function PlanningForm(props) {
+  const [round, remount] = useRemountKey();
+  return <PlanningFormFields key={round} {...props} onDiscardDraft={remount} />;
+}
+
+function PlanningFormFields({ plan, onSaved, onCancel, onDiscardDraft }) {
   const isNew = !plan;
+  const draft = useDraft('planning', { enabled: isNew, onDiscard: onDiscardDraft });
 
   const [header, setHeader] = useState(() =>
-    isNew
+    draft.initial?.header ?? (isNew
       ? {
           orderId: '',
           // Which style of the order this plan is for. An order carries a line
@@ -138,11 +146,11 @@ export default function PlanningForm({ plan, onSaved, onCancel }) {
           containerNo: plan.containerNo ?? '',
           planDate: asDateInput(plan.planDate),
           remarks: plan.remarks ?? '',
-        },
+        }),
   );
 
   const [lines, setLines] = useState(() =>
-    isNew || !plan.lines?.length
+    draft.initial?.lines ?? (isNew || !plan.lines?.length
       ? [blankLine()]
       : plan.lines.map((l) => ({
           key: l.id,
@@ -158,8 +166,10 @@ export default function PlanningForm({ plan, onSaved, onCancel }) {
           fabricUom: l.fabricUom ?? 'Mtrs',
           status: l.status ?? 'PENDING',
           remark: l.remark ?? '',
-        })),
+        }))),
   );
+
+  useKeepDraft(draft, { header, lines });
 
   const [orderOptions, setOrderOptions] = useState(null);
   const [orderInfo, setOrderInfo] = useState(null);
@@ -401,6 +411,7 @@ export default function PlanningForm({ plan, onSaved, onCancel }) {
     setServerError('');
 
     if (!header.orderId) return setServerError('Pick the order this plan is for.');
+    if (!header.containerNo?.trim()) return setServerError('Enter the Container No.');
     if (!header.orderLineId) return setServerError('Pick which style of the order this plan covers.');
     if (completeLines.length === 0) {
       return setServerError('Add at least one allotment line with a date and a deliverable size.');
@@ -411,7 +422,7 @@ export default function PlanningForm({ plan, onSaved, onCancel }) {
       // to the one style of it the plan was raised for.
       ...(isNew ? { orderId: header.orderId, orderLineId: header.orderLineId } : {}),
       planDepartment: header.planDepartment,
-      containerNo: header.containerNo || null,
+      containerNo: header.containerNo.trim(),
       planDate: header.planDate,
       remarks: header.remarks || null,
       lines: completeLines.map((l) => toPayloadLine(l, header.planDepartment)),
@@ -422,6 +433,7 @@ export default function PlanningForm({ plan, onSaved, onCancel }) {
       const saved = isNew
         ? await planningsApi.create(payload)
         : await planningsApi.update(plan.id, payload);
+      draft.clear();
       onSaved(saved, isNew);
     } catch (err) {
       setServerError(err.message);
@@ -453,7 +465,7 @@ export default function PlanningForm({ plan, onSaved, onCancel }) {
               loading={orderOptions === null}
               disabled={!isNew}
               getValue={(o) => o.id}
-              getLabel={(o) => `${o.orderNo} - ${o.style?.styleNo ?? ''} (${fmtQty(o.orderQty)} pcs)`}
+              getLabel={(o) => `${fmtOrderStyle(o)} (${fmtQty(o.orderQty)} pcs)`}
               placeholder="Select order..."
               value={header.orderId}
               onChange={(e) => {
@@ -523,7 +535,7 @@ export default function PlanningForm({ plan, onSaved, onCancel }) {
             never used again, so the list could only ever grow into a thousand
             dead entries with the one needed today missing from it.
           */}
-          <Field label="Container No" htmlFor="pl-container">
+          <Field label="Container No" required htmlFor="pl-container">
             <TextInput
               id="pl-container"
               value={header.containerNo}
@@ -732,6 +744,11 @@ export default function PlanningForm({ plan, onSaved, onCancel }) {
       </div>
 
       <div className="modal-footer">
+        {draft.restored && (
+          <button type="button" className="btn btn-ghost draft-discard" onClick={draft.discard} disabled={saving}>
+            Discard draft
+          </button>
+        )}
         <button type="button" className="btn" onClick={onCancel} disabled={saving}>
           Cancel
         </button>
@@ -747,7 +764,7 @@ function Detail({ label, value, mono, hint }) {
   return (
     <div className="field">
       <label>{label}</label>
-      <div className={mono ? 'mono' : ''} style={{ paddingTop: 2 }}>
+      <div className={`detail-value${mono ? ' mono' : ''}`}>
         {value || <span className="faint">-</span>}
       </div>
       {hint && <span className="hint">{hint}</span>}

@@ -823,25 +823,6 @@ describe('E2E - cutting challan and fabric issue', () => {
     assert.equal(row.workflowState, 'APPROVED');
   });
 
-  test('C5: a fabric issue with no challan line is refused', { skip: skipIfNoDb() }, async () => {
-    await assert.rejects(
-      fabricIssue.create(
-        {
-          issueNo: 'C2C9-FI-NOCC',
-          issueDate: '2026-08-28',
-          rollId: made.roll,
-          purpose: 'CUTTING',
-          orderId: made.order,
-          styleId: made.style,
-          issuedByName: 'E2E Store',
-          fabricQtyIssued: '40',
-        },
-        maker,
-      ),
-      /must quote the approved cutting challan line/i,
-    );
-  });
-
   /** C5's own worked example: 40 + 30 + 30 fills a line of 100, and a fourth fails. */
   test('C5: partial fulfilment 40 + 30 + 30 completes the line; a fourth issue is refused', { skip: skipIfNoDb() }, async () => {
     const before = await onHand(made.item, 'MAIN STORE');

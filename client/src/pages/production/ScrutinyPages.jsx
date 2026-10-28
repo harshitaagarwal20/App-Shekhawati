@@ -43,6 +43,7 @@ import {
   Spinner,
   TextArea,
   TextInput,
+  ClearFilters,
 } from '../../components/ui.jsx';
 import {
   FieldGroup,
@@ -58,10 +59,11 @@ import {
 import { StateBadge, WorkflowTrail } from '../../components/workflow.jsx';
 import { Detail, DetailGrid, TraceChain } from '../shared/Detail.jsx';
 import { fabricIssues as fiApi, employees as employeesApi } from '../../services/erp.js';
-import { fmtDate, fmtDateTime, fmtEnum, fmtNum, todayInput, fmtOrder } from '../../utils/format.js';
+import { fmtDate, fmtDateTime, fmtEnum, fmtNum, fmtOrder, fmtOrderStyle, todayInput } from '../../utils/format.js';
 import { loadFailed } from '../../services/loadFailures.js';
 import { ExportButton } from '../../components/dataTransfer.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
+import DateRangeFilter from '../../components/DateRangeFilter.jsx';
 
 const DECISIONS = [
   { value: 'ACCEPT', label: 'Accept' },
@@ -92,7 +94,7 @@ export function ScrutinyList() {
   const list = useResourceList((params) => scrutinyApi.list(params), {
     defaultSort: 'scrutinyDate',
     defaultDir: 'desc',
-    initialFilters: { decision: '', orderId: '', defectType: '', isLocked: '' },
+    initialFilters: { decision: '', orderId: '', dateFrom: '', dateTo: '' },
   });
 
   const [orderOptions, setOrderOptions] = useState([]);
@@ -155,15 +157,6 @@ export function ScrutinyList() {
             />
           </Field>
 
-          <Field label="Defect" htmlFor="fs-f-defect">
-            <MasterSelect
-              id="fs-f-defect"
-              listCode="DefectType"
-              placeholder="All"
-              value={list.filters.defectType ?? ''}
-              onChange={(e) => list.setFilter('defectType', e.target.value)}
-            />
-          </Field>
 
           <Field label="Order" htmlFor="fs-f-order">
             <RecordSelect
@@ -176,19 +169,8 @@ export function ScrutinyList() {
             />
           </Field>
 
-          <div className="field">
-            <label htmlFor="fs-f-locked">State</label>
-            <EnumSelect
-              id="fs-f-locked"
-              options={[
-                { value: 'false', label: 'Open — awaiting decision' },
-                { value: 'true', label: 'Finalised' },
-              ]}
-              placeholder="All"
-              value={list.filters.isLocked ?? ''}
-              onChange={(e) => list.setFilter('isLocked', e.target.value)}
-            />
-          </div>
+          <DateRangeFilter filters={list.filters} setFilter={list.setFilter} />
+          <ClearFilters list={list} />
         </div>
 
         <TableWrap>
@@ -417,7 +399,7 @@ function ScrutinyForm({ onSaved, onCancel }) {
             label="Order"
             required
             options={orders}
-            getLabel={(o) => `${o.orderNo} — ${o.style?.styleNo ?? ''}`}
+            getLabel={fmtOrderStyle}
             placeholder="Choose the order..."
           />
           <RHFMasterSelect form={form} name="defectType" label="Defect type" listCode="DefectType" required />

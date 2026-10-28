@@ -68,10 +68,15 @@ export const AUDITED = {
   // Phase 5. Each register is one screen with its rows edited in place, so
   // the trail links to the register rather than to a detail page.
   internal_quality_checks: { label: 'Internal quality check', route: () => '/internal-quality-checks' },
-  final_checker_reports: { label: 'Final checker report', route: () => '/final-checker-reports' },
-  finished_checker_records: { label: 'Finished checker record', route: () => '/finished-checker-records' },
+  internal_quality_defects: { label: 'Internal quality check defect', route: () => '/internal-quality-checks' },
+  finished_checker_records: { label: 'External report', route: () => '/finished-checker-records' },
   spot_rectifications: { label: 'Spot rectification', route: () => '/spot-rectifications' },
   reconciliation_reports: { label: 'Reconciliation report', route: () => '/reconciliation-reports' },
+  // Phase 6.
+  needle_check_cartons: { label: 'Needle checking carton', route: () => '/needle-checking' },
+  packing_entries: { label: 'Packing entry', route: () => '/packing' },
+  dispatches: { label: 'Dispatch', route: (id) => `/dispatches/${id}` },
+  dispatch_lines: { label: 'Dispatch line', route: () => '/dispatches' },
   excess_rules: { label: 'Excess rule', route: () => '/masters/excess-rules' },
   excess_approvals: { label: 'Excess authorisation', route: () => '/approvals' },
   buyers: { label: 'Buyer', route: () => '/masters/buyers' },

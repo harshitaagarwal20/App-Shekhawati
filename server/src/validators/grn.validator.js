@@ -81,7 +81,7 @@ export const createGrnSchema = z.object({
     .optional()
     .refine((date) => !date || new Date(date) <= new Date(), 'GRN date cannot be in the future'),
   /// Excel: "purpose" (Dropdown -> L_GRNPurpose)
-  purpose: grnPurpose,
+  purpose: grnPurpose.optional(),
   /// Excel: "Receiving Qty" (Manual)
   /// Must be > 0, reasonable upper limit
   receivingQty: decimal('Receiving quantity', { min: 0, allowZero: false })
@@ -147,10 +147,6 @@ export const createGrnDocumentSchema = z
     acknowledgeToleranceBreach: z.boolean().optional(),
     headerRemarks: optionalText(2000),
     lines: z.array(grnLine).min(1, 'Add at least one line').max(50),
-  })
-  .refine((d) => d.purpose || d.lines.every((l) => l.purpose), {
-    message: 'Give the purpose on the receipt or on every line',
-    path: ['purpose'],
   });
 
 /**

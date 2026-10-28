@@ -31,6 +31,7 @@ import { fmtDate, fmtDateTime, fmtEnum, fmtMoney, fmtNum } from '../../utils/for
 import {
   cuttingChallans,
   cuttingIssues,
+  dispatches,
   fabricIssues,
   gatePasses,
   grns,
@@ -50,6 +51,9 @@ const FETCHERS = {
   'cutting-issue': (id) => cuttingIssues.print(id),
   'fabric-issue': (id) => fabricIssues.print(id),
   'cutting-challan': (id) => cuttingChallans.print(id),
+  /* Phase 6 - one set per dispatch, both read off it. */
+  'dispatch-note': (id) => dispatches.print(id, 'dispatch-note'),
+  'packing-list': (id) => dispatches.print(id, 'packing-list'),
 };
 
 /** Where "Back" goes. */
@@ -62,6 +66,8 @@ const BACK_TO = {
   'cutting-issue': '/cutting-issues',
   'fabric-issue': '/fabric-issues',
   'cutting-challan': '/cutting-challans',
+  'dispatch-note': '/dispatches',
+  'packing-list': '/dispatches',
 };
 
 /**
@@ -179,6 +185,8 @@ export default function DocumentPrint() {
         {kind === 'cutting-issue' && <CuttingIssueBody doc={doc} />}
         {kind === 'fabric-issue' && <FabricIssueChallanBody doc={doc} />}
         {kind === 'cutting-challan' && <CuttingChallanBody doc={doc} />}
+        {kind === 'dispatch-note' && <DispatchNoteBody doc={doc} />}
+        {kind === 'packing-list' && <PackingListBody doc={doc} />}
 
         <Signatures names={doc.signatures ?? ['Prepared By', 'Checked By', 'Authorised By']} />
 
@@ -194,9 +202,9 @@ export default function DocumentPrint() {
 function Header({ doc }) {
   const company = companyOf(doc);
   const number =
-    doc.invoiceNo ?? doc.poId ?? doc.gatePassNo ?? doc.grnNo ?? doc.jobNo ?? doc.challanNo ?? '';
+    doc.dispatchNo ?? doc.invoiceNo ?? doc.poId ?? doc.gatePassNo ?? doc.grnNo ?? doc.jobNo ?? doc.challanNo ?? '';
   const date =
-    doc.invoiceDate ?? doc.poDate ?? doc.gatePassDate ?? doc.grnDate ?? doc.issueDate ?? doc.printedAt;
+    doc.dispatchDate ?? doc.invoiceDate ?? doc.poDate ?? doc.gatePassDate ?? doc.grnDate ?? doc.issueDate ?? doc.printedAt;
 
   return (
     <div className="print-header">
@@ -866,13 +874,13 @@ function ChallanTerms({ items, remarks }) {
 }
 
 /** What the person taking delivery writes on, before the signature row. */
-function ReceiverAcknowledgement() {
+function ReceiverAcknowledgement({ name }) {
   return (
     <div className="challan-ack">
       <div className="po-terms-title">Receiver&rsquo;s acknowledgement</div>
       <p>Received the goods listed above in good order and condition.</p>
       <div className="challan-ack-fields">
-        <span>Name: ______________________</span>
+        <span>Name: {name ? <strong>{name}</strong> : '______________________'}</span>
         <span>Date: ____________</span>
         <span>Qty received: ____________</span>
       </div>
@@ -1015,6 +1023,7 @@ function FabricIssueChallanBody({ doc }) {
         <PoMeta label="Buyer" value={references.buyerName} />
         <PoMeta label="Style" value={references.styleNo} />
         <PoMeta label="Issued by" value={doc.issuedBy} />
+        <PoMeta label="Issued to" value={doc.issuedTo} />
       </div>
 
       <table className="print-table po-items">
@@ -1104,7 +1113,7 @@ function FabricIssueChallanBody({ doc }) {
         remarks={doc.remarks}
       />
 
-      <ReceiverAcknowledgement />
+      <ReceiverAcknowledgement name={doc.issuedTo} />
     </>
   );
 }
@@ -1143,6 +1152,8 @@ function CuttingIssueBody({ doc }) {
           label="Plan approval"
           value={references.approvalNo ? `${references.approvalNo} (v${references.approvalVersion})` : null}
         />
+        <PoMeta label="Issued by" value={doc.issuedBy} />
+        <PoMeta label="Cutting contractor" value={doc.contractor} />
       </div>
 
       <table className="print-table po-items">
@@ -1326,6 +1337,42 @@ function CuttingChallanBody({ doc }) {
         )}
       </div>
 
+      {/* The rolls behind the Issued column. Fabric goes out roll-wise, so the
+          sheet names every roll against the line it was issued for. */}
+      {lines.some((l) => l.issues?.length) && (
+        <>
+          <div className="po-terms-title">Rolls issued</div>
+          <table className="print-table po-items">
+            <thead>
+              <tr>
+                <th className="po-sr">Line</th>
+                <th>Roll No</th>
+                <th>Issue No</th>
+                <th>Date</th>
+                <th>Issued to</th>
+                <th>UOM</th>
+                <th className="num">Qty</th>
+              </tr>
+            </thead>
+            <tbody>
+              {lines.flatMap((l) =>
+                (l.issues ?? []).map((fi) => (
+                  <tr key={fi.issueNo}>
+                    <td className="po-sr">{l.lineNo}</td>
+                    <td className="code">{fi.rollNo ?? '-'}</td>
+                    <td className="code">{fi.issueNo}</td>
+                    <td>{fmtDate(fi.issueDate)}</td>
+                    <td>{fi.issuedTo ?? '-'}</td>
+                    <td>{fi.uom}</td>
+                    <td className="num">{fmtNum(fi.qty, { decimals: 4 })}</td>
+                  </tr>
+                )),
+              )}
+            </tbody>
+          </table>
+        </>
+      )}
+
       {/* A challan whose balance was written off says so on its face, or the
           store spends a week looking for materials nobody is going to issue. */}
       {doc.closedShort && (
@@ -1346,6 +1393,164 @@ function CuttingChallanBody({ doc }) {
         ]}
         remarks={doc.remarks}
       />
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+//  Phase 6 - the dispatch's prints
+// ---------------------------------------------------------------------------
+
+/** The strip both dispatch prints open with. Read off the dispatch, so they agree. */
+function DispatchMeta({ doc }) {
+  return (
+    <div className="po-meta">
+      <PoMeta label="Dispatch No" value={doc.dispatchNo} />
+      <PoMeta label="Date" value={fmtDate(doc.dispatchDate)} />
+      <PoMeta label="Order No" value={doc.orderNo} />
+      <PoMeta label="Buyer PO" value={doc.buyerPoNo} />
+      <PoMeta label="Container No" value={doc.containerNo} />
+      <PoMeta label="Invoice No" value={doc.invoiceNo} />
+      <PoMeta label="Ship mode" value={doc.shipMode} />
+      <PoMeta label="Carrier / AWB-BL No" value={doc.carrierRef} />
+      <PoMeta label="ETA" value={doc.eta ? fmtDate(doc.eta) : null} />
+    </div>
+  );
+}
+
+/** The buyer's shipment details and address: buyer, ship to, consignee, notify party. */
+function ShipmentParties({ doc }) {
+  return (
+    <div className="po-parties">
+      <PoParty
+        title="Buyer"
+        lines={[
+          { label: 'Buyer', value: doc.buyer, strong: true },
+          { label: 'Address', value: doc.buyerAddress },
+          { label: 'Ship to', value: doc.shipTo },
+        ]}
+      />
+      <PoParty
+        title="Consignee"
+        lines={[
+          { label: 'Consignee', value: doc.consigneeName, strong: true },
+          { label: 'Address', value: doc.consigneeAddress },
+          { label: 'Notify party', value: [doc.notifyPartyName, doc.notifyPartyAddress].filter(Boolean).join(', ') },
+          { label: 'Port of discharge', value: doc.portOfDischarge },
+          { label: 'Final destination', value: doc.finalDestination },
+          { label: 'Price terms', value: doc.priceTerms },
+          { label: 'Freight terms', value: doc.freightTerms },
+        ]}
+      />
+    </div>
+  );
+}
+
+/** The dispatch note: what left, for whom and where to. */
+function DispatchNoteBody({ doc }) {
+  return (
+    <>
+      <div className="po-parties">
+        <PoParty title="From" lines={consignorLines(doc)} />
+      </div>
+      <ShipmentParties doc={doc} />
+      <DispatchMeta doc={doc} />
+      <table className="print-table po-items">
+        <thead>
+          <tr>
+            <th className="po-sr">Sr.</th>
+            <th>Style</th>
+            <th className="num">Boxes</th>
+            <th className="num">Pcs</th>
+          </tr>
+        </thead>
+        <tbody>
+          {doc.lines.map((l, i) => (
+            <tr key={l.styleNo}>
+              <td className="po-sr">{i + 1}</td>
+              <td><strong>{l.styleNo}</strong>{l.styleDescription && <div className="po-item-note">{l.styleDescription}</div>}</td>
+              <td className="num">{fmtNum(l.boxes, { decimals: 0 })}</td>
+              <td className="num">{fmtNum(l.pcs, { decimals: 0 })}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="po-totals">
+        <div className="po-total-line"><span>Total boxes</span><b>{fmtNum(doc.totalBoxes, { decimals: 0 })}</b></div>
+        <div className="po-total-line"><span>Total qty (pcs)</span><b>{fmtNum(doc.totalPcs, { decimals: 0 })}</b></div>
+      </div>
+      <ChallanTerms
+        items={[
+          `Quote Dispatch No ${doc.dispatchNo}${doc.invoiceNo ? ` and invoice ${doc.invoiceNo}` : ''} on every document for this shipment.`,
+          doc.containerNo ? `Container ${doc.containerNo}.` : null,
+        ]}
+        remarks={doc.remarks}
+      />
+      <ReceiverAcknowledgement />
+    </>
+  );
+}
+
+/** The packing details, box by box: the packing lines this dispatch took. */
+function PackingListBody({ doc }) {
+  const kg = (v) => (v == null ? '—' : fmtNum(v, { decimals: 2 }));
+  const cm = (v) => (v == null ? '—' : fmtNum(v, { decimals: 1 }));
+  return (
+    <>
+      <ShipmentParties doc={doc} />
+      <DispatchMeta doc={doc} />
+      <table className="print-table po-items">
+        <thead>
+          <tr>
+            <th>Box No</th>
+            <th>Style No.</th>
+            <th>Name</th>
+            <th>Color</th>
+            <th className="num">Packing</th>
+            <th>Packets × bags</th>
+            <th className="num">Boxes</th>
+            <th className="num">Qty (pcs)</th>
+            <th className="num">N.W / box</th>
+            <th className="num">G.W / box</th>
+            <th className="num">N.W (kg)</th>
+            <th className="num">G.W (kg)</th>
+            <th className="num">L × W × H (cm)</th>
+            <th className="num">CBM</th>
+          </tr>
+        </thead>
+        <tbody>
+          {doc.lines.map((l, i) => (
+            <tr key={`${l.boxNo}-${i}`}>
+              <td className="nowrap"><strong>{l.boxNo}</strong></td>
+              <td>{l.styleNo}</td>
+              <td>{l.name}</td>
+              <td>{l.colorCode}</td>
+              <td className="num">{fmtNum(l.pcsPerBox, { decimals: 0 })}</td>
+              <td className="nowrap">{l.packing ?? '—'}</td>
+              <td className="num">{fmtNum(l.boxes, { decimals: 0 })}</td>
+              <td className="num">{fmtNum(l.qty, { decimals: 0 })}</td>
+              <td className="num">{kg(l.nwPerBoxKg)}</td>
+              <td className="num">{kg(l.gwPerBoxKg)}</td>
+              <td className="num">{kg(l.nwKg)}</td>
+              <td className="num">{kg(l.gwKg)}</td>
+              <td className="num nowrap">{l.lengthCm == null ? '—' : `${cm(l.lengthCm)} × ${cm(l.widthCm)} × ${cm(l.heightCm)}`}</td>
+              <td className="num">{l.cbm == null ? '—' : fmtNum(l.cbm, { decimals: 3 })}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="po-totals">
+        <div className="po-total-line"><span>Total boxes</span><b>{fmtNum(doc.totals.boxes, { decimals: 0 })}</b></div>
+        <div className="po-total-line">
+          <span>Total packets</span>
+          <b>{fmtNum(doc.totals.packets, { decimals: 0 })}{Number(doc.totals.looseBags) ? ` + ${fmtNum(doc.totals.looseBags, { decimals: 0 })} bags` : ''}</b>
+        </div>
+        <div className="po-total-line"><span>Total qty (pcs = bags)</span><b>{fmtNum(doc.totals.qty, { decimals: 0 })}</b></div>
+        <div className="po-total-line"><span>Net weight (kg)</span><b>{fmtNum(doc.totals.nwKg, { decimals: 2 })}</b></div>
+        <div className="po-total-line"><span>Gross weight (kg)</span><b>{fmtNum(doc.totals.gwKg, { decimals: 2 })}</b></div>
+        <div className="po-total-line"><span>CBM</span><b>{fmtNum(doc.totals.cbm, { decimals: 3 })}</b></div>
+      </div>
+      <div className="challan-note">The boxes of order {doc.orderNo} on dispatch {doc.dispatchNo}.</div>
     </>
   );
 }

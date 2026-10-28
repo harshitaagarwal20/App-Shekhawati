@@ -212,16 +212,29 @@ const ROLL_SEARCH = ['rollNo', 'fabricName', 'colorCode', 'content', 'count', 'g
  * NULLs as distinct and would happily create the same item twice.
  */
 export function itemIdentity(source) {
+  const colorCode = source.colorCode ?? '';
   return {
     itemCategory: source.item ?? source.itemCategory ?? '',
     subCategory: source.subCategory ?? '',
     accessoriesItem: source.accessoriesItem ?? '',
     accessoryType: source.accessoryType ?? '',
-    colorCode: source.colorCode ?? '',
+    // This value is also used to resolve stock identity. The dropdown used to
+    // contain both spellings, so receipts created two balances for one shade.
+    // Keep the canonical spelling on the inventory item even when an older
+    // PO still carries the retired spelling.
+    colorCode: canonicalInventoryColor(colorCode),
     gsm: source.gsm ?? '',
     count: source.count ?? '',
     uom: source.uom ?? '',
   };
+}
+
+/** Canonical spelling for known duplicate ColorCode dropdown values. */
+export function canonicalInventoryColor(value) {
+  const color = String(value ?? '').trim();
+  const key = color.toLocaleLowerCase().replace(/\s+/g, ' ');
+  if (key === 'mid night blue') return 'Midnight Blue';
+  return color;
 }
 
 /**
@@ -309,15 +322,32 @@ export async function resolveOrCreateItem(tx, source, actorId) {
   const existing = await tx.inventoryItem.findUnique({
     where: { inventory_item_identity: identity },
   });
-  if (existing) {
-    if (existing.deletedAt) {
+  // Older rows may still contain a retired spelling. Reuse the canonical
+  // item's stock identity instead of creating yet another item for that PO.
+  const legacyColorMatch = existing ?? (identity.itemCategory === 'Fabric'
+    ? (await tx.inventoryItem.findMany({
+        where: {
+          itemCategory: identity.itemCategory,
+          subCategory: identity.subCategory,
+          accessoriesItem: identity.accessoriesItem,
+          accessoryType: identity.accessoryType,
+          gsm: identity.gsm,
+          count: identity.count,
+          uom: identity.uom,
+          deletedAt: null,
+        },
+        orderBy: [{ itemCode: 'asc' }],
+      })).find((item) => canonicalInventoryColor(item.colorCode) === identity.colorCode)
+    : null);
+  if (legacyColorMatch) {
+    if (legacyColorMatch.deletedAt) {
       throw ApiError.conflict(
-        `Inventory item ${existing.itemCode} (${existing.description}) has been deleted. ` +
+        `Inventory item ${legacyColorMatch.itemCode} (${legacyColorMatch.description}) has been deleted. ` +
           'Restore it before receiving stock against it.',
-        { itemCode: existing.itemCode },
+        { itemCode: legacyColorMatch.itemCode },
       );
     }
-    return { item: existing, created: false };
+    return { item: legacyColorMatch, created: false };
   }
 
   const itemCode = await nextNumber('INVENTORY_ITEM', { tx });
@@ -1327,6 +1357,7 @@ export async function listLedger(query) {
       value: D(totals._sum.value ?? 0).toFixed(2),
     },
   };
+
 }
 
 /** Fabric rolls. */
@@ -1454,6 +1485,20 @@ export async function stockSummary({
     },
   };
 
+  // Balance rows are retained after a location is emptied so the ledger and
+  // reconciliation can keep using the same item/location key. They are not
+  // useful stock-summary lines, though: transfers and issues otherwise leave
+  // misleading zero rows behind indefinitely. Low-stock mode uses `where`
+  // directly below so a zero balance can still be reported as below reorder.
+  const stockedWhere = {
+    ...where,
+    OR: [
+      { qty: { gt: 0 } },
+      { inProcessQty: { gt: 0 } },
+      { value: { gt: 0 } },
+    ],
+  };
+
   const ITEM_SELECT = {
     id: true,
     itemCode: true,
@@ -1471,7 +1516,7 @@ export async function stockSummary({
   };
 
   const [aggregate, lowCandidates] = await Promise.all([
-    prisma.stockBalance.aggregate({ where, _count: { _all: true }, _sum: { value: true } }),
+    prisma.stockBalance.aggregate({ where: stockedWhere, _count: { _all: true }, _sum: { value: true } }),
     prisma.stockBalance.findMany({
       where: lowCandidateWhere,
       select: { itemId: true, location: true, qty: true, item: { select: { reorderLevel: true } } },
@@ -1500,7 +1545,7 @@ export async function stockSummary({
           return { itemId, location: loc };
         }),
       }
-    : where;
+    : stockedWhere;
 
   // A filter that matched nothing must return nothing. Without this guard an
   // empty OR is dropped by Prisma and the screen would show the whole store

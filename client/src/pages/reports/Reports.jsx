@@ -46,7 +46,7 @@ import {
   Spinner,
   TextInput,
 } from '../../components/ui.jsx';
-import { fmtDate, fmtDateTime, fmtEnum, toDateInput } from '../../utils/format.js';
+import { fmtBuyer, fmtDate, fmtDateTime, fmtEnum, fmtOrder, fmtVendor, toDateInput } from '../../utils/format.js';
 import { loadFailed } from '../../services/loadFailures.js';
 import ReportTable from '../../components/ReportTable.jsx';
 
@@ -63,8 +63,6 @@ const FILTER_LABEL = {
   purpose: 'Purpose',
   stage: 'Roll stage',
   status: 'Status',
-  approvalStatus: 'Approval',
-  decision: 'Decision',
   inspectionStatus: 'Inspection',
   // The Checker Report: the number marked on the bag.
   checkerCode: 'Checker code',
@@ -82,8 +80,6 @@ const ENUM_OPTIONS = {
     'SCRUTINY_HOLD', 'ISSUED_TO_CUTTING', 'CONSUMED', 'REJECTED',
   ],
   status: ['PENDING', 'IN_PROGRESS', 'COMPLETED', 'ON_HOLD', 'CANCELLED'],
-  approvalStatus: ['PENDING', 'APPROVED', 'REJECTED'],
-  decision: ['ACCEPT', 'REJECT', 'REWORK'],
   inspectionStatus: ['PENDING', 'PASSED', 'FAILED'],
   process: ['DYEING', 'PRINTING', 'WASHING', 'FINISHING'],
   qcStage: ['FABRIC_SCRUTINY', 'CUT_PIECES', 'INLINE_QC', 'EXTERNAL_QC', 'REJECTED'],
@@ -660,10 +656,10 @@ export function ReportFilter({
       name === 'buyerId' ? buyerOptions : name === 'vendorId' ? vendorOptions : orderOptions;
     const getLabel =
       name === 'buyerId'
-        ? (o) => o.buyerName
+        ? fmtBuyer
         : name === 'vendorId'
-          ? (o) => o.vendorName
-          : (o) => o.orderNo;
+          ? fmtVendor
+          : fmtOrder;
     return (
       <Field label={label} htmlFor={id}>
         <RecordSelect

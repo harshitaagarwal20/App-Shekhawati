@@ -69,8 +69,6 @@ const CuttingIssueList = lazy(() => import('../pages/cutting/CuttingIssuePages.j
 const CuttingIssueForm = lazy(() => import('../pages/cutting/CuttingIssueForm.jsx'));
 // C8 - how long documents sit at each step.
 // C5 - the requirement the cutting floor raises before any fabric is issued.
-const CuttingChallanList = lazy(() => import('../pages/cutting/CuttingChallanPages.jsx').then((m) => ({ default: m.CuttingChallanList })));
-const CuttingChallanDetail = lazy(() => import('../pages/cutting/CuttingChallanPages.jsx').then((m) => ({ default: m.CuttingChallanDetail })));
 // Cut pieces counted in from the cutting department, before issue to stitching.
 const CutPiecesReceiptList = lazy(() => import('../pages/cutting/CutPiecesReceiptPages.jsx').then((m) => ({ default: m.CutPiecesReceiptList })));
 const CutPiecesReceiptDetail = lazy(() => import('../pages/cutting/CutPiecesReceiptPages.jsx').then((m) => ({ default: m.CutPiecesReceiptDetail })));
@@ -102,6 +100,12 @@ const RejectedRegister = lazy(() => import('../pages/finishing/RejectedRegister.
 const RegisterPage = lazy(() => import('../pages/quality/RegisterPage.jsx'));
 
 const DocumentPrint = lazy(() => import('../pages/print/DocumentPrint.jsx'));
+// Phase 6 - needle checking, packing, dispatch.
+const NeedleList = lazy(() => import('../pages/shipping/NeedlePages.jsx').then((m) => ({ default: m.NeedleList })));
+const PackingList = lazy(() => import('../pages/shipping/PackingPages.jsx').then((m) => ({ default: m.PackingList })));
+const DispatchList = lazy(() => import('../pages/shipping/DispatchPages.jsx').then((m) => ({ default: m.DispatchList })));
+const DispatchForm = lazy(() => import('../pages/shipping/DispatchPages.jsx').then((m) => ({ default: m.DispatchForm })));
+const DispatchDetail = lazy(() => import('../pages/shipping/DispatchPages.jsx').then((m) => ({ default: m.DispatchDetail })));
 
 const ListMaster = lazy(() => import('../pages/masters/ListMaster.jsx'));
 const Buyers = lazy(() => import('../pages/masters/Buyers.jsx'));
@@ -200,6 +204,10 @@ export default function AppRoutes() {
           {/* Fourteen reports, one generic screen. Each report's own permission
               is checked by the API on every run. */}
           <Route path="/reports" element={guarded('REPORT.VIEW', <Reports />)} />
+          {/* Ask (the assistant) is switched off in the client for now. To bring
+              it back, restore the AssistantPage import above and:
+              <Route path="/assistant" element={guarded('ASSISTANT.VIEW', <AssistantPage />)} />
+              - and the sidebar entry described in config/navigation.js. */}
           {/* Guarded on any one of its reports' permissions; the screen then
               offers only the reports the catalogue says this role may run. */}
           <Route
@@ -345,17 +353,6 @@ export default function AppRoutes() {
 
           {/* --- Cutting: the last module ------------------------------------ */}
 
-          {/* C5. The challan comes BEFORE the issue, both in the process and
-              here: fabric may only be issued against an approved one. */}
-          <Route
-            path="/cutting-challans"
-            element={guarded('CUTTING_CHALLAN.VIEW', <CuttingChallanList />)}
-          />
-          <Route
-            path="/cutting-challans/:id"
-            element={guarded('CUTTING_CHALLAN.VIEW', <CuttingChallanDetail />)}
-          />
-
           <Route
             path="/cut-pieces-receipts"
             element={guarded('CUT_PIECES_RECEIPT.VIEW', <CutPiecesReceiptList />)}
@@ -394,9 +391,15 @@ export default function AppRoutes() {
           <Route path="/alteration/entries/:id" element={guarded('ALTERATION.VIEW', <AlterationEntryDetail />)} />
           <Route path="/rejected-register" element={guarded('REJECTED_REGISTER.VIEW', <RejectedRegister />)} />
           <Route path="/internal-quality-checks" element={guarded('INTERNAL_QUALITY_CHECK.VIEW', <RegisterPage key="internalQc" descriptor={REGISTERS.internalQc} />)} />
-          <Route path="/final-checker-reports" element={guarded('FINAL_CHECKER_REPORT.VIEW', <RegisterPage key="finalChecker" descriptor={REGISTERS.finalChecker} />)} />
           <Route path="/finished-checker-records" element={guarded('FINISHED_CHECKER.VIEW', <RegisterPage key="finishedChecker" descriptor={REGISTERS.finishedChecker} />)} />
           <Route path="/spot-rectifications" element={guarded('SPOT_RECTIFICATION.VIEW', <RegisterPage key="spotRectification" descriptor={REGISTERS.spotRectification} />)} />
+          {/* --- Phase 6: needle checking, packing, dispatch --- */}
+          <Route path="/needle-checking" element={guarded('NEEDLE_DETECTION.VIEW', <NeedleList />)} />
+          <Route path="/packing" element={guarded('PACKING.VIEW', <PackingList />)} />
+          <Route path="/dispatches" element={guarded('DISPATCH.VIEW', <DispatchList />)} />
+          <Route path="/dispatches/new" element={guarded('DISPATCH.CREATE', <DispatchForm />)} />
+          <Route path="/dispatches/:id" element={guarded('DISPATCH.VIEW', <DispatchDetail />)} />
+          <Route path="/dispatches/:id/edit" element={guarded('DISPATCH.EDIT', <DispatchForm />)} />
           <Route path="/reconciliation-reports" element={guarded('RECONCILIATION_REPORT.VIEW', <RegisterPage key="reconciliation" descriptor={REGISTERS.reconciliation} />)} />
 
           <Route

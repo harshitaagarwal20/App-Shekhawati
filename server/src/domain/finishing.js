@@ -12,7 +12,7 @@
  *
  *  Where each piece goes next:
  *
- *      approved                  -> Humidity Checking (Phase 5)
+ *      approved                  -> Needle Checking (Phase 6)
  *      Iron, in either box       -> back to Ironing, source Re-iron
  *      anything else in a box    -> the Alteration Unit, one bag per box+reason
  *
@@ -27,7 +27,7 @@
  *      at ironing, waiting         received (all sources) - ironed - damaged + re-ironed
  *      at ironing, damage undecided  damaged - re-ironed - rejected at ironing
  *      ironed, waiting for QC      ironed - offered
- *      approved                    (waiting for Humidity Checking)
+ *      approved                    (waiting for Needle Checking)
  *      sent back to re-iron        QC "Iron" - received at ironing as Re-iron
  *      at the Alteration Unit      bags - altered - not repairable
  *      altered, waiting to iron    altered - received at ironing from Alteration

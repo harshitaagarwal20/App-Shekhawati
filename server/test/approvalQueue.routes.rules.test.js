@@ -34,7 +34,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-import { REGISTRY } from '../src/services/approvalEngine.js';
+import { QUEUED_TYPES, REGISTRY } from '../src/services/approvalEngine.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..', '..');
@@ -62,7 +62,7 @@ const declaredRoutes = new Set(
 describe('the approval queue can open everything it lists', () => {
   test('ROUTE_FOR covers every document type in the approval engine registry', () => {
     const mapped = Object.keys(routeMap());
-    const missing = Object.keys(REGISTRY).filter((type) => !mapped.includes(type));
+    const missing = QUEUED_TYPES.filter((type) => !mapped.includes(type));
     assert.deepEqual(
       missing,
       [],
@@ -88,7 +88,8 @@ describe('the approval queue can open everything it lists', () => {
 
   test('the two documents this guard was written for are openable', () => {
     const map = routeMap();
-    assert.equal(map.CUTTING_CHALLAN, '/cutting-challans/${id}');
+    // Retired: no screen, and not listed as waiting.
+    assert.equal(map.CUTTING_CHALLAN, undefined);
     assert.equal(map.DYE_ISSUE, '/job-works/${id}');
   });
 });

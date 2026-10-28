@@ -26,12 +26,14 @@ import {
   Spinner,
   StatusBadge,
   TextInput,
+  ClearFilters,
 } from '../../components/ui.jsx';
-import { fmtDate, fmtEnum, fmtNum } from '../../utils/format.js';
+import { fmtDate, fmtEnum, fmtNum, fmtVendor } from '../../utils/format.js';
 import GatePassForm from './GatePassForm.jsx';
 import { loadFailed } from '../../services/loadFailures.js';
 import { ExportButton } from '../../components/dataTransfer.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
+import DateRangeFilter from '../../components/DateRangeFilter.jsx';
 
 const TYPE_OPTIONS = [
   { value: 'INWARD', label: 'Inward' },
@@ -91,9 +93,9 @@ export default function GatePassList() {
     initialFilters: {
       type: '',
       status: '',
-      purpose: '',
       vendorId: '',
-      withVariation: '',
+      dateFrom: '',
+      dateTo: '',
     },
   });
 
@@ -168,37 +170,20 @@ export default function GatePassList() {
             />
           </Field>
 
-          <Field label="Purpose" htmlFor="gp-f-purpose">
-            <EnumSelect
-              id="gp-f-purpose"
-              options={PURPOSE_OPTIONS}
-              placeholder="All"
-              value={list.filters.purpose ?? ''}
-              onChange={(e) => list.setFilter('purpose', e.target.value)}
-            />
-          </Field>
 
           <Field label="Vendor" htmlFor="gp-f-vendor">
             <RecordSelect
               id="gp-f-vendor"
               options={vendorOptions}
-              getLabel={(v) => v.vendorName}
+              getLabel={fmtVendor}
               placeholder="All vendors"
               value={list.filters.vendorId ?? ''}
               onChange={(e) => list.setFilter('vendorId', e.target.value)}
             />
           </Field>
 
-          <div className="field">
-            <label htmlFor="gp-f-var">Deliveries</label>
-            <EnumSelect
-              id="gp-f-var"
-              options={[{ value: 'true', label: 'That did not match' }]}
-              placeholder="All"
-              value={list.filters.withVariation ?? ''}
-              onChange={(e) => list.setFilter('withVariation', e.target.value)}
-            />
-          </div>
+          <DateRangeFilter filters={list.filters} setFilter={list.setFilter} />
+          <ClearFilters list={list} />
         </div>
 
         <TableWrap>

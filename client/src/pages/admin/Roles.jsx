@@ -55,6 +55,7 @@ import {
   SortableTh,
   Spinner,
   TextInput,
+  ClearFilters,
 } from '../../components/ui.jsx';
 import TableWrap from '../../components/TableWrap.jsx';
 
@@ -286,6 +287,7 @@ export default function Roles() {
               />
             </Field>
           </div>
+          <ClearFilters list={list} />
         </div>
 
         <TableWrap>

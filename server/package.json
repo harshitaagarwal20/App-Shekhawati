@@ -16,7 +16,7 @@
     "db:format": "prisma format",
     "lint": "eslint src",
     "test": "node --test --test-concurrency=1 \"test/*.test.js\"",
-    "test:rules": "node --test test/rules.test.js test/phase6-18.rules.test.js test/reports.rules.test.js test/phase38-40.rules.test.js test/tax.rules.test.js test/rbac.rules.test.js test/dashboard.rules.test.js test/pagination.rules.test.js test/urlParams.rules.test.js test/c1.poMode.rules.test.js test/upload.rules.test.js test/improvements.rules.test.js test/costing-and-cutting.rules.test.js test/accessoryVariety.rules.test.js test/planning.fabricStock.rules.test.js test/excessRules.rules.test.js test/stitching.rules.test.js test/ironing.rules.test.js test/finishing.rules.test.js test/inlineQc.rules.test.js test/dailySummary.rules.test.js test/screensByRole.rules.test.js test/finalQc.rules.test.js",
+    "test:rules": "node --test test/rules.test.js test/phase6-18.rules.test.js test/reports.rules.test.js test/phase38-40.rules.test.js test/tax.rules.test.js test/rbac.rules.test.js test/dashboard.rules.test.js test/pagination.rules.test.js test/urlParams.rules.test.js test/c1.poMode.rules.test.js test/upload.rules.test.js test/improvements.rules.test.js test/costing-and-cutting.rules.test.js test/accessoryVariety.rules.test.js test/planning.fabricStock.rules.test.js test/excessRules.rules.test.js test/stitching.rules.test.js test/ironing.rules.test.js test/finishing.rules.test.js test/inlineQc.rules.test.js test/dailySummary.rules.test.js test/screensByRole.rules.test.js test/finalQc.rules.test.js test/shipping.rules.test.js test/assistant.rules.test.js",
     "seed:e2e": "node scripts/seed-e2e.js",
     "db:setup": "prisma migrate deploy && node prisma/seed/index.js",
     "verify:seed": "node prisma/seed/verify.js",
@@ -29,6 +29,8 @@
     "seed": "node prisma/seed/index.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.3.0",
+    "@huggingface/transformers": "^4.3.1",
     "@prisma/client": "^6.3.0",
     "bcryptjs": "^2.4.3",
     "compression": "^1.8.1",
@@ -37,6 +39,7 @@
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.3.0",
+    "unpdf": "^1.9.1",
     "zod": "^3.24.1"
   },
   "devDependencies": {

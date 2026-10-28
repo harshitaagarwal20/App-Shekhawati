@@ -341,7 +341,7 @@ function explode(style, orderLine) {
 export async function list(query) {
   const {
     page, pageSize, skip, take, orderBy, search, includeDeleted,
-    approvalStatus, workflowState, orderId, styleId, containerNo,
+    approvalStatus, workflowState, orderId, styleId, containerNo, dateFrom, dateTo,
   } = query;
 
   const where = {
@@ -351,6 +351,9 @@ export async function list(query) {
     ...(orderId ? { orderId } : {}),
     ...(styleId ? { styleId } : {}),
     ...(containerNo ? { containerNo } : {}),
+    ...(dateFrom || dateTo
+      ? { planDate: { ...(dateFrom ? { gte: new Date(dateFrom) } : {}), ...(dateTo ? { lte: new Date(dateTo) } : {}) } }
+      : {}),
     ...searchFilter(search, SEARCH),
   };
 

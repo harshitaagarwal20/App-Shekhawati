@@ -52,9 +52,26 @@ export function checkDefectsWithinChecked(checked, defects, defectField) {
 /** The QC status after which the work goes back to a unit. */
 export const QC_STATUS_REJECTED = 'Rejected';
 
-export function checkInternalQualityCheck({ totalPcsChecked, totalDefectPcs, qcStatus, transferredBackToUnit }) {
-  const over = checkDefectsWithinChecked(totalPcsChecked, totalDefectPcs, 'totalDefectPcs');
-  if (over) return over;
+/** "Total Defect Pcs" = SUM(the count on each defect line). */
+export function internalQcDefectTotal(defects = []) {
+  return defects.reduce((sum, d) => sum + n(d.qty), 0);
+}
+
+export function checkInternalQualityCheck({ totalPcsChecked, defects = [], qcStatus, transferredBackToUnit }) {
+  const seen = new Set();
+  for (const d of defects) {
+    if (seen.has(d.defectType)) {
+      return { field: 'defects', message: `"${d.defectType}" is on the check twice - put its whole count on one line` };
+    }
+    seen.add(d.defectType);
+  }
+  const total = internalQcDefectTotal(defects);
+  if (total > n(totalPcsChecked)) {
+    return {
+      field: 'defects',
+      message: `The defects add up to ${total}, more than the ${n(totalPcsChecked)} pieces checked`,
+    };
+  }
   // The sheet: "Transferred Back To Unit - if Rejected".
   if (qcStatus === QC_STATUS_REJECTED && !transferredBackToUnit) {
     return {

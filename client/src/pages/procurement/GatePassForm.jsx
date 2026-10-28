@@ -40,7 +40,7 @@ import {
   ScanBox,
 } from '../../components/mobile.jsx';
 import { CollapsibleField, Field, RecordSelect, Spinner, TextArea, TextInput } from '../../components/ui.jsx';
-import { fmtDateTime, fmtNum, nowLocalInput, todayInput } from '../../utils/format.js';
+import { fmtDateTime, fmtNum, fmtVendor, nowLocalInput, todayInput } from '../../utils/format.js';
 import { loadFailed } from '../../services/loadFailures.js';
 
 const TYPES = [
@@ -251,7 +251,7 @@ export default function GatePassForm({ onSaved, onCancel }) {
             options={vendorOptions ?? []}
             loading={vendorOptions === null}
             getValue={(v) => v.id}
-            getLabel={(v) => `${v.vendorName} (${v.vendorCode})`}
+            getLabel={fmtVendor}
             placeholder="Select vendor..."
             value={vendorId}
             onChange={(e) => setVendorId(e.target.value)}

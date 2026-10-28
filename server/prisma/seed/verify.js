@@ -41,6 +41,23 @@ const listValues = (code) => {
   return l ? new Set(l.values) : null;
 };
 
+// A dropdown must not offer two labels that differ only by case or stray
+// whitespace. ColorCode also has one known semantic alias retired in the
+// migration below; keep seed data from bringing it back.
+for (const list of masterLists) {
+  const seen = new Map();
+  for (const entry of list.values) {
+    const value = typeof entry === 'string' ? entry : entry.value;
+    let key = String(value).normalize('NFKC').trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+    if (list.code === 'ColorCode' && key === 'mid night blue') key = 'midnight blue';
+    if (seen.has(key)) {
+      fail(`master list ${list.code}: values "${seen.get(key)}" and "${value}" are duplicates after normalizing case/spacing`);
+    } else {
+      seen.set(key, value);
+    }
+  }
+}
+
 const buyerNames = set(buyers, 'buyerName');
 const vendorNames = set(vendors, 'vendorName');
 const employeeNames = set(employees, 'empName');

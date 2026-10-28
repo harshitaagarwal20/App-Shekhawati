@@ -34,7 +34,7 @@
 import test, { describe } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { listUrlParams } from '../../client/src/hooks/useResourceList.js';
+import { listUrlParams, withToday } from '../../client/src/hooks/useResourceList.js';
 
 /** The shape every list passes: paging, sorting, search, then its filters. */
 const DEFAULTS = { search: '', page: 1, pageSize: 25, sortBy: 'name', sortDir: 'asc', status: '' };
@@ -171,5 +171,32 @@ describe('List URLs - values that need escaping', () => {
     const q = new URLSearchParams(build({ search: 'page=9&status=X' }));
     assert.equal(q.get('search'), 'page=9&status=X');
     assert.equal(q.get('status'), null, 'the search value leaked into a real parameter');
+  });
+});
+
+describe('List URLs - date ranges open on today', () => {
+  const TODAY = '2026-10-27';
+  const dated = { dateFrom: TODAY, dateTo: TODAY };
+  const buildDated = (values) =>
+    listUrlParams(new URLSearchParams(''), {
+      values: { ...DEFAULTS, ...dated, ...values },
+      defaults: { ...DEFAULTS, ...dated },
+    }).toString();
+
+  test('a blank date range is given today, other filters are left alone', () => {
+    assert.deepEqual(withToday({ status: '', dateFrom: '', dateTo: '' }, TODAY), { status: '', ...dated });
+    assert.deepEqual(withToday({ orderFrom: '', orderTo: '' }, TODAY), { orderFrom: TODAY, orderTo: TODAY });
+  });
+
+  test('a range already chosen is not overwritten', () => {
+    assert.deepEqual(withToday({ dateFrom: '2026-10-01', dateTo: '' }, TODAY), { dateFrom: '2026-10-01', dateTo: '' });
+  });
+
+  test('today, being the default, is not written', () => {
+    assert.equal(buildDated({}), '');
+  });
+
+  test('"All dates" is written as an explicit blank, so a refresh keeps it', () => {
+    assert.equal(buildDated({ dateFrom: '', dateTo: '' }), 'dateFrom=&dateTo=');
   });
 });

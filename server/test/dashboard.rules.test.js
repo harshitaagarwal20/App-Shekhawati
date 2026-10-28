@@ -33,7 +33,7 @@ import {
   STAGES,
   sectionsFor,
 } from '../src/services/dashboard.service.js';
-import { REGISTRY } from '../src/services/approvalEngine.js';
+import { QUEUED_TYPES, REGISTRY } from '../src/services/approvalEngine.js';
 import { buildPermissions } from '../prisma/seed/data/rbac.js';
 
 /** A `has()` backed by an explicit set, the way a real role holds permissions. */
@@ -159,7 +159,7 @@ describe('Dashboard - a user is shown only what they hold', () => {
     assert.equal(s.attention.length, ATTENTION_PROBES.length);
     assert.equal(s.pipeline.length, STAGES.length);
     assert.equal(s.masters.length, MASTER_COUNTS.length);
-    assert.equal(s.approvals.length, Object.keys(REGISTRY).length);
+    assert.equal(s.approvals.length, QUEUED_TYPES.length);
     assert.equal(s.stock, true);
     assert.equal(s.activity, true);
   });
@@ -288,7 +288,7 @@ const declaredRoutes = new Set(
 describe('Dashboard - every approval bar is clickable', () => {
   test('QUEUE_ROUTE names every document type in the approval engine registry', () => {
     const mapped = queueRouteMap();
-    const missing = Object.keys(REGISTRY).filter((type) => !(type in mapped));
+    const missing = QUEUED_TYPES.filter((type) => !(type in mapped));
     assert.deepEqual(
       missing,
       [],
@@ -312,7 +312,8 @@ describe('Dashboard - every approval bar is clickable', () => {
     const map = queueRouteMap();
     assert.equal(map.MATERIAL_PLAN, '/material-plans');
     assert.equal(map.DYE_ISSUE, '/job-works');
-    assert.equal(map.CUTTING_CHALLAN, '/cutting-challans');
+    // Retired: no screen, and not listed as waiting.
+    assert.equal(map.CUTTING_CHALLAN, undefined);
     // F-04 has no list screen at all, so the approval queue is its only stage.
     assert.equal(map.GRN_REVERSAL, null);
   });

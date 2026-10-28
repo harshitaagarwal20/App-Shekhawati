@@ -174,7 +174,6 @@ export const masterLists = [
       'Olive',
       'Royal Blue',
       'Red',
-      'Mid Night Blue',
       'Sky Gray',
       'Dark Green',
       'Sand Gbeige',
